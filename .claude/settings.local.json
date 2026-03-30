@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@14 julie-shop --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm)",
+      "Bash(cp julie-shop/.gitignore .gitignore)",
+      "Bash(cp julie-shop/package.json .)",
+      "Bash(cp julie-shop/package-lock.json .)",
+      "Bash(cp julie-shop/tsconfig.json .)",
+      "Bash(cp julie-shop/next.config.mjs .)",
+      "Bash(rm -rf julie-shop)",
+      "Bash(mkdir -p supabase/migrations)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn-ui@latest init -y)",
+      "Bash(npx shadcn@latest init -y)",
+      "Bash(npx shadcn@latest add button input label dialog select tabs toast dropdown-menu badge card separator sheet --yes)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout 15 npx next dev --port 3000)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
