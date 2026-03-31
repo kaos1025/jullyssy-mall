@@ -6,7 +6,7 @@ const PHOTO_REVIEW_POINT = 500
 const TEXT_REVIEW_POINT = 100
 
 export const POST = async (request: Request) => {
-  const supabase = createClient()
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const {
@@ -67,6 +67,14 @@ export const POST = async (request: Request) => {
 
   if (error || !review) {
     return NextResponse.json({ error: "리뷰 작성 실패" }, { status: 500 })
+  }
+
+  // 주문상품 리뷰 완료 표시
+  if (orderItemId) {
+    await admin
+      .from("order_items")
+      .update({ is_reviewed: true })
+      .eq("id", orderItemId)
   }
 
   // 이미지 업로드 (최대 3장)

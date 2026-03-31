@@ -17,7 +17,7 @@ interface ProductsPageProps {
 }
 
 const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
-  const supabase = createClient()
+  const supabase = await createClient()
   const page = Number(searchParams.page) || 1
   const pageSize = 20
   const offset = (page - 1) * pageSize
@@ -100,6 +100,7 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
                 key={product.id}
                 id={product.id}
                 name={product.name}
+                slug={product.slug}
                 price={product.price}
                 sale_price={product.sale_price}
                 thumbnail={

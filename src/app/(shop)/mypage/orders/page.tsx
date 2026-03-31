@@ -32,7 +32,7 @@ const statusVariant = (status: string) => {
 }
 
 const OrdersPage = async ({ searchParams }: OrdersPageProps) => {
-  const supabase = createClient()
+  const supabase = await createClient()
   const page = Number(searchParams.page) || 1
   const pageSize = 10
   const offset = (page - 1) * pageSize

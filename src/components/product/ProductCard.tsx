@@ -9,6 +9,7 @@ interface ProductCardProps {
   sale_price: number | null
   thumbnail: string | null
   review_count?: number
+  slug?: string | null
 }
 
 const ProductCard = ({
@@ -18,6 +19,7 @@ const ProductCard = ({
   sale_price,
   thumbnail,
   review_count = 0,
+  slug,
 }: ProductCardProps) => {
   const discountRate = sale_price
     ? Math.round(((price - sale_price) / price) * 100)
@@ -25,7 +27,7 @@ const ProductCard = ({
   const displayPrice = sale_price ?? price
 
   return (
-    <Link href={`/products/${id}`} className="group block">
+    <Link href={`/products/${slug || id}`} className="group block">
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
         {thumbnail ? (
           <Image

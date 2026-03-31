@@ -84,6 +84,7 @@ export interface Product {
   id: string
   category_id: string | null
   name: string
+  slug: string | null
   description: string | null
   price: number
   sale_price: number | null
@@ -152,6 +153,7 @@ export interface OrderItem {
   size: string
   price: number
   quantity: number
+  is_reviewed: boolean
   created_at: string
 }
 

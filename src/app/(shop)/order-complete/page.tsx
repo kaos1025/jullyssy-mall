@@ -12,7 +12,7 @@ interface OrderCompletePageProps {
 const OrderCompletePage = async ({ searchParams }: OrderCompletePageProps) => {
   if (!searchParams.order_id) redirect("/")
 
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: order } = await supabase
     .from("orders")
     .select("*")

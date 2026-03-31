@@ -8,7 +8,7 @@ export const POST = async (
   _request: Request,
   { params }: { params: { id: string } }
 ) => {
-  const supabase = createClient()
+  const supabase = await createClient()
   const admin = createAdminClient()
 
   const {

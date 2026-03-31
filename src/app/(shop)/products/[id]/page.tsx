@@ -16,11 +16,11 @@ interface ProductDetailPageProps {
 export const generateMetadata = async ({
   params,
 }: ProductDetailPageProps): Promise<Metadata> => {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: product } = await supabase
     .from("products")
     .select("name, description")
-    .eq("id", params.id)
+    .or(`slug.eq.${params.id},id.eq.${params.id}`)
     .single()
 
   if (!product) return { title: "상품을 찾을 수 없습니다" }
@@ -32,7 +32,7 @@ export const generateMetadata = async ({
 }
 
 const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // 상품 + 이미지 + 옵션 조회
   const { data: product } = await supabase
@@ -45,7 +45,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       product_options(*)
     `
     )
-    .eq("id", params.id)
+    .or(`slug.eq.${params.id},id.eq.${params.id}`)
     .eq("status", "ACTIVE")
     .single()
 
@@ -61,7 +61,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       user:profiles(name, height, weight)
     `
     )
-    .eq("product_id", params.id)
+    .eq("product_id", product.id)
     .order("created_at", { ascending: false })
 
   const typedReviews = (reviews || []) as unknown as ReviewWithImages[]

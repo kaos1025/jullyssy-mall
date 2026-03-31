@@ -45,6 +45,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
 
   const [form, setForm] = useState({
     name: product?.name || "",
+    slug: product?.slug || "",
     category_id: product?.category_id || "",
     price: product?.price || 0,
     sale_price: product?.sale_price || 0,
@@ -129,6 +130,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
           .from("products")
           .update({
             name: form.name,
+            slug: form.slug || null,
             category_id: form.category_id || null,
             price: form.price,
             sale_price: form.sale_price || null,
@@ -144,6 +146,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
           .from("products")
           .insert({
             name: form.name,
+            slug: form.slug || null,
             category_id: form.category_id || null,
             price: form.price,
             sale_price: form.sale_price || null,
@@ -226,6 +229,19 @@ const ProductForm = ({ product }: ProductFormProps) => {
             value={form.name}
             onChange={(e) => updateForm("name", e.target.value)}
             required
+          />
+        </div>
+        <div>
+          <Label>URL 슬러그 (선택)</Label>
+          <Input
+            value={form.slug}
+            onChange={(e) =>
+              updateForm(
+                "slug",
+                e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+              )
+            }
+            placeholder="예: black-knit-top"
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
