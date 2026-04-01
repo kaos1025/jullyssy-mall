@@ -1,37 +1,20 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { notFound } from "next/navigation"
+import { createAdminClient } from "@/lib/supabase/admin"
 import ProductForm from "../ProductForm"
 
-const EditProductPage = () => {
-  const params = useParams()
-  const [product, setProduct] = useState<unknown>(null)
-  const [loading, setLoading] = useState(true)
+interface EditProductPageProps {
+  params: { id: string }
+}
 
-  useEffect(() => {
-    const fetchProduct = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("products")
-        .select("*, product_options(*), product_images(*)")
-        .eq("id", params.id)
-        .single()
+const EditProductPage = async ({ params }: EditProductPageProps) => {
+  const admin = createAdminClient()
+  const { data: product } = await admin
+    .from("products")
+    .select("*, product_options(*), product_images(*)")
+    .eq("id", params.id)
+    .single()
 
-      if (data) setProduct(data)
-      setLoading(false)
-    }
-    fetchProduct()
-  }, [params.id])
-
-  if (loading) {
-    return <div className="text-center py-20 text-muted-foreground">로딩 중...</div>
-  }
-
-  if (!product) {
-    return <div className="text-center py-20 text-muted-foreground">상품을 찾을 수 없습니다.</div>
-  }
+  if (!product) notFound()
 
   return (
     <div className="space-y-6">

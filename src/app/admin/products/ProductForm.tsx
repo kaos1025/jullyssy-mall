@@ -119,100 +119,36 @@ const ProductForm = ({ product }: ProductFormProps) => {
     }
 
     setLoading(true)
-    const supabase = createClient()
 
     try {
-      // 1. 상품 저장
-      let productId = product?.id
+      const formData = new FormData()
+      formData.append("product", JSON.stringify(form))
+      formData.append("options", JSON.stringify(options))
+      formData.append(
+        "existing_image_ids",
+        JSON.stringify(existingImages.map((img) => img.id))
+      )
+      imageFiles.forEach((file) => formData.append("images", file))
 
-      if (isEdit && productId) {
-        await supabase
-          .from("products")
-          .update({
-            name: form.name,
-            slug: form.slug || null,
-            category_id: form.category_id || null,
-            price: form.price,
-            sale_price: form.sale_price || null,
-            description: form.description || null,
-            material: form.material || null,
-            care_info: form.care_info || null,
-            origin: form.origin || null,
-            status: form.status,
-          })
-          .eq("id", productId)
-      } else {
-        const { data, error } = await supabase
-          .from("products")
-          .insert({
-            name: form.name,
-            slug: form.slug || null,
-            category_id: form.category_id || null,
-            price: form.price,
-            sale_price: form.sale_price || null,
-            description: form.description || null,
-            material: form.material || null,
-            care_info: form.care_info || null,
-            origin: form.origin || null,
-            status: form.status,
-          })
-          .select()
-          .single()
+      const url = isEdit
+        ? `/api/admin/products/${product!.id}`
+        : "/api/admin/products"
+      const method = isEdit ? "PUT" : "POST"
 
-        if (error) throw error
-        productId = data.id
-      }
+      const res = await fetch(url, { method, body: formData })
+      const data = await res.json()
 
-      // 2. 옵션 저장
-      if (isEdit) {
-        await supabase
-          .from("product_options")
-          .delete()
-          .eq("product_id", productId!)
-      }
-
-      const validOptions = options.filter((o) => o.color && o.size)
-      if (validOptions.length > 0) {
-        await supabase.from("product_options").insert(
-          validOptions.map((o) => ({
-            product_id: productId!,
-            color: o.color,
-            size: o.size,
-            extra_price: o.extra_price || 0,
-            stock: o.stock || 0,
-            sku: o.sku || null,
-          }))
-        )
-      }
-
-      // 3. 이미지 업로드
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i]
-        const ext = file.name.split(".").pop()
-        const path = `products/${productId}/${Date.now()}_${i}.${ext}`
-
-        const { error: uploadError } = await supabase.storage
-          .from("product-images")
-          .upload(path, file)
-
-        if (!uploadError) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("product-images").getPublicUrl(path)
-
-          await supabase.from("product_images").insert({
-            product_id: productId!,
-            url: publicUrl,
-            is_thumbnail: existingImages.length === 0 && i === 0,
-            sort_order: existingImages.length + i,
-          })
-        }
+      if (!res.ok) {
+        throw new Error(data.error || "저장 실패")
       }
 
       toast({ title: isEdit ? "상품이 수정되었습니다" : "상품이 등록되었습니다" })
       router.push("/admin/products")
-    } catch {
-      toast({ variant: "destructive", title: "저장 실패" })
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: err instanceof Error ? err.message : "저장 실패",
+      })
     } finally {
       setLoading(false)
     }
