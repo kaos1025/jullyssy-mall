@@ -1,6 +1,13 @@
 #!/bin/bash
 # ==============================================
-# 쥴리씨 자사몰 - Claude Code Skills 설치 스크립트
+# 쥴리씨 자사몰 — Claude Code Skills v2 설치 스크립트
+# ==============================================
+# v2 변경사항:
+#   - Git Conventions 추가 (50자 제한, 1 commit = 1 intent)
+#   - Pre-commit 5단계 검증 (시크릿 스캔, console.log 검사)
+#   - Definition of Done 체크리스트
+#   - review-cycle 스킬 신규 추가
+#   - Slash Commands 참조 추가
 # ==============================================
 # 사용법: jullyssy-mall 프로젝트 루트에서 실행
 #   bash setup-skills.sh
@@ -8,110 +15,160 @@
 
 set -e
 
-# 프로젝트 루트 확인
-if [ ! -f "package.json" ] || [ ! -f "CLAUDE.md" ]; then
+if [ ! -f "package.json" ]; then
   echo "❌ 에러: jullyssy-mall 프로젝트 루트에서 실행해주세요."
   exit 1
 fi
 
-echo "🚀 Claude Code Skills 설치 시작..."
+echo "🚀 Claude Code Skills v2 설치 시작..."
 
-# .claude/skills 디렉토리 생성
-mkdir -p .claude/skills/code-review
-mkdir -p .claude/skills/commit
-mkdir -p .claude/skills/test
-mkdir -p .claude/skills/pr
+mkdir -p .claude/skills/{code-review,commit,test,pr,review-cycle}
 
-echo "📁 디렉토리 생성 완료"
+# ─────────────────────────────────────────────
+# CLAUDE.md 업데이트
+# ─────────────────────────────────────────────
+cat > CLAUDE.md << 'CLAUDE_EOF'
+# 쥴리씨 - 여성의류 자사몰
 
-# --- code-review SKILL.md ---
-cat > .claude/skills/code-review/SKILL.md << 'SKILL_EOF'
----
-name: code-review
-description: Next.js 14 + Supabase 여성의류 자사몰 코드 리뷰. "코드 리뷰", "리뷰해줘", "코드 검토", "review", "이거 괜찮아?" 등의 요청 시 자동 실행.
----
+## 프로젝트 개요
+- 여성의류 자사몰 신규 개발 (네이버 스마트스토어 → 자사몰 확장)
+- 1인 바이브코딩 개발, 1개월 내 런칭 목표
+- 타겟: 20~40대 여성
 
-# 쥴리씨 자사몰 코드 리뷰
+## 기술 스택 (변경 불가)
+- **프론트엔드**: Next.js 14 (App Router) + Tailwind CSS + shadcn/ui
+- **백엔드/DB**: Supabase (Auth + PostgreSQL + Storage)
+- **비즈니스 로직**: Next.js API Routes (Route Handlers)
+- **결제**: 토스페이먼츠
+- **배포**: Vercel + Supabase Cloud
+- **폰트**: Pretendard (한국어 최적화)
 
-## 실행 절차
+## 코딩 컨벤션
+- 모든 코드는 TypeScript strict mode
+- 컴포넌트: 함수형 + Arrow Function export
+- 서버 컴포넌트 기본, 클라이언트 필요시에만 "use client"
+- import 경로: @/ alias 사용 (src/ 기준)
+- Supabase 클라이언트 3종 분리:
+  - 브라우저(CSR): `@/lib/supabase/client`
+  - 서버컴포넌트(SSR): `@/lib/supabase/server`
+  - 서비스롤(어드민): `@/lib/supabase/admin`
+- API Route에서 에러 응답: `{ error: string, code?: string }` 형태 통일
+- 가격/금액은 항상 int (원 단위, 소수점 없음)
 
-1. 변경된 파일 목록 확인: `git diff --name-only HEAD~1` 또는 `git diff --staged --name-only`
-2. 각 파일을 아래 체크리스트 기준으로 검사
-3. 결과를 정해진 출력 형식으로 보고
-
-## 체크리스트
-
-### 🚨 CRITICAL (반드시 수정)
-
-- **보안**: Supabase service_role_key가 클라이언트 코드에 노출되지 않았는가?
-- **보안**: API Route에서 인증 확인 없이 데이터 수정하는 곳이 없는가?
-- **보안**: RLS 우회 가능한 쿼리가 없는가? (admin API는 예외)
-- **결제**: 토스페이먼츠 금액 검증이 서버에서 수행되는가?
-- **결제**: 주문 생성 시 스냅샷(상품명, 가격, 옵션)을 저장하는가?
-- **타입 안전**: `as any`, `@ts-ignore`를 사용하지 않았는가?
-- **환경변수**: API Key, Secret이 하드코딩되지 않았는가?
-
-### ⚠️ MAJOR (권장 수정)
-
-- **Supabase 클라이언트 분리**: 브라우저→`client.ts`, 서버컴포넌트→`server.ts`, 어드민→`admin.ts` 올바른 것을 사용하는가?
-- **서버/클라이언트 분리**: `"use client"` 없이 useState, useEffect 등 훅을 사용하지 않았는가?
-- **서버/클라이언트 분리**: 불필요하게 `"use client"`를 선언하지 않았는가?
-- **에러 처리**: API Route에 try-catch가 있고 `{ error: string }` 형태로 응답하는가?
-- **금액 처리**: 가격/금액이 int(원 단위)로 처리되는가? (소수점 금지)
-- **성능**: 서버 컴포넌트에서 가능한 데이터를 fetch하고 클라이언트에 props로 전달하는가?
-- **N+1 쿼리**: Supabase select에서 관계 데이터를 join으로 한 번에 가져오는가?
-
-### 📝 MINOR (선택 개선)
-
-- **네이밍**: 파일은 PascalCase(컴포넌트) 또는 kebab-case(라우트), import는 `@/` alias 사용
-- **컴포넌트 크기**: 하나의 컴포넌트가 200줄을 넘지 않는가?
-- **중복 코드**: 반복되는 패턴이 있으면 커스텀 훅이나 유틸로 추출 가능한가?
-- **접근성**: img에 alt, button에 aria-label 등 기본 접근성이 충족되는가?
-- **모바일 퍼스트**: Tailwind 클래스가 모바일 우선(기본값)으로 작성되었는가?
-
-### 🛒 비즈니스 로직
-
-- **재고**: 주문/결제 시 재고 차감 로직이 원자적(atomic)인가?
-- **네이버 연동**: naver_product_no, naver_option_id 매핑이 유지되는가?
-- **쿠폰/포인트**: 할인 금액 계산이 서버에서 검증되는가?
-- **주문 상태**: OrderStatus 전이가 올바른가? (예: PENDING→PAID만 가능)
-
-## 출력 형식
-
+## 폴더 구조
 ```
-## 🔍 코드 리뷰 결과
-
-### 🚨 Critical
-- [파일:라인] 이슈 설명 → 수정 제안
-
-### ⚠️ Major
-- [파일:라인] 이슈 설명 → 수정 제안
-
-### 📝 Minor
-- [파일:라인] 이슈 설명
-
-### ✅ 잘된 점
-- 칭찬
-
-### 📊 요약
-| 등급 | 개수 |
-|------|------|
-| Critical | N |
-| Major | N |
-| Minor | N |
-| **판정** | 통과 / 조건부 통과 / 재검토 필요 |
+src/
+├── app/
+│   ├── (auth)/          # 로그인/회원가입 (별도 레이아웃)
+│   ├── (shop)/          # 고객 화면 (헤더+푸터 레이아웃)
+│   ├── admin/           # 관리자 (별도 레이아웃, 미들웨어 가드)
+│   └── api/             # Route Handlers
+├── components/
+│   ├── ui/              # shadcn/ui 컴포넌트
+│   ├── layout/          # Header, Footer, MobileNav
+│   ├── product/         # 상품 관련 컴포넌트
+│   └── common/          # 공통 (Loading, Empty 등)
+├── lib/
+│   └── supabase/        # Supabase 클라이언트 3종
+├── hooks/               # Custom hooks
+├── types/               # TypeScript 타입
+└── constants/           # 상수 (주문상태, 카테고리 등)
 ```
 
-## 판정 기준
+## DB 핵심 테이블
+- profiles (auth.users 확장), addresses
+- categories (self-join 계층), products, product_images, product_options
+- orders, order_items (스냅샷 저장), payments (raw_response jsonb)
+- coupons, user_coupons, point_histories
+- reviews, review_images
+- naver_sync_logs
 
-- Critical 1개 이상 → **재검토 필요**
-- Major 3개 이상 → **조건부 통과**
-- 그 외 → **통과**
-SKILL_EOF
+## 주의사항
+- 주문/주문상품은 반드시 스냅샷 저장 (상품 변경돼도 주문 데이터 보존)
+- 네이버 스마트스토어 매핑: naver_product_no, naver_option_id 필드 유지
+- 토스페이먼츠 응답은 raw_response jsonb로 원본 보관
+- RLS 필수: 고객 데이터는 본인 것만 접근 가능
+- 모바일 퍼스트 디자인
+- 어드민은 이메일 화이트리스트로 접근 제어 (ADMIN_EMAILS 환경변수)
 
-echo "✅ code-review 스킬 생성"
+## Git Conventions
 
-# --- commit SKILL.md ---
+### Commit Format
+
+```
+<type>(<scope>): <subject>
+```
+
+| Type | Usage |
+|------|-------|
+| `feat` | 새 기능 |
+| `fix` | 버그 수정 |
+| `refactor` | 코드 구조 개선 (동작 변경 없음) |
+| `style` | UI/스타일링 변경 |
+| `docs` | 문서 수정 |
+| `chore` | 설정/빌드/의존성 |
+| `test` | 테스트 추가/수정 |
+
+- Subject: **50자 이내**, 마침표 없음, 한국어 작성
+- **1 commit = 1 intent** (feature + refactor + format 섞지 말 것)
+- Scope: product, cart, order, payment, auth, admin, review, naver, ui, db
+
+### Pre-commit Checklist
+
+1. `npx tsc --noEmit` — 타입 에러 0건
+2. `npx next lint` — ESLint 에러 0건
+3. `lib/`, `src/app/api/` 내 하드코딩된 시크릿 없음
+4. `console.log` 잔존 여부 확인
+5. `.env.local` staged 아닌지 확인
+
+### Branch Strategy
+
+- **main** ← feature/*, fix/*, refactor/*
+- main 직접 푸시 금지, 반드시 PR을 통해 머지
+- .env 파일: 절대 커밋 금지
+
+---
+
+## Definition of Done
+
+- [ ] 코드 동작 확인 (최소 1개 검증된 경로)
+- [ ] `npx tsc --noEmit` — 0 errors
+- [ ] `npx next lint` — 0 errors
+- [ ] 실패 케이스 처리됨 (에러/빈 상태/로딩 UI)
+- [ ] 네이밍과 구조가 의도를 드러냄
+- [ ] PR description 작성 (What/Why/How)
+
+---
+
+## Slash Commands
+
+Claude Code에서 사용 가능한 워크플로우:
+
+| Command | 기능 |
+|---------|------|
+| `/commit` | Pre-commit 5단계 검증 + git commit |
+| `/push` | 원격 푸시 (안전 검사 포함) |
+| `/pr` | PR 템플릿 자동 생성 |
+| `/test` | vitest 테스트 실행 |
+| `/review-cycle` | 전체 품질 점검 (lint → tsc → test → security → commit-ready) |
+| `/code-review` | 체크리스트 기반 구조화된 코드 리뷰 |
+
+---
+
+## Skills (자동 실행)
+`.claude/skills/` 폴더에 정의된 스킬은 대화 맥락에 따라 자동으로 실행됨:
+- **code-review**: 코드 리뷰 요청 시 → 보안/결제/타입 안전성 중심 검사
+- **commit**: 커밋 요청 시 → pre-commit 5단계 검증 + Conventional Commits 자동 생성
+- **test**: 테스트 요청 시 → vitest 기반 테스트 작성/실행 (Supabase 모킹)
+- **pr**: PR 요청 시 → 변경사항 분석 + PR 템플릿 자동 생성
+- **review-cycle**: 품질 점검 요청 시 → lint/tsc/test/security 전체 순회 후 commit-ready 판정
+CLAUDE_EOF
+
+echo "✅ CLAUDE.md 업데이트 (Git Conventions + DoD + Slash Commands)"
+
+# ─────────────────────────────────────────────
+# commit SKILL.md (v2 — 50자 제한, 5단계 검증)
+# ─────────────────────────────────────────────
 cat > .claude/skills/commit/SKILL.md << 'SKILL_EOF'
 ---
 name: commit
@@ -122,56 +179,65 @@ description: 코드 변경사항을 검증하고 커밋/푸시합니다. "커밋
 
 ## 실행 절차
 
-### Step 1: Pre-commit 검증
+### Step 1: Pre-commit 5단계 검증
 
-아래 명령을 순서대로 실행하고, 하나라도 실패하면 **커밋하지 말고** 에러를 수정하라.
+아래를 순서대로 실행. **하나라도 실패하면 커밋하지 말고** 에러를 수정하라.
 
 ```bash
-# 1. TypeScript 타입 체크
+# 1. TypeScript 타입 체크 — 0 errors 필수
 npx tsc --noEmit
 
-# 2. ESLint 검사
+# 2. ESLint — 0 errors 필수
 npx next lint
 
-# 3. 빌드 가능 여부 (선택 - 사용자가 "빠른 커밋" 요청 시 스킵 가능)
-# npm run build
+# 3. 시크릿 하드코딩 검사
+grep -rn "sk_live\|sk_test\|service_role\|supabase_service" src/lib/ src/app/api/ --include="*.ts" --include="*.tsx" || echo "✅ No hardcoded secrets"
+
+# 4. console.log 잔존 검사
+grep -rn "console\.log" src/ --include="*.ts" --include="*.tsx" | grep -v "node_modules" | grep -v ".test." || echo "✅ No stray console.log"
+
+# 5. .env 파일 staged 여부
+git diff --staged --name-only | grep -E "^\.env" && echo "🚨 .env staged! 즉시 중단!" || echo "✅ No .env staged"
 ```
 
 ### Step 2: 변경사항 분석
 
 ```bash
-# staged 파일 확인
 git diff --staged --name-only
-
-# staged 없으면 전체 변경사항 확인
 git diff --name-only
 git status --short
 ```
 
+**1 commit = 1 intent 원칙:**
+- 변경사항에 feature + refactor + style이 섞여있으면 **분리 커밋을 제안**하라.
+- 예: "새 컴포넌트 추가"와 "기존 코드 포맷팅"은 별도 커밋.
+
 ### Step 3: 커밋 메시지 생성
 
-**Conventional Commits** 형식을 따르라:
+**형식:**
 
 ```
-<type>(<scope>): <한국어 설명>
-
-- 변경 내용 1
-- 변경 내용 2
+<type>(<scope>): <subject>
 ```
 
-**type 규칙:**
+**규칙:**
+- Subject: **50자 이내**, 마침표 없음
+- 한국어로 작성
+- scope 생략 가능 (여러 영역에 걸친 변경인 경우)
+
+**type:**
 
 | type | 용도 | 예시 |
 |------|------|------|
-| `feat` | 새 기능 | `feat(product): 상품 상세 페이지 구현` |
-| `fix` | 버그 수정 | `fix(cart): 수량 변경 시 가격 미반영 수정` |
-| `refactor` | 리팩토링 | `refactor(api): 주문 API 에러 처리 통일` |
-| `style` | UI/스타일링 | `style(header): 모바일 네비게이션 반응형 개선` |
+| `feat` | 새 기능 | `feat(product): 상품 상세 이미지 갤러리` |
+| `fix` | 버그 수정 | `fix(cart): 수량 변경 시 가격 미반영` |
+| `refactor` | 리팩토링 | `refactor(api): 주문 에러 처리 통일` |
+| `style` | UI/스타일링 | `style(header): 모바일 네비 반응형 개선` |
 | `chore` | 설정/의존성 | `chore: shadcn/ui 컴포넌트 추가` |
 | `docs` | 문서 | `docs: CLAUDE.md 폴더 구조 업데이트` |
-| `test` | 테스트 | `test(order): 주문 생성 API 테스트 추가` |
+| `test` | 테스트 | `test(order): 주문 생성 API 테스트` |
 
-**scope 규칙 (이 프로젝트 전용):**
+**scope:**
 
 | scope | 해당 경로 |
 |-------|-----------|
@@ -189,245 +255,141 @@ git status --short
 ### Step 4: 커밋 실행
 
 ```bash
-# 변경사항이 staged가 아니면 먼저 add
 git add -A
-
-# 커밋
 git commit -m "<생성된 메시지>"
 ```
 
 ### Step 5: 푸시 (사용자가 "푸시"도 요청한 경우만)
 
 ```bash
-# 현재 브랜치 확인
 git branch --show-current
-
-# 푸시
 git push origin <현재-브랜치>
 ```
 
 ## 주의사항
 
-- `.env.local` 파일이 staged에 포함되면 **즉시 중단**하고 경고
-- `console.log`가 남아있으면 커밋 전 알림 (디버깅 코드 정리)
-- 한 커밋에 관련 없는 변경이 섞여있으면 분리 커밋 제안
-- 커밋 메시지는 반드시 **한국어**로 작성
+- Pre-commit 5단계 중 하나라도 실패 → 커밋 금지
+- 1 commit = 1 intent → 혼합 변경은 분리 제안
+- Subject 50자 초과 → 줄여서 재생성
+- `.env.local` staged → 즉시 중단 + 경고
 SKILL_EOF
 
-echo "✅ commit 스킬 생성"
+echo "✅ commit 스킬 업데이트 (50자 제한, 5단계 검증)"
 
-# --- test SKILL.md ---
-cat > .claude/skills/test/SKILL.md << 'SKILL_EOF'
+# ─────────────────────────────────────────────
+# review-cycle SKILL.md (신규)
+# ─────────────────────────────────────────────
+cat > .claude/skills/review-cycle/SKILL.md << 'SKILL_EOF'
 ---
-name: test
-description: Next.js 14 자사몰 테스트 작성 및 실행. "테스트", "테스트 작성", "test", "테스트 돌려줘", "이거 테스트 해줘" 등의 요청 시 자동 실행.
----
-
-# 쥴리씨 자사몰 테스트 자동화
-
-## 테스트 환경 확인
-
-먼저 테스트 도구가 설치되어 있는지 확인하라:
-
-```bash
-npx vitest --version 2>/dev/null || npx jest --version 2>/dev/null || echo "NO_TEST_RUNNER"
-```
-
-테스트 러너가 없으면 아래를 설치 제안:
-
-```bash
-npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom @vitejs/plugin-react
-```
-
-vitest 설정 파일이 없으면 생성:
-
-```typescript
-// vitest.config.ts
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import path from 'path'
-
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    globals: true,
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
-```
-
-```typescript
-// src/test/setup.ts
-import '@testing-library/jest-dom'
-```
-
-## 테스트 작성 규칙
-
-### 파일 위치
-
-테스트 파일은 소스 파일과 같은 디렉토리에 `.test.ts(x)` 확장자로 생성:
-
-```
-src/app/api/orders/route.ts
-src/app/api/orders/route.test.ts     ← 여기
-
-src/components/product/ProductCard.tsx
-src/components/product/ProductCard.test.tsx  ← 여기
-
-src/hooks/use-cart.ts
-src/hooks/use-cart.test.ts           ← 여기
-```
-
-### 테스트 분류
-
-| 종류 | 대상 | 우선순위 |
-|------|------|----------|
-| **API Route 테스트** | `src/app/api/**` | 🔴 최우선 |
-| **비즈니스 로직 테스트** | `src/hooks/`, `src/lib/` | 🔴 최우선 |
-| **컴포넌트 테스트** | `src/components/**` | 🟡 중요 |
-| **페이지 테스트** | `src/app/**/(page).tsx` | 🟢 선택 |
-
-### API Route 테스트 패턴
-
-```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() => ({
-    auth: { getUser: vi.fn() },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-    })),
-  })),
-}))
-
-describe('POST /api/orders', () => {
-  it('인증되지 않은 요청은 401을 반환한다', async () => {})
-  it('재고 부족 시 400을 반환한다', async () => {})
-  it('정상 주문 시 스냅샷이 저장된다', async () => {})
-  it('금액은 정수(원 단위)로 저장된다', async () => {})
-})
-```
-
-### Hook 테스트 패턴
-
-```typescript
-import { renderHook, act } from '@testing-library/react'
-import { useCartStore } from './use-cart'
-
-describe('useCartStore', () => {
-  beforeEach(() => { useCartStore.getState().clearCart() })
-  it('상품을 추가하면 cart에 반영된다', () => {})
-  it('같은 옵션의 상품을 추가하면 수량이 증가한다', () => {})
-  it('총 금액이 정확히 계산된다', () => {})
-})
-```
-
-## 테스트 실행
-
-```bash
-npx vitest run                                    # 전체
-npx vitest run src/app/api/orders/route.test.ts   # 특정 파일
-npx vitest                                        # watch
-npx vitest run --coverage                         # 커버리지
-```
-
-## 주의사항
-
-- Supabase는 항상 **모킹** (실제 DB 연결 금지)
-- 토스페이먼츠 API 호출도 반드시 **모킹**
-- 환경변수는 `vi.stubEnv()` 사용
-- 금액 관련 테스트는 **경계값**(0원, 최대 금액, 할인 후 0원 이하) 반드시 포함
-SKILL_EOF
-
-echo "✅ test 스킬 생성"
-
-# --- pr SKILL.md ---
-cat > .claude/skills/pr/SKILL.md << 'SKILL_EOF'
----
-name: pr
-description: Pull Request를 생성합니다. "PR", "풀리퀘스트", "PR 만들어줘", "머지 요청", "pull request" 등의 요청 시 자동 실행.
+name: review-cycle
+description: 전체 품질 점검 사이클을 실행합니다. "리뷰 사이클", "review cycle", "품질 점검", "전체 검사", "커밋 전 검사" 등의 요청 시 자동 실행.
 ---
 
-# Pull Request 생성
+# 전체 품질 점검 사이클
+
+lint → tsc → test → security → commit-ready 순서로 전체 코드 품질을 검증한다.
+각 단계가 모두 통과해야 "Commit Ready" 판정을 내린다.
 
 ## 실행 절차
 
-### Step 1: 현재 상태 확인
+### Phase 1: Lint (코드 스타일)
 
 ```bash
-git branch --show-current
-git log main..HEAD --oneline
-git diff main --name-only --stat
+npx next lint
 ```
 
-main 브랜치에서 직접 PR을 만들려고 하면 **중단**하고 피처 브랜치 생성을 제안하라.
+- 0 errors → ✅ PASS
+- errors 존재 → ❌ FAIL, 자동 수정 시도: `npx next lint --fix` 후 재검사
 
-### Step 2: 미커밋 변경사항 처리
+### Phase 2: Type Check (타입 안전성)
 
 ```bash
-git status --short
+npx tsc --noEmit
 ```
 
-미커밋 변경사항이 있으면 **먼저 commit 스킬을 실행**하라.
+- 0 errors → ✅ PASS
+- errors 존재 → ❌ FAIL, 에러 목록 출력 후 수정 제안
 
-### Step 3: 원격 푸시
+### Phase 3: Test (테스트)
 
 ```bash
-BRANCH=$(git branch --show-current)
-git push origin $BRANCH
+# vitest가 설치되어 있으면
+npx vitest run 2>/dev/null
+
+# 없으면 빌드로 대체 검증
+npm run build
 ```
 
-### Step 4: PR 본문 생성
+- 전체 통과 → ✅ PASS
+- 실패 → ❌ FAIL, 실패한 테스트 목록 + 수정 제안
 
-아래 템플릿에 따라 PR 본문을 작성하라:
-
-```markdown
-## 📋 작업 요약
-## 🔄 변경 내역
-### 추가 / 수정 / 삭제
-## 📁 변경 파일
-| 파일 | 변경 내용 |
-|------|-----------|
-## 🧪 테스트
-- [ ] TypeScript 타입 체크 통과
-- [ ] ESLint 통과
-- [ ] 로컬 빌드 성공
-- [ ] 주요 기능 수동 테스트 완료
-## 🏷️ 카테고리
-- [ ] 🆕 새 기능 / 🐛 버그 수정 / ♻️ 리팩토링 / 💄 스타일 / 🗃️ DB / ⚙️ 설정
-## 📝 참고사항
-```
-
-### Step 5: PR 타이틀
-
-Conventional Commits: `<type>(<scope>): <한국어 설명>`
-
-### Step 6: PR 생성
+### Phase 4: Security (보안 점검)
 
 ```bash
-gh pr create --title "<타이틀>" --body "<본문>" --base main --head $(git branch --show-current)
+# 1. 환경변수 하드코딩 검사
+echo "=== Secret Scan ==="
+grep -rn "sk_live\|sk_test\|service_role\|supabase_service\|TOSS_SECRET\|toss_sk" src/ --include="*.ts" --include="*.tsx" | grep -v "process\.env\|\.env" || echo "✅ No hardcoded secrets"
+
+# 2. console.log 잔존 검사
+echo "=== Console.log Scan ==="
+grep -rn "console\.log" src/ --include="*.ts" --include="*.tsx" | grep -v "node_modules" | grep -v ".test." || echo "✅ No stray console.log"
+
+# 3. .env staged 검사
+echo "=== .env Scan ==="
+git diff --staged --name-only | grep -E "^\.env" && echo "🚨 .env STAGED!" || echo "✅ No .env staged"
+
+# 4. Supabase 클라이언트 혼용 검사
+echo "=== Supabase Client Misuse Scan ==="
+grep -rn "supabase/admin" src/app/\(shop\)/ src/app/\(auth\)/ src/components/ --include="*.ts" --include="*.tsx" || echo "✅ No admin client in client code"
 ```
 
-gh CLI가 없으면: `https://github.com/kaos1025/jullyssy-mall/compare/main...<브랜치명>`
+- 모든 항목 ✅ → PASS
+- 1개라도 발견 → ❌ FAIL
 
-## 주의사항
+### Phase 5: Commit-Ready 판정
 
-- DB 마이그레이션 포함 시 ⚠️ 경고 추가
-- 결제 로직 변경 시 ⚠️ 경고 추가
-- 환경변수 변경 시 ⚠️ Vercel 업데이트 필요 경고 추가
+## 결과 출력 형식
+
+```
+## 🔄 Review Cycle 결과
+
+| Phase | 상태 | 비고 |
+|-------|------|------|
+| Lint | ✅/❌ | ESLint errors: N |
+| Type Check | ✅/❌ | tsc errors: N |
+| Test | ✅/❌ | passed/failed/skipped |
+| Security | ✅/❌ | issues: N |
+
+### 최종 판정: ✅ Commit Ready / ❌ Not Ready
+
+[❌ 항목이 있으면 수정 필요 사항 목록]
+```
+
+## 판정 기준
+
+- **4/4 PASS** → ✅ **Commit Ready** — 바로 커밋 가능
+- **3/4 PASS** (Security만 FAIL) → ⚠️ **조건부 Ready** — 보안 이슈 수정 후 커밋
+- **그 외** → ❌ **Not Ready** — 수정 필요
 SKILL_EOF
 
-echo "✅ pr 스킬 생성"
+echo "✅ review-cycle 스킬 생성 (신규)"
+
+# ─────────────────────────────────────────────
+# 나머지 기존 스킬 유지 (code-review, test, pr)
+# ─────────────────────────────────────────────
+
+# code-review가 없으면 생성 (이미 있으면 스킵)
+if [ ! -f ".claude/skills/code-review/SKILL.md" ]; then
+  echo "⚠️  code-review 스킬이 없습니다. 먼저 이전 setup-skills.sh를 실행해주세요."
+fi
+
+if [ ! -f ".claude/skills/test/SKILL.md" ]; then
+  echo "⚠️  test 스킬이 없습니다. 먼저 이전 setup-skills.sh를 실행해주세요."
+fi
+
+if [ ! -f ".claude/skills/pr/SKILL.md" ]; then
+  echo "⚠️  pr 스킬이 없습니다. 먼저 이전 setup-skills.sh를 실행해주세요."
+fi
 
 # settings.local.json 업데이트
 cat > .claude/settings.local.json << 'JSON_EOF'
@@ -443,31 +405,33 @@ cat > .claude/settings.local.json << 'JSON_EOF'
       "Bash(npx eslint:*)",
       "Bash(git:*)",
       "Bash(gh pr:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(grep:*)"
     ]
   }
 }
 JSON_EOF
 
-echo "✅ settings.local.json 업데이트"
+echo "✅ settings.local.json 업데이트 (grep 권한 추가)"
 
 echo ""
 echo "=========================================="
-echo "🎉 Claude Code Skills 설치 완료!"
+echo "🎉 Claude Code Skills v2 설치 완료!"
 echo "=========================================="
 echo ""
-echo "생성된 스킬:"
-echo "  📋 .claude/skills/code-review/SKILL.md"
-echo "  📦 .claude/skills/commit/SKILL.md"
-echo "  🧪 .claude/skills/test/SKILL.md"
-echo "  🔀 .claude/skills/pr/SKILL.md"
+echo "v2 변경사항:"
+echo "  📝 CLAUDE.md — Git Conventions + Definition of Done + Slash Commands"
+echo "  📦 commit 스킬 — 50자 제한, 1 commit = 1 intent, 5단계 pre-commit"
+echo "  🔄 review-cycle 스킬 — 신규 (lint→tsc→test→security→commit-ready)"
 echo ""
-echo "사용법 (Claude Code 터미널에서):"
-echo '  > "코드 리뷰해줘"     → code-review 자동 실행'
-echo '  > "커밋해줘"           → commit 자동 실행'
-echo '  > "테스트 작성해줘"    → test 자동 실행'
-echo '  > "PR 만들어줘"       → pr 자동 실행'
+echo "전체 스킬 목록:"
+echo "  📋 /code-review  — 보안/결제/타입 안전성 코드 리뷰"
+echo "  📦 /commit       — 5단계 pre-commit + Conventional Commits"
+echo "  🧪 /test         — vitest 테스트 작성/실행"
+echo "  🔀 /pr           — PR 템플릿 자동 생성"
+echo "  🔄 /review-cycle — 전체 품질 점검 사이클 (신규!)"
 echo ""
 echo "커밋하려면:"
-echo "  git add -A && git commit -m 'chore: Claude Code Skills 세팅'"
+echo "  git add -A"
+echo "  git commit -m 'chore: Claude Code Skills v2 (Git Conventions + review-cycle)'"
 echo "  git push origin main"

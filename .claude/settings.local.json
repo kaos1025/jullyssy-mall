@@ -10,7 +10,8 @@
       "Bash(npx eslint:*)",
       "Bash(git:*)",
       "Bash(gh pr:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(grep:*)"
     ]
   }
 }
