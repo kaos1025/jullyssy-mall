@@ -2,19 +2,37 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
 
-interface NaverProduct {
-  originProductNo: number
+interface ChannelProduct {
+  channelProductNo: number
   name: string
   salePrice: number
-  originalPrice: number
   discountedPrice: number | null
-  detailContent: string | null
   statusType: string
+  detailContent: string | null
   stockQuantity: number
-  images?: {
-    representativeImage?: { url: string }
-    optionalImages?: { url: string }[]
-  }
+  representativeImage?: { url: string }
+  optionalImages?: { url: string }[]
+  optionCombinations?: {
+    id: number
+    optionName1: string
+    optionName2: string
+    stockQuantity: number
+    price: number
+  }[]
+}
+
+interface NaverProductDetail {
+  originProductNo: number
+  channelProducts?: ChannelProduct[]
+  // 개별 조회 시 직접 필드로 올 수도 있음
+  name?: string
+  salePrice?: number
+  discountedPrice?: number | null
+  detailContent?: string | null
+  statusType?: string
+  stockQuantity?: number
+  representativeImage?: { url: string }
+  optionalImages?: { url: string }[]
   optionCombinations?: {
     id: number
     optionName1: string
@@ -26,13 +44,25 @@ interface NaverProduct {
 
 const importSingleProduct = async (
   admin: ReturnType<typeof createAdminClient>,
-  np: NaverProduct
+  raw: NaverProductDetail
 ) => {
+  // channelProducts 래핑 여부에 따라 데이터 추출
+  const cp = raw.channelProducts?.[0]
+  const name = cp?.name || raw.name || ""
+  const salePrice = cp?.salePrice || raw.salePrice || 0
+  const discountedPrice = cp?.discountedPrice || raw.discountedPrice || null
+  const detailContent = cp?.detailContent || raw.detailContent || null
+  const statusType = cp?.statusType || raw.statusType || ""
+  const stockQuantity = cp?.stockQuantity || raw.stockQuantity || 0
+  const representImage = cp?.representativeImage || raw.representativeImage
+  const optionalImages = cp?.optionalImages || raw.optionalImages || []
+  const optionCombinations = cp?.optionCombinations || raw.optionCombinations || []
+
   // 이미 임포트된 상품인지 확인
   const { data: existing } = await admin
     .from("products")
     .select("id")
-    .eq("naver_product_no", String(np.originProductNo))
+    .eq("naver_product_no", String(raw.originProductNo))
     .single()
 
   if (existing) {
@@ -43,12 +73,12 @@ const importSingleProduct = async (
   const { data: product, error: prodError } = await admin
     .from("products")
     .insert({
-      name: np.name,
-      description: np.detailContent || null,
-      price: np.salePrice || np.originalPrice || 0,
-      sale_price: np.discountedPrice || null,
-      status: np.statusType === "SALE" ? "ACTIVE" : "HIDDEN",
-      naver_product_no: String(np.originProductNo),
+      name,
+      description: detailContent,
+      price: salePrice,
+      sale_price: discountedPrice,
+      status: statusType === "SALE" ? "ACTIVE" : "HIDDEN",
+      naver_product_no: String(raw.originProductNo),
     })
     .select()
     .single()
@@ -57,9 +87,7 @@ const importSingleProduct = async (
     throw new Error("상품 등록 실패")
   }
 
-  // 이미지 등록
-  const images = np.images?.optionalImages || []
-  const representImage = np.images?.representativeImage
+  // 대표 이미지 등록
   if (representImage?.url) {
     await admin.from("product_images").insert({
       product_id: product.id,
@@ -69,11 +97,12 @@ const importSingleProduct = async (
     })
   }
 
-  for (let i = 0; i < images.length; i++) {
-    if (images[i]?.url) {
+  // 추가 이미지 등록
+  for (let i = 0; i < optionalImages.length; i++) {
+    if (optionalImages[i]?.url) {
       await admin.from("product_images").insert({
         product_id: product.id,
-        url: images[i].url,
+        url: optionalImages[i].url,
         is_thumbnail: false,
         sort_order: i + 1,
       })
@@ -81,25 +110,24 @@ const importSingleProduct = async (
   }
 
   // 옵션 등록
-  const options = np.optionCombinations || []
-  for (const opt of options) {
+  for (const opt of optionCombinations) {
     await admin.from("product_options").insert({
       product_id: product.id,
       color: opt.optionName1 || "기본",
       size: opt.optionName2 || "FREE",
       stock: opt.stockQuantity || 0,
-      extra_price: opt.price ? opt.price - (np.salePrice || 0) : 0,
+      extra_price: opt.price ? opt.price - salePrice : 0,
       naver_option_id: opt.id ? String(opt.id) : null,
     })
   }
 
   // 옵션이 없으면 기본 옵션 추가
-  if (options.length === 0) {
+  if (optionCombinations.length === 0) {
     await admin.from("product_options").insert({
       product_id: product.id,
       color: "기본",
       size: "FREE",
-      stock: np.stockQuantity || 0,
+      stock: stockQuantity,
       extra_price: 0,
     })
   }
@@ -126,7 +154,7 @@ export const POST = async (request: NextRequest) => {
       try {
         // 개별 상품 상세 조회
         const detailRes = await fetch(
-          `${NAVER_API_BASE}/v2/products/${productNo}`,
+          `${NAVER_API_BASE}/v1/products/${productNo}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
 
@@ -136,11 +164,11 @@ export const POST = async (request: NextRequest) => {
           continue
         }
 
-        const np: NaverProduct = await detailRes.json()
+        const np: NaverProductDetail = await detailRes.json()
         const result = await importSingleProduct(admin, np)
 
         if (result.skipped) {
-          successCount++ // 이미 존재하는 상품은 성공으로 카운트
+          successCount++
         } else {
           successCount++
         }
