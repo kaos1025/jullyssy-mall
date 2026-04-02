@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -23,9 +22,8 @@ const paymentMethods: { value: PaymentMethodType; label: string }[] = [
 ]
 
 const CheckoutPage = () => {
-  const router = useRouter()
   const { toast } = useToast()
-  const { items, clearCart, getTotal } = useCart()
+  const { items, getTotal } = useCart()
   const [mounted, setMounted] = useState(false)
 
   const [showItems, setShowItems] = useState(false)
@@ -107,7 +105,7 @@ const CheckoutPage = () => {
         throw new Error(err.error || "주문 생성 실패")
       }
 
-      const { order_id, order_no, amount } = await res.json()
+      const { order_id, order_no, paid_amount } = await res.json()
 
       // 2. 토스페이먼츠 결제 요청
       const { loadTossPayments } = await import(
@@ -128,7 +126,7 @@ const CheckoutPage = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (payment as any).requestPayment({
         method: methodMap[paymentMethod],
-        amount: { currency: "KRW", value: amount },
+        amount: { currency: "KRW", value: paid_amount },
         orderId: order_no,
         orderName:
           items.length === 1

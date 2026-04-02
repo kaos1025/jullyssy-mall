@@ -12,7 +12,7 @@ import { SHIPPING_FEE, FREE_SHIPPING_THRESHOLD } from "@/constants"
 
 const CartPage = () => {
   const router = useRouter()
-  const { items, removeItem, updateQuantity, getTotal } = useCart()
+  const { items, removeItem, updateQuantity } = useCart()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
 

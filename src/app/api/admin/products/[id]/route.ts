@@ -118,6 +118,7 @@ export const PUT = async (
 
     // 4. 새 이미지 업로드
     const existingCount = existingImageIds.length
+    const uploadErrors: string[] = []
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i]
       const ext = file.name.split(".").pop()
@@ -128,21 +129,27 @@ export const PUT = async (
         .from("product-images")
         .upload(path, buffer, { contentType: file.type })
 
-      if (!uploadError) {
-        const {
-          data: { publicUrl },
-        } = admin.storage.from("product-images").getPublicUrl(path)
-
-        await admin.from("product_images").insert({
-          product_id: productId,
-          url: publicUrl,
-          is_thumbnail: existingCount === 0 && i === 0,
-          sort_order: existingCount + i,
-        })
+      if (uploadError) {
+        uploadErrors.push(`${file.name}: ${uploadError.message}`)
+        continue
       }
+
+      const {
+        data: { publicUrl },
+      } = admin.storage.from("product-images").getPublicUrl(path)
+
+      await admin.from("product_images").insert({
+        product_id: productId,
+        url: publicUrl,
+        is_thumbnail: existingCount === 0 && i === 0,
+        sort_order: existingCount + i,
+      })
     }
 
-    return NextResponse.json({ id: productId })
+    return NextResponse.json({
+      id: productId,
+      ...(uploadErrors.length > 0 && { image_errors: uploadErrors }),
+    })
   } catch {
     return NextResponse.json({ error: "상품 수정 실패" }, { status: 500 })
   }

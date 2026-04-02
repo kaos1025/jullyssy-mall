@@ -1,6 +1,9 @@
+import Link from "next/link"
+import { PackageOpen, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import ProductCard from "@/components/product/ProductCard"
 import ProductListFilter from "@/components/product/ProductListFilter"
+import { Button } from "@/components/ui/button"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -22,12 +25,43 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
   const pageSize = 20
   const offset = (page - 1) * pageSize
 
-  // 카테고리 목록 조회
+  // 1depth 카테고리 목록 조회
   const { data: categories } = await supabase
     .from("categories")
     .select("*")
     .is("parent_id", null)
     .order("sort_order")
+
+  // 서브카테고리 조회: 선택된 카테고리의 children
+  let subCategories: typeof categories = []
+  let selectedParentId: string | null = null
+
+  if (searchParams.category && categories) {
+    // 선택된 slug가 1depth인지 확인
+    const parentCat = categories.find((c) => c.slug === searchParams.category)
+    if (parentCat) {
+      selectedParentId = parentCat.id
+    } else {
+      // 2depth slug일 수 있음 → 부모를 찾기
+      const { data: subCat } = await supabase
+        .from("categories")
+        .select("parent_id")
+        .eq("slug", searchParams.category)
+        .single()
+      if (subCat?.parent_id) {
+        selectedParentId = subCat.parent_id
+      }
+    }
+
+    if (selectedParentId) {
+      const { data: subs } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("parent_id", selectedParentId)
+        .order("sort_order")
+      subCategories = subs || []
+    }
+  }
 
   // 상품 쿼리 빌드
   let query = supabase
@@ -35,17 +69,15 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
     .select(
       `
       *,
-      product_images!inner(url, is_thumbnail),
+      product_images(url, is_thumbnail),
       reviews(id)
     `,
       { count: "exact" }
     )
     .eq("status", "ACTIVE")
-    .eq("product_images.is_thumbnail", true)
 
   // 카테고리 필터
   if (searchParams.category) {
-    // 슬러그로 카테고리 ID 찾기 (부모 + 자식 모두 포함)
     const { data: cat } = await supabase
       .from("categories")
       .select("id")
@@ -82,19 +114,32 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
 
   const { data: products, count } = await query.range(offset, offset + pageSize - 1)
 
-  const totalPages = Math.ceil((count || 0) / pageSize)
+  const totalCount = count || 0
+  const hasNextPage = offset + pageSize < totalCount
+
+  // 다음 페이지 URL 생성
+  const nextPageParams = new URLSearchParams()
+  if (searchParams.category) nextPageParams.set("category", searchParams.category)
+  if (searchParams.sort) nextPageParams.set("sort", searchParams.sort)
+  nextPageParams.set("page", String(page + 1))
 
   return (
     <div className="container py-6">
       <ProductListFilter
         categories={categories || []}
+        subCategories={subCategories || []}
         currentCategory={searchParams.category}
         currentSort={searchParams.sort}
       />
 
+      {/* 상품 수 */}
+      <p className="text-sm text-muted-foreground mt-4 mb-4">
+        전체 {totalCount.toLocaleString()}개
+      </p>
+
       {products && products.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {products.map((product) => (
               <ProductCard
                 key={product.id}
@@ -104,45 +149,32 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
                 price={product.price}
                 sale_price={product.sale_price}
                 thumbnail={
-                  product.product_images?.[0]?.url || null
+                  product.product_images?.find((img: { is_thumbnail: boolean }) => img.is_thumbnail)?.url
+                  || product.product_images?.[0]?.url
+                  || null
                 }
                 review_count={product.reviews?.length || 0}
+                status={product.status}
+                created_at={product.created_at}
               />
             ))}
           </div>
 
-          {/* 페이지네이션 */}
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-8">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (p) => (
-                  <a
-                    key={p}
-                    href={`/products?${new URLSearchParams({
-                      ...(searchParams.category
-                        ? { category: searchParams.category }
-                        : {}),
-                      ...(searchParams.sort
-                        ? { sort: searchParams.sort }
-                        : {}),
-                      page: String(p),
-                    }).toString()}`}
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-md text-sm ${
-                      p === page
-                        ? "bg-primary text-primary-foreground"
-                        : "border hover:bg-muted"
-                    }`}
-                  >
-                    {p}
-                  </a>
-                )
-              )}
+          {/* 다음 페이지 */}
+          {hasNextPage && (
+            <div className="flex justify-center mt-10">
+              <Button variant="outline" size="lg" asChild>
+                <Link href={`/products?${nextPageParams.toString()}`}>
+                  다음 페이지 <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
             </div>
           )}
         </>
       ) : (
-        <div className="text-center py-20 text-muted-foreground">
-          상품이 없습니다.
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+          <PackageOpen className="h-12 w-12 mb-4" strokeWidth={1.5} />
+          <p className="text-sm">상품 준비 중입니다</p>
         </div>
       )}
     </div>

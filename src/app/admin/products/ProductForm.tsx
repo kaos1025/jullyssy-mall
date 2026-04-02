@@ -142,7 +142,15 @@ const ProductForm = ({ product }: ProductFormProps) => {
         throw new Error(data.error || "저장 실패")
       }
 
-      toast({ title: isEdit ? "상품이 수정되었습니다" : "상품이 등록되었습니다" })
+      if (data.image_errors) {
+        toast({
+          variant: "destructive",
+          title: "이미지 업로드 일부 실패",
+          description: data.image_errors.join(", "),
+        })
+      } else {
+        toast({ title: isEdit ? "상품이 수정되었습니다" : "상품이 등록되었습니다" })
+      }
       router.push("/admin/products")
     } catch (err) {
       toast({

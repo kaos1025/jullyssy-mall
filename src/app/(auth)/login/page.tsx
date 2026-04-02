@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 
-const LoginPage = () => {
+const LoginForm = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/"
@@ -129,6 +129,14 @@ const LoginPage = () => {
         </p>
       </CardContent>
     </Card>
+  )
+}
+
+const LoginPage = () => {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }
 

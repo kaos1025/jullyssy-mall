@@ -1,14 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, ShoppingBag } from "lucide-react"
+import { Minus, Plus, X, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useCart } from "@/hooks/use-cart"
 import { cn } from "@/lib/utils"
 import type { ProductOption } from "@/types"
+
+interface SelectedItem {
+  optionId: string
+  color: string
+  size: string
+  quantity: number
+  unitPrice: number
+  stock: number
+}
 
 interface ProductOptionsProps {
   productId: string
@@ -33,27 +42,81 @@ const ProductOptions = ({
 
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
   const [selectedSize, setSelectedSize] = useState<string | null>(null)
-  const [quantity, setQuantity] = useState(1)
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([])
+  const [highlightId, setHighlightId] = useState<string | null>(null)
 
   const colors = Array.from(new Set(options.map((o) => o.color)))
   const availableSizes = selectedColor
     ? options.filter((o) => o.color === selectedColor)
     : []
 
-  const selectedOption =
-    selectedColor && selectedSize
-      ? options.find(
-          (o) => o.color === selectedColor && o.size === selectedSize
-        )
-      : null
-
   const basePrice = salePrice ?? price
-  const totalPrice = selectedOption
-    ? (basePrice + selectedOption.extra_price) * quantity
-    : basePrice
+
+  const totalPrice = selectedItems.reduce(
+    (sum, item) => sum + item.unitPrice * item.quantity,
+    0
+  )
+
+  // 색상 + 사이즈 선택 완료 시 자동으로 selectedItems에 추가
+  useEffect(() => {
+    if (!selectedColor || !selectedSize) return
+
+    const option = options.find(
+      (o) => o.color === selectedColor && o.size === selectedSize
+    )
+    if (!option || option.stock === 0) return
+
+    setSelectedItems((prev) => {
+      const existing = prev.find((item) => item.optionId === option.id)
+      if (existing) {
+        // 같은 옵션이면 수량 +1
+        return prev.map((item) =>
+          item.optionId === option.id
+            ? { ...item, quantity: Math.min(item.quantity + 1, item.stock) }
+            : item
+        )
+      }
+      return [
+        ...prev,
+        {
+          optionId: option.id,
+          color: option.color,
+          size: option.size,
+          quantity: 1,
+          unitPrice: basePrice + option.extra_price,
+          stock: option.stock,
+        },
+      ]
+    })
+
+    // 하이라이트 애니메이션
+    setHighlightId(option.id)
+    setTimeout(() => setHighlightId(null), 1500)
+
+    // 선택 초기화
+    setSelectedColor(null)
+    setSelectedSize(null)
+  }, [selectedColor, selectedSize, options, basePrice])
+
+  const updateQuantity = (optionId: string, delta: number) => {
+    setSelectedItems((prev) =>
+      prev.map((item) =>
+        item.optionId === optionId
+          ? {
+              ...item,
+              quantity: Math.max(1, Math.min(item.stock, item.quantity + delta)),
+            }
+          : item
+      )
+    )
+  }
+
+  const removeItem = (optionId: string) => {
+    setSelectedItems((prev) => prev.filter((item) => item.optionId !== optionId))
+  }
 
   const handleAddToCart = () => {
-    if (!selectedOption) {
+    if (selectedItems.length === 0) {
       toast({
         variant: "destructive",
         title: "옵션을 선택해주세요",
@@ -62,27 +125,33 @@ const ProductOptions = ({
       return
     }
 
-    addItem({
-      product_id: productId,
-      product_option_id: selectedOption.id,
-      product_name: productName,
-      product_image: productImage,
-      color: selectedOption.color,
-      size: selectedOption.size,
-      price: basePrice,
-      extra_price: selectedOption.extra_price,
-      quantity,
-      stock: selectedOption.stock,
+    selectedItems.forEach((item) => {
+      const option = options.find((o) => o.id === item.optionId)
+      if (!option) return
+      addItem({
+        product_id: productId,
+        product_option_id: item.optionId,
+        product_name: productName,
+        product_image: productImage,
+        color: item.color,
+        size: item.size,
+        price: basePrice,
+        extra_price: option.extra_price,
+        quantity: item.quantity,
+        stock: item.stock,
+      })
     })
 
     toast({
       title: "장바구니에 추가했습니다",
-      description: `${productName} (${selectedColor}/${selectedSize})`,
+      description: `${productName} (${selectedItems.length}개 옵션)`,
     })
+
+    setSelectedItems([])
   }
 
   const handleBuyNow = () => {
-    if (!selectedOption) {
+    if (selectedItems.length === 0) {
       toast({
         variant: "destructive",
         title: "옵션을 선택해주세요",
@@ -91,7 +160,23 @@ const ProductOptions = ({
       return
     }
 
-    handleAddToCart()
+    selectedItems.forEach((item) => {
+      const option = options.find((o) => o.id === item.optionId)
+      if (!option) return
+      addItem({
+        product_id: productId,
+        product_option_id: item.optionId,
+        product_name: productName,
+        product_image: productImage,
+        color: item.color,
+        size: item.size,
+        price: basePrice,
+        extra_price: option.extra_price,
+        quantity: item.quantity,
+        stock: item.stock,
+      })
+    })
+
     router.push("/cart")
   }
 
@@ -109,7 +194,6 @@ const ProductOptions = ({
               onClick={() => {
                 setSelectedColor(color)
                 setSelectedSize(null)
-                setQuantity(1)
               }}
               className={cn(
                 "px-4 py-2 rounded-md border text-sm transition-colors",
@@ -135,7 +219,6 @@ const ProductOptions = ({
                 onClick={() => {
                   if (opt.stock > 0) {
                     setSelectedSize(opt.size)
-                    setQuantity(1)
                   }
                 }}
                 disabled={opt.stock === 0}
@@ -144,7 +227,7 @@ const ProductOptions = ({
                   selectedSize === opt.size
                     ? "border-primary bg-primary/5 text-primary"
                     : opt.stock === 0
-                      ? "border-border text-muted-foreground/40 cursor-not-allowed line-through"
+                      ? "bg-gray-100 text-gray-300 cursor-not-allowed line-through border-transparent"
                       : "border-border hover:border-muted-foreground/50"
                 )}
               >
@@ -163,72 +246,91 @@ const ProductOptions = ({
         </div>
       )}
 
-      {/* 수량 */}
-      {selectedOption && (
-        <div>
-          <p className="text-sm font-medium mb-2">수량</p>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center border rounded-md">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="p-2 hover:bg-muted transition-colors"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="w-12 text-center text-sm">{quantity}</span>
-              <button
-                onClick={() =>
-                  setQuantity(Math.min(selectedOption.stock, quantity + 1))
-                }
-                className="p-2 hover:bg-muted transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
+      {/* 선택된 옵션 리스트 */}
+      {selectedItems.length > 0 && (
+        <div className="space-y-2 border-t pt-4">
+          {selectedItems.map((item) => (
+            <div
+              key={item.optionId}
+              className={cn(
+                "flex items-center justify-between p-3 bg-muted/30 rounded-md border transition-all duration-300",
+                highlightId === item.optionId
+                  ? "border-primary animate-pulse"
+                  : "border-transparent"
+              )}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm truncate">
+                  {item.color} / {item.size}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center border rounded-md bg-white">
+                  <button
+                    onClick={() => updateQuantity(item.optionId, -1)}
+                    className="p-1.5 hover:bg-muted transition-colors"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="w-8 text-center text-sm">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.optionId, 1)}
+                    className="p-1.5 hover:bg-muted transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <span className="text-sm font-medium w-20 text-right">
+                  {(item.unitPrice * item.quantity).toLocaleString()}원
+                </span>
+                <button
+                  onClick={() => removeItem(item.optionId)}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
+          ))}
+
+          {/* 총 금액 */}
+          <div className="flex items-center justify-between pt-2">
             <span className="text-sm text-muted-foreground">
-              (재고 {selectedOption.stock}개)
+              총 상품금액 ({selectedItems.reduce((s, i) => s + i.quantity, 0)}개)
+            </span>
+            <span className="text-xl font-bold">
+              {totalPrice.toLocaleString()}원
             </span>
           </div>
         </div>
       )}
 
-      {/* 가격 */}
-      <div className="border-t pt-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">총 상품금액</span>
-          <span className="text-xl font-bold">
-            {totalPrice.toLocaleString()}원
-          </span>
-        </div>
-      </div>
-
       {/* 버튼 — PC */}
       <div className="hidden md:flex gap-3">
         <Button
           variant="outline"
-          className="flex-1"
+          className="w-[40%]"
           size="lg"
           onClick={handleAddToCart}
         >
           <ShoppingBag className="h-4 w-4 mr-2" />
           장바구니
         </Button>
-        <Button className="flex-1" size="lg" onClick={handleBuyNow}>
+        <Button className="w-[60%]" size="lg" onClick={handleBuyNow}>
           바로구매
         </Button>
       </div>
 
       {/* 버튼 — 모바일 하단 고정 */}
-      <div className="fixed bottom-14 left-0 right-0 z-40 bg-background border-t p-3 flex gap-3 md:hidden">
+      <div className="fixed bottom-[60px] left-0 right-0 z-40 bg-white border-t shadow-lg py-3 px-4 flex gap-3 md:hidden pb-[calc(12px+env(safe-area-inset-bottom))]">
         <Button
           variant="outline"
-          className="flex-1"
+          className="w-[40%]"
           onClick={handleAddToCart}
         >
-          <ShoppingBag className="h-4 w-4 mr-2" />
           장바구니
         </Button>
-        <Button className="flex-1" onClick={handleBuyNow}>
+        <Button className="w-[60%]" onClick={handleBuyNow}>
           바로구매
         </Button>
       </div>

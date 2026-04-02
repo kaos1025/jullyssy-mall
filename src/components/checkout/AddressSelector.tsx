@@ -106,8 +106,13 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
 
     new daum.Postcode({
       oncomplete: (data: { zonecode: string; roadAddress: string }) => {
-        handleNewAddressChange("zipcode", data.zonecode)
-        handleNewAddressChange("address1", data.roadAddress)
+        const updated = {
+          ...newAddress,
+          zipcode: data.zonecode,
+          address1: data.roadAddress,
+        }
+        setNewAddress(updated)
+        onSelect({ ...updated, memo })
       },
     }).open()
   }

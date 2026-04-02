@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import { Heart, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ProductImage } from "@/types"
 
@@ -50,6 +51,36 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
             이미지 없음
           </div>
         )}
+
+        {/* 좌우 화살표 */}
+        {images.length > 1 && selectedIndex > 0 && (
+          <button
+            onClick={() => setSelectedIndex(selectedIndex - 1)}
+            className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-sm hover:bg-white transition-colors"
+            aria-label="이전 이미지"
+          >
+            <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+        )}
+        {images.length > 1 && selectedIndex < images.length - 1 && (
+          <button
+            onClick={() => setSelectedIndex(selectedIndex + 1)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-sm hover:bg-white transition-colors"
+            aria-label="다음 이미지"
+          >
+            <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+        )}
+
+        {/* 찜하기 플로팅 아이콘 */}
+        {/* TODO: 찜 기능 구현 후 onClick 연결 */}
+        <button
+          className="absolute top-3 right-3 bg-white/80 rounded-full p-2 shadow-sm hover:bg-white transition-colors"
+          aria-label="찜하기"
+        >
+          <Heart className="h-5 w-5" strokeWidth={1.5} />
+        </button>
+
         {/* 인디케이터 */}
         {images.length > 1 && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
@@ -71,7 +102,7 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
 
       {/* 썸네일 리스트 */}
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {images.map((img, i) => (
             <button
               key={img.id}
