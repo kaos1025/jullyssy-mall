@@ -69,7 +69,8 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
     .select(
       `
       *,
-      product_images(url, is_thumbnail),
+      product_images(url, is_thumbnail, sort_order),
+      product_options(color),
       reviews(id)
     `,
       { count: "exact" }
@@ -153,6 +154,12 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
                   || product.product_images?.[0]?.url
                   || null
                 }
+                images={
+                  (product.product_images ?? [])
+                    .sort((a: { sort_order?: number }, b: { sort_order?: number }) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                    .map((img: { url: string }) => img.url)
+                }
+                colors={Array.from(new Set((product.product_options ?? []).map((o: { color: string }) => o.color)))}
                 review_count={product.reviews?.length || 0}
                 status={product.status}
                 created_at={product.created_at}

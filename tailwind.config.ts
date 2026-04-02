@@ -34,7 +34,11 @@ const config = {
   				'Segoe UI Emoji',
   				'Segoe UI Symbol',
   				'sans-serif'
-  			]
+  			],
+  			display: ['Cormorant Garamond', 'serif']
+  		},
+  		spacing: {
+  			section: '80px'
   		},
   		colors: {
   			border: 'hsl(var(--border))',
@@ -69,6 +73,13 @@ const config = {
   			card: {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			subtle: '#FAFAF8',
+  			warm: '#F5F0EB',
+  			badge: {
+  				best: '#1A1A1A',
+  				sale: '#D94B4B',
+  				new: '#C4956A'
   			}
   		},
   		borderRadius: {
