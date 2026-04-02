@@ -49,6 +49,10 @@ interface OriginProduct {
   }
   detailAttribute?: {
     optionInfo?: OptionInfo
+    originAreaInfo?: {
+      originAreaCode?: string
+      content?: string
+    }
     [key: string]: unknown
   }
 }
@@ -83,6 +87,7 @@ const importSingleProduct = async (
   const stockQuantity = op.stockQuantity || 0
   const representImage = op.images?.representativeImage
   const optionalImages = op.images?.optionalImages || []
+  const origin = op.detailAttribute?.originAreaInfo?.content || null
   const naverCategoryId = op.leafCategoryId ? String(op.leafCategoryId) : null
   const naverCategoryName = op.wholeCategoryName || null
 
@@ -143,6 +148,7 @@ const importSingleProduct = async (
       price: originalPrice,
       sale_price: salePrice,
       category_id: categoryId,
+      origin,
       status: statusType === "SALE" ? "ACTIVE" : "HIDDEN",
       naver_product_no: originProductNo,
     })
