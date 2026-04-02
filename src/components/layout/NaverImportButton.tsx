@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast"
 
 interface NaverProductItem {
   productNo: string
+  channelProductNo: string | null
   name: string
   price: number
   salePrice: number | null
@@ -26,7 +27,7 @@ interface NaverProductItem {
 
 const DISPLAY_STEP = 20
 
-const NaverImportButton = () => {
+const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [products, setProducts] = useState<NaverProductItem[]>([])
@@ -71,6 +72,8 @@ const NaverImportButton = () => {
       setSearch("")
       setSearched(false)
       setDisplayCount(DISPLAY_STEP)
+    } else {
+      onClose?.()
     }
   }
 
@@ -131,10 +134,15 @@ const NaverImportButton = () => {
     setImporting(true)
 
     try {
+      // 선택된 상품의 productNo + channelProductNo 매핑
+      const items = products
+        .filter((p) => selectedNos.has(p.productNo))
+        .map((p) => ({ productNo: p.productNo, channelProductNo: p.channelProductNo }))
+
       const res = await fetch("/api/naver/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productNos: Array.from(selectedNos) }),
+        body: JSON.stringify({ items }),
       })
       const data = await res.json()
 

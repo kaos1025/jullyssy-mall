@@ -61,6 +61,7 @@ export const GET = async (request: NextRequest) => {
       .from("products")
       .select("naver_product_no")
       .not("naver_product_no", "is", null)
+      .neq("status", "DELETED")
 
     const importedSet = new Set(
       (imported || []).map((p) => p.naver_product_no)
@@ -70,6 +71,7 @@ export const GET = async (request: NextRequest) => {
       const cp = item.channelProducts?.[0]
       return {
         productNo: String(item.originProductNo),
+        channelProductNo: cp?.channelProductNo ? String(cp.channelProductNo) : null,
         name: cp?.name || "",
         price: cp?.salePrice || 0,
         salePrice: cp?.discountedPrice || null,

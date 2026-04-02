@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Users,
   Ticket,
+  ArrowLeftRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +18,7 @@ const menuItems = [
   { href: "/admin/orders", label: "주문관리", icon: ShoppingCart },
   { href: "/admin/members", label: "회원관리", icon: Users },
   { href: "/admin/coupons", label: "쿠폰관리", icon: Ticket },
+  { href: "/admin/settings/category-mapping", label: "카테고리 매핑", icon: ArrowLeftRight },
 ]
 
 const AdminSidebar = () => {

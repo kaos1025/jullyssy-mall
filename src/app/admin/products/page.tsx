@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Plus, Search } from "lucide-react"
+import { Plus, Search, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import NaverImportButton from "@/components/layout/NaverImportButton"
+import { useToast } from "@/hooks/use-toast"
 
 const statusLabel: Record<string, string> = {
   ACTIVE: "판매중",
@@ -33,6 +34,7 @@ interface ProductRow {
 }
 
 const AdminProductsPage = () => {
+  const { toast } = useToast()
   const [products, setProducts] = useState<ProductRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -64,7 +66,7 @@ const AdminProductsPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">상품 관리</h1>
         <div className="flex gap-2">
-          <NaverImportButton />
+          <NaverImportButton onClose={fetchProducts} />
           <Button asChild>
             <Link href="/admin/products/new">
               <Plus className="h-4 w-4 mr-2" />
@@ -172,9 +174,28 @@ const AdminProductsPage = () => {
                     {new Date(product.created_at).toLocaleDateString("ko-KR")}
                   </td>
                   <td className="p-3 text-center">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/admin/products/${product.id}`}>수정</Link>
-                    </Button>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/admin/products/${product.id}`}>수정</Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={async () => {
+                          if (!confirm(`"${product.name}" 상품을 삭제하시겠습니까?`)) return
+                          const res = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" })
+                          if (res.ok) {
+                            toast({ title: "상품 삭제 완료" })
+                            fetchProducts()
+                          } else {
+                            toast({ variant: "destructive", title: "삭제 실패" })
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))
