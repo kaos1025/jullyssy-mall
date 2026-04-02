@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import NaverImportButton from "@/components/layout/NaverImportButton"
 
 const statusLabel: Record<string, string> = {
   ACTIVE: "판매중",
@@ -62,12 +63,15 @@ const AdminProductsPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">상품 관리</h1>
-        <Button asChild>
-          <Link href="/admin/products/new">
-            <Plus className="h-4 w-4 mr-2" />
-            상품 등록
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <NaverImportButton />
+          <Button asChild>
+            <Link href="/admin/products/new">
+              <Plus className="h-4 w-4 mr-2" />
+              상품 등록
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* 필터 */}
