@@ -1,4 +1,4 @@
-import { createHmac } from "crypto"
+import bcrypt from "bcryptjs"
 
 const NAVER_API_BASE = "https://api.commerce.naver.com/external"
 
@@ -12,11 +12,12 @@ export const getNaverAccessToken = async () => {
     throw new Error("네이버 커머스 API 환경변수가 설정되지 않았습니다")
   }
 
-  // HMAC-SHA256 서명 생성 (네이버 커머스 API 스펙)
+  // bcrypt 서명 생성 (네이버 커머스 API 스펙)
+  // clientSecret은 네이버가 발급한 bcrypt salt ($2a$... 형태)
   const timestamp = Date.now()
-  const signature = createHmac("sha256", clientSecret)
-    .update(`${clientId}_${timestamp}`)
-    .digest("base64")
+  const password = `${clientId}_${timestamp}`
+  const hashed = bcrypt.hashSync(password, clientSecret)
+  const clientSecretSign = Buffer.from(hashed).toString("base64")
 
   const res = await fetch(`${NAVER_API_BASE}/v1/oauth2/token`, {
     method: "POST",
@@ -24,7 +25,7 @@ export const getNaverAccessToken = async () => {
     body: new URLSearchParams({
       client_id: clientId,
       timestamp: String(timestamp),
-      client_secret_sign: signature,
+      client_secret_sign: clientSecretSign,
       grant_type: "client_credentials",
       type: "SELF",
     }),
