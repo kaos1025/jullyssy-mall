@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
 import dayjs from "dayjs"
 
 interface MemberRow {
@@ -41,28 +40,12 @@ const AdminMembersPage = () => {
 
   const fetchMembers = useCallback(async () => {
     setLoading(true)
-    const supabase = createClient()
-    let query = supabase
-      .from("profiles")
-      .select("*, orders(id)")
-      .order("created_at", { ascending: false })
+    const params = new URLSearchParams()
+    if (search) params.set("search", search)
 
-    if (search) {
-      query = query.or(
-        `name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
-      )
-    }
-
-    const { data } = await query.limit(100)
-
-    if (data) {
-      setMembers(
-        data.map((m) => ({
-          ...m,
-          order_count: m.orders?.length || 0,
-        })) as MemberRow[]
-      )
-    }
+    const res = await fetch(`/api/admin/members?${params}`)
+    const data = await res.json()
+    setMembers(data.error ? [] : data)
     setLoading(false)
   }, [search])
 
@@ -75,20 +58,21 @@ const AdminMembersPage = () => {
     const amount = parseInt(pointAmount, 10)
     if (isNaN(amount) || amount === 0) return
 
-    const supabase = createClient()
-
-    // 포인트 업데이트
-    await supabase
-      .from("profiles")
-      .update({ point: pointTarget.point + amount })
-      .eq("id", pointTarget.id)
-
-    // 히스토리
-    await supabase.from("point_histories").insert({
-      user_id: pointTarget.id,
-      amount,
-      reason: pointReason,
+    const res = await fetch(`/api/admin/members/${pointTarget.id}/point`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount,
+        reason: pointReason,
+        currentPoint: pointTarget.point,
+      }),
     })
+
+    if (!res.ok) {
+      const { error } = await res.json()
+      toast({ variant: "destructive", title: "포인트 처리 실패", description: error })
+      return
+    }
 
     toast({
       title: `포인트 ${amount > 0 ? "지급" : "차감"} 완료`,

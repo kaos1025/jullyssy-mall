@@ -1,13 +1,18 @@
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { createAdminClient } from "@/lib/supabase/admin"
-import type { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "상품 관리 | 쥴리씨 어드민",
-}
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const statusLabel: Record<string, string> = {
   ACTIVE: "판매중",
@@ -16,37 +21,42 @@ const statusLabel: Record<string, string> = {
   DELETED: "삭제",
 }
 
-interface AdminProductsPageProps {
-  searchParams: { status?: string; search?: string }
+interface ProductRow {
+  id: string
+  name: string
+  price: number
+  sale_price: number | null
+  status: string
+  created_at: string
+  stock_sum: number
 }
 
-const AdminProductsPage = async ({ searchParams }: AdminProductsPageProps) => {
-  const admin = createAdminClient()
+const AdminProductsPage = () => {
+  const [products, setProducts] = useState<ProductRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("ALL")
 
-  let query = admin
-    .from("products")
-    .select("*, product_options(stock)")
-    .neq("status", "DELETED")
-    .order("created_at", { ascending: false })
+  const fetchProducts = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (statusFilter !== "ALL") params.set("status", statusFilter)
+    if (search) params.set("search", search)
 
-  if (searchParams.status && searchParams.status !== "ALL") {
-    query = query.eq("status", searchParams.status)
+    const res = await fetch(`/api/admin/products?${params}`)
+    const data = await res.json()
+    setProducts(data.error ? [] : data)
+    setLoading(false)
+  }, [statusFilter, search])
+
+  useEffect(() => {
+    fetchProducts()
+  }, [fetchProducts])
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    fetchProducts()
   }
-
-  if (searchParams.search) {
-    query = query.ilike("name", `%${searchParams.search}%`)
-  }
-
-  const { data } = await query
-
-  const products = (data || []).map((p) => ({
-    ...p,
-    stock_sum:
-      p.product_options?.reduce(
-        (sum: number, o: { stock: number }) => sum + o.stock,
-        0
-      ) || 0,
-  }))
 
   return (
     <div className="space-y-6">
@@ -61,23 +71,27 @@ const AdminProductsPage = async ({ searchParams }: AdminProductsPageProps) => {
       </div>
 
       {/* 필터 */}
-      <form className="flex flex-col md:flex-row gap-3">
-        <input
-          name="search"
-          defaultValue={searchParams.search || ""}
-          placeholder="상품명 검색"
-          className="flex-1 border rounded-md px-3 py-2 text-sm"
-        />
-        <select
-          name="status"
-          defaultValue={searchParams.status || "ALL"}
-          className="border rounded-md px-3 py-2 text-sm w-[140px]"
-        >
-          <option value="ALL">전체 상태</option>
-          <option value="ACTIVE">판매중</option>
-          <option value="SOLDOUT">품절</option>
-          <option value="HIDDEN">숨김</option>
-        </select>
+      <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="상품명 검색"
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">전체 상태</SelectItem>
+            <SelectItem value="ACTIVE">판매중</SelectItem>
+            <SelectItem value="SOLDOUT">품절</SelectItem>
+            <SelectItem value="HIDDEN">숨김</SelectItem>
+          </SelectContent>
+        </Select>
         <Button type="submit" variant="outline" size="sm">
           검색
         </Button>
@@ -97,7 +111,16 @@ const AdminProductsPage = async ({ searchParams }: AdminProductsPageProps) => {
             </tr>
           </thead>
           <tbody>
-            {products.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="text-center py-10 text-muted-foreground"
+                >
+                  로딩 중...
+                </td>
+              </tr>
+            ) : products.length === 0 ? (
               <tr>
                 <td
                   colSpan={6}

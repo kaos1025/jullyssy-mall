@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
 import { ORDER_STATUS_LABEL } from "@/constants"
 import dayjs from "dayjs"
 
@@ -61,32 +60,13 @@ const AdminOrdersPage = () => {
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
-    const supabase = createClient()
-    let query = supabase
-      .from("orders")
-      .select("*, order_items(product_name, quantity)")
-      .order("created_at", { ascending: false })
+    const params = new URLSearchParams()
+    if (statusFilter !== "ALL") params.set("status", statusFilter)
+    if (search) params.set("search", search)
 
-    if (statusFilter === "CANCELLED") {
-      query = query.in("status", [
-        "CANCELLED",
-        "RETURN_REQUESTED",
-        "RETURNED",
-        "EXCHANGE_REQUESTED",
-        "EXCHANGED",
-      ])
-    } else if (statusFilter !== "ALL") {
-      query = query.eq("status", statusFilter)
-    }
-
-    if (search) {
-      query = query.or(
-        `order_no.ilike.%${search}%,recipient.ilike.%${search}%,recipient_phone.ilike.%${search}%`
-      )
-    }
-
-    const { data } = await query.limit(100)
-    setOrders((data || []) as OrderRow[])
+    const res = await fetch(`/api/admin/orders?${params}`)
+    const data = await res.json()
+    setOrders(data.error ? [] : data)
     setLoading(false)
   }, [statusFilter, search])
 
@@ -95,16 +75,22 @@ const AdminOrdersPage = () => {
   }, [fetchOrders])
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
-    const supabase = createClient()
-    await supabase.from("orders").update({ status: newStatus }).eq("id", orderId)
+    await fetch(`/api/admin/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    })
     fetchOrders()
     toast({ title: `주문 상태: ${ORDER_STATUS_LABEL[newStatus]}` })
   }
 
   const handleBulkStatusChange = async (newStatus: string) => {
     if (selectedIds.length === 0) return
-    const supabase = createClient()
-    await supabase.from("orders").update({ status: newStatus }).in("id", selectedIds)
+    await fetch("/api/admin/orders/bulk", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: selectedIds, status: newStatus }),
+    })
     setSelectedIds([])
     fetchOrders()
     toast({ title: `${selectedIds.length}건 상태 변경: ${ORDER_STATUS_LABEL[newStatus]}` })
@@ -112,11 +98,11 @@ const AdminOrdersPage = () => {
 
   const handleTrackingSubmit = async () => {
     if (!trackingOrderId || !trackingNo) return
-    const supabase = createClient()
-    await supabase
-      .from("orders")
-      .update({ courier, tracking_no: trackingNo, status: "SHIPPING" })
-      .eq("id", trackingOrderId)
+    await fetch(`/api/admin/orders/${trackingOrderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courier, tracking_no: trackingNo, status: "SHIPPING" }),
+    })
 
     setTrackingOrderId(null)
     setTrackingNo("")

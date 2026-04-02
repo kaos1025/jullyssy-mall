@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -15,6 +15,44 @@ const verifyAdmin = async () => {
 
   if (!adminEmails.includes(user.email?.toLowerCase() || "")) return null
   return user
+}
+
+export const GET = async (request: NextRequest) => {
+  const admin = createAdminClient()
+  const { searchParams } = request.nextUrl
+  const status = searchParams.get("status") || "ALL"
+  const search = searchParams.get("search") || ""
+
+  let query = admin
+    .from("products")
+    .select("*, product_options(stock)")
+    .neq("status", "DELETED")
+    .order("created_at", { ascending: false })
+
+  if (status && status !== "ALL") {
+    query = query.eq("status", status)
+  }
+
+  if (search) {
+    query = query.ilike("name", `%${search}%`)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const products = (data || []).map((p) => ({
+    ...p,
+    stock_sum:
+      p.product_options?.reduce(
+        (sum: number, o: { stock: number }) => sum + o.stock,
+        0
+      ) || 0,
+  }))
+
+  return NextResponse.json(products)
 }
 
 export const POST = async (request: Request) => {

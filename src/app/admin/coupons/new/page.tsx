@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
 
 const NewCouponPage = () => {
   const router = useRouter()
@@ -46,25 +45,30 @@ const NewCouponPage = () => {
     }
 
     setLoading(true)
-    const supabase = createClient()
 
-    const { error } = await supabase.from("coupons").insert({
-      name: form.name,
-      code: form.code.toUpperCase(),
-      type: form.type,
-      discount_value: form.discount_value,
-      min_order_amount: form.min_order_amount || 0,
-      max_discount: form.max_discount || null,
-      starts_at: new Date(form.starts_at).toISOString(),
-      expires_at: new Date(form.expires_at).toISOString(),
-      max_issues: form.max_issues || null,
+    const res = await fetch("/api/admin/coupons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.name,
+        code: form.code.toUpperCase(),
+        type: form.type,
+        discount_value: form.discount_value,
+        min_order_amount: form.min_order_amount || 0,
+        max_discount: form.max_discount || null,
+        starts_at: new Date(form.starts_at).toISOString(),
+        expires_at: new Date(form.expires_at).toISOString(),
+        max_issues: form.max_issues || null,
+      }),
     })
 
-    if (error) {
+    const data = await res.json()
+
+    if (data.error) {
       toast({
         variant: "destructive",
         title: "쿠폰 생성 실패",
-        description: error.message,
+        description: data.error,
       })
     } else {
       toast({ title: "쿠폰이 생성되었습니다" })

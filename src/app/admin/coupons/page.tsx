@@ -5,7 +5,6 @@ import Link from "next/link"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/client"
 import dayjs from "dayjs"
 import type { Coupon } from "@/types"
 
@@ -15,13 +14,9 @@ const AdminCouponsPage = () => {
 
   useEffect(() => {
     const fetchCoupons = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("coupons")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (data) setCoupons(data)
+      const res = await fetch("/api/admin/coupons")
+      const data = await res.json()
+      if (!data.error) setCoupons(data)
       setLoading(false)
     }
     fetchCoupons()
