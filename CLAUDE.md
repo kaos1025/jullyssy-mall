@@ -94,7 +94,7 @@ src/
 ### Branch Strategy
 
 - **main** ← feature/*, fix/*, refactor/*
-- main 직접 푸시 금지, 반드시 PR을 통해 머지
+- main 직접 푸시 금지, 사용자 요청했을때 외에는 반드시 PR을 통해 머지
 - .env 파일: 절대 커밋 금지
 
 ---

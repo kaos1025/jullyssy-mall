@@ -25,8 +25,8 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
   }
 
   return (
-    <div className="space-y-3">
-      {/* 메인 이미지 */}
+    <div className="w-full md:max-w-[600px] overflow-hidden space-y-3">
+      {/* 메인 이미지 — aspect 3:4, PC max-h 800px → 너비 600px */}
       <div
         className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted"
         onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
@@ -100,18 +100,21 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
         )}
       </div>
 
-      {/* 썸네일 리스트 */}
+      {/* 썸네일 리스트 — 메인 이미지와 동일 너비, 1행 가로 스크롤 */}
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <div
+          className="w-full flex flex-nowrap gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: "none" }}
+        >
           {images.map((img, i) => (
             <button
               key={img.id}
               onClick={() => setSelectedIndex(i)}
               className={cn(
-                "relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border-2 transition-colors",
+                "relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md cursor-pointer transition-all",
                 i === selectedIndex
-                  ? "border-primary"
-                  : "border-transparent hover:border-muted-foreground/30"
+                  ? "ring-2 ring-primary ring-offset-1"
+                  : "border border-transparent hover:opacity-80"
               )}
             >
               <Image

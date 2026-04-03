@@ -11,7 +11,17 @@
       "Bash(git:*)",
       "Bash(gh pr:*)",
       "Bash(gh auth:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(echo \"VITEST_EXIT: $?\")",
+      "Bash(xargs wc:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx playwright:*)",
+      "Bash(curl -s \"http://localhost:3000/_next/static/css/app/layout.css\")",
+      "Read(//c/Users/jully/AppData/Local/Temp/claude/F--juji-jullyssy-mall/a7104f52-fd8c-47d6-868f-b302bdaac7a3/tasks/**)",
+      "Bash(node -e \"const j=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\);const d=JSON.parse\\(j\\);console.log\\('cookies:', d.cookies?.length || 0\\);d.cookies?.forEach\\(c=>console.log\\(c.name, c.domain, c.path, c.value?.substring\\(0,30\\)+'...'\\)\\);console.log\\('origins:', d.origins?.length || 0\\);d.origins?.forEach\\(o=>{console.log\\(o.origin\\);o.localStorage?.forEach\\(l=>console.log\\('  ls:', l.name, l.value?.substring\\(0,50\\)+'...'\\)\\)}\\)\")",
+      "Bash(curl -s http://localhost:3000/robots.txt)",
+      "Bash(curl -s http://localhost:3000/sitemap.xml)",
+      "Bash(ls src/components/ui/toast*.tsx src/hooks/use-toast.ts)"
     ]
   }
 }

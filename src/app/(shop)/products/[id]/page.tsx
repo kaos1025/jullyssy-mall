@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { PackageOpen, MessageSquare, HelpCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -7,9 +8,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Button } from "@/components/ui/button"
 import ImageGallery from "@/components/product/ImageGallery"
 import ProductOptions from "@/components/product/ProductOptions"
 import ProductReviews from "@/components/product/ProductReviews"
+import ProductDescription from "@/components/product/ProductDescription"
+import ProductCard from "@/components/product/ProductCard"
+import ShareButton from "@/components/product/ShareButton"
+import { SHOPPING_GUIDE } from "@/constants/shopping-guide"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
 
@@ -20,40 +26,45 @@ interface ProductDetailPageProps {
 export const generateMetadata = async ({
   params,
 }: ProductDetailPageProps): Promise<Metadata> => {
-  const supabase = await createClient()
-  const { data: product } = await supabase
-    .from("products")
-    .select("id, slug, name, description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
-    .or(`slug.eq.${params.id},id.eq.${params.id}`)
-    .single()
+  try {
+    const supabase = await createClient()
+    const { data: product } = await supabase
+      .from("products")
+      .select("id, slug, name, description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
+      .or(`slug.eq.${params.id},id.eq.${params.id}`)
+      .eq("status", "ACTIVE")
+      .single()
 
-  if (!product) return { title: "상품을 찾을 수 없습니다" }
+    if (!product) return { title: "상품 상세" }
 
-  const displayPrice = product.sale_price ?? product.price
-  const thumbnail =
-    product.product_images?.find(
-      (img: { is_thumbnail: boolean }) => img.is_thumbnail
-    )?.url || product.product_images?.[0]?.url
+    const displayPrice = product.sale_price ?? product.price
+    const thumbnail =
+      product.product_images?.find(
+        (img: { is_thumbnail: boolean }) => img.is_thumbnail
+      )?.url || product.product_images?.[0]?.url
 
-  return {
-    title: product.name,
-    description: `${product.name} | ${displayPrice.toLocaleString()}원 | 쥴리씨`,
-    openGraph: {
+    return {
       title: product.name,
-      description: product.description?.slice(0, 160) || product.name,
-      ...(thumbnail && {
-        images: [{ url: thumbnail, width: 800, height: 1067, alt: product.name }],
-      }),
-    },
-    keywords: [
-      product.name,
-      ...(product.search_tags ?? []),
-      "여성의류",
-      "쥴리씨",
-    ],
-    alternates: {
-      canonical: `/products/${product.slug || product.id}`,
-    },
+      description: `${product.name} | ${displayPrice.toLocaleString()}원 | 쥴리씨`,
+      openGraph: {
+        title: product.name,
+        description: product.description?.slice(0, 160) || product.name,
+        ...(thumbnail && {
+          images: [{ url: thumbnail, width: 800, height: 1067, alt: product.name }],
+        }),
+      },
+      keywords: [
+        product.name,
+        ...(product.search_tags ?? []),
+        "여성의류",
+        "쥴리씨",
+      ],
+      alternates: {
+        canonical: `/products/${product.slug || product.id}`,
+      },
+    }
+  } catch {
+    return { title: "상품 상세" }
   }
 }
 
@@ -100,6 +111,19 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     )
     .eq("product_id", product.id)
     .order("created_at", { ascending: false })
+
+  // 관련상품 조회 (같은 카테고리, 현재 상품 제외)
+  let relatedProducts: typeof product[] = []
+  if (product.category_id) {
+    const { data: related } = await supabase
+      .from("products")
+      .select("*, product_images(url, is_thumbnail, sort_order), product_options(color)")
+      .eq("category_id", product.category_id)
+      .eq("status", "ACTIVE")
+      .neq("id", product.id)
+      .limit(8)
+    relatedProducts = related || []
+  }
 
   const typedReviews = (reviews || []) as unknown as ReviewWithImages[]
   const averageRating =
@@ -177,14 +201,22 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
 
         {/* 우측: 상품 정보 + 옵션 */}
         <div className="md:sticky md:top-20 md:self-start space-y-4">
-          {/* 카테고리 breadcrumb */}
-          {product.category && (
-            <p className="text-xs text-muted-foreground">
-              {parentCategory
-                ? `${parentCategory.name} > ${product.category.name}`
-                : product.category.name}
-            </p>
-          )}
+          {/* 카테고리 breadcrumb + 공유 */}
+          <div className="flex items-center justify-between">
+            {product.category ? (
+              <p className="text-xs text-muted-foreground">
+                {parentCategory
+                  ? `${parentCategory.name} > ${product.category.name}`
+                  : product.category.name}
+              </p>
+            ) : (
+              <div />
+            )}
+            <ShareButton
+              title={product.name}
+              text={`${product.name} | ${(product.sale_price ?? product.price).toLocaleString()}원`}
+            />
+          </div>
 
           {/* 상품명 */}
           <h1 className="text-lg font-bold">{product.name}</h1>
@@ -265,61 +297,128 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
         </div>
       </div>
 
-      {/* 탭: 상세설명 / 리뷰 / 배송·교환 */}
+      {/* 탭: 4탭 */}
       <div className="mt-12" id="reviews">
         <Tabs defaultValue="description">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="description" className="flex-1 md:flex-none">
-              상세설명
-            </TabsTrigger>
-            <TabsTrigger value="reviews" className="flex-1 md:flex-none">
-              리뷰 ({typedReviews.length})
-            </TabsTrigger>
-            <TabsTrigger value="shipping" className="flex-1 md:flex-none">
-              배송/교환
-            </TabsTrigger>
+          <TabsList className="grid grid-cols-4 w-full border-b border-gray-200 bg-transparent p-0 h-auto rounded-none gap-0">
+            {[
+              { value: "description", label: "상세설명" },
+              { value: "related", label: "관련상품" },
+              { value: "reviews", label: `구매후기${typedReviews.length > 0 ? ` (${typedReviews.length})` : ""}` },
+              { value: "qna", label: "상품문의" },
+            ].map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="text-xs md:text-sm py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground hover:text-foreground bg-transparent justify-center"
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
+
+          {/* 상세설명 */}
           <TabsContent value="description" className="mt-6">
             {product.description ? (
-              <div
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: product.description }}
-              />
+              <ProductDescription html={product.description} />
             ) : (
               <p className="text-center py-10 text-muted-foreground">
                 상세설명이 없습니다.
               </p>
             )}
           </TabsContent>
-          <TabsContent value="reviews" className="mt-6">
-            <ProductReviews
-              reviews={typedReviews}
-              averageRating={averageRating}
-            />
+
+          {/* 관련상품 */}
+          <TabsContent value="related" className="mt-6">
+            {relatedProducts.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+                {relatedProducts.map((rp) => {
+                  const rpImages = (rp.product_images ?? [])
+                    .sort((a: { sort_order?: number }, b: { sort_order?: number }) =>
+                      (a.sort_order ?? 0) - (b.sort_order ?? 0)
+                    )
+                  const rpThumb =
+                    rpImages.find((img: { is_thumbnail: boolean }) => img.is_thumbnail)?.url ||
+                    rpImages[0]?.url ||
+                    null
+                  const rpColors = Array.from(
+                    new Set((rp.product_options ?? []).map((o: { color: string }) => o.color))
+                  ) as string[]
+                  return (
+                    <ProductCard
+                      key={rp.id}
+                      id={rp.id}
+                      name={rp.name}
+                      slug={rp.slug}
+                      price={rp.price}
+                      sale_price={rp.sale_price}
+                      thumbnail={rpThumb}
+                      images={rpImages.map((img: { url: string }) => img.url)}
+                      colors={rpColors}
+                      status={rp.status}
+                      created_at={rp.created_at}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <PackageOpen className="h-12 w-12 mb-3" strokeWidth={1.5} />
+                <p className="text-sm">관련 상품이 없습니다</p>
+              </div>
+            )}
           </TabsContent>
-          <TabsContent value="shipping" className="mt-6">
-            <div className="space-y-6 text-sm leading-relaxed">
-              <div>
-                <h3 className="font-bold mb-2">배송 안내</h3>
-                <ul className="space-y-1 text-muted-foreground list-disc list-inside">
-                  <li>배송비: 3,000원 (5만원 이상 구매 시 무료배송)</li>
-                  <li>배송 기간: 결제 완료 후 1~3 영업일 이내 출고</li>
-                  <li>도서산간 지역은 추가 배송비가 발생할 수 있습니다.</li>
-                </ul>
+
+          {/* 구매후기 */}
+          <TabsContent value="reviews" className="mt-6">
+            {typedReviews.length > 0 ? (
+              <ProductReviews
+                reviews={typedReviews}
+                averageRating={averageRating}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <MessageSquare className="h-12 w-12 mb-3" strokeWidth={1.5} />
+                <p className="text-sm font-medium">아직 구매후기가 없습니다</p>
+                <p className="text-xs mt-1">첫 번째 후기를 남겨주세요!</p>
               </div>
-              <div>
-                <h3 className="font-bold mb-2">교환/반품 안내</h3>
-                <ul className="space-y-1 text-muted-foreground list-disc list-inside">
-                  <li>상품 수령 후 7일 이내 교환/반품 신청 가능</li>
-                  <li>고객 변심에 의한 교환/반품 시 배송비 고객 부담</li>
-                  <li>상품 하자 시 무료 교환/반품 가능</li>
-                  <li>착용하거나 세탁한 상품, 택을 제거한 상품은 교환/반품 불가</li>
-                </ul>
-              </div>
+            )}
+          </TabsContent>
+
+          {/* 상품문의 */}
+          {/* P2: qna 테이블 생성 후 실제 CRUD 구현 */}
+          <TabsContent value="qna" className="mt-6">
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <HelpCircle className="h-12 w-12 mb-3" strokeWidth={1.5} />
+              <p className="text-sm font-medium">상품문의가 없습니다</p>
+              <Button variant="outline" size="sm" className="mt-4" asChild>
+                <a href="#">카카오톡으로 문의하기</a>
+              </Button>
             </div>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* 쇼핑가이드 — 별도 섹션 */}
+      <section className="mt-12 border-t bg-muted/30 -mx-4 md:-mx-8 px-4 md:px-8 py-8">
+        <h2 className="text-lg font-bold mb-4">쇼핑가이드</h2>
+        <Accordion type="single" collapsible defaultValue="item-0">
+          {SHOPPING_GUIDE.map((section, idx) => (
+            <AccordionItem key={idx} value={`item-${idx}`}>
+              <AccordionTrigger className="text-sm font-bold hover:no-underline">
+                {section.title}
+              </AccordionTrigger>
+              <AccordionContent>
+                <ul className="space-y-1 text-sm text-muted-foreground list-disc list-inside">
+                  {section.items.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </section>
     </div>
   )
 }

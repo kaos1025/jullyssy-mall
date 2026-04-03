@@ -152,7 +152,7 @@ const Header = ({ categories }: HeaderProps) => {
         <div className="flex-1 md:hidden" />
 
         {/* 우측 아이콘 */}
-        <div className="flex items-center gap-0.5 shrink-0">
+        <div className="flex items-center gap-1 md:gap-2 shrink-0">
           {/* 모바일 검색 아이콘 */}
           <Button
             variant="ghost"
@@ -169,11 +169,11 @@ const Header = ({ categories }: HeaderProps) => {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden md:flex"
+            className="hidden md:flex h-10 w-10"
             asChild
           >
             <Link href="/mypage">
-              <User className="h-5 w-5" strokeWidth={1.5} />
+              <User className="h-6 w-6" strokeWidth={1.5} />
               <span className="sr-only">마이페이지</span>
             </Link>
           </Button>
@@ -181,20 +181,20 @@ const Header = ({ categories }: HeaderProps) => {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden md:flex"
+            className="hidden md:flex h-10 w-10"
             asChild
           >
             <Link href="/mypage">
-              <Heart className="h-5 w-5" strokeWidth={1.5} />
+              <Heart className="h-6 w-6" strokeWidth={1.5} />
               <span className="sr-only">찜</span>
             </Link>
           </Button>
           {/* 장바구니 */}
-          <Button variant="ghost" size="icon" className="relative" asChild>
+          <Button variant="ghost" size="icon" className="relative md:h-10 md:w-10" asChild>
             <Link href="/cart">
-              <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
+              <ShoppingBag className="h-5 w-5 md:h-6 md:w-6" strokeWidth={1.5} />
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] md:text-xs font-bold rounded-full h-4 w-4 md:min-w-[18px] md:h-[18px] flex items-center justify-center">
                   {itemCount > 99 ? "99" : itemCount}
                 </span>
               )}
