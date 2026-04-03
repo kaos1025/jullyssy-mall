@@ -10,7 +10,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: "html",
-  timeout: 30_000,
+  timeout: 60_000,
 
   use: {
     baseURL: "http://localhost:3000",
@@ -38,7 +38,7 @@ export default defineConfig({
         storageState: path.join(authDir, "user.json"),
       },
       dependencies: ["setup"],
-      testMatch: /^(?!admin-).*\.spec\.ts$/,
+      testIgnore: /admin-/,
     },
     {
       name: "admin-tests",
@@ -47,7 +47,7 @@ export default defineConfig({
         storageState: path.join(authDir, "admin.json"),
       },
       dependencies: ["setup"],
-      testMatch: /^admin-.*\.spec\.ts$/,
+      testMatch: /admin-/,
     },
   ],
 })

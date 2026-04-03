@@ -5,18 +5,30 @@ import {
   adminClient,
 } from "../helpers/supabase-admin"
 import { PREFIXES, TEST_ADDRESS } from "../helpers/test-data"
-import { injectCart, clearCart } from "../helpers/cart"
+import { injectCart } from "../helpers/cart"
 
 const PREFIX = PREFIXES.order
 
 let testProduct: { id: string; name: string; price: number }
 let testOptionId: string
 
+const makeCartItem = () => ({
+  product_id: testProduct.id,
+  product_option_id: testOptionId,
+  product_name: testProduct.name,
+  product_image: null,
+  color: "블랙",
+  size: "M",
+  price: 35000,
+  extra_price: 0,
+  quantity: 1,
+  stock: 10,
+})
+
 test.describe("주문 결제 플로우", () => {
   test.beforeAll(async () => {
     await cleanupByPrefix(PREFIX)
 
-    // 테스트 상품 생성
     const product = await createTestProduct({
       name: `${PREFIX} 니트 원피스`,
       price: 35000,
@@ -29,7 +41,6 @@ test.describe("주문 결제 플로우", () => {
 
     testProduct = { id: product.id, name: product.name, price: product.price }
 
-    // 옵션 ID 조회
     const { data: opts } = await adminClient
       .from("product_options")
       .select("id")
@@ -43,7 +54,6 @@ test.describe("주문 결제 플로우", () => {
 
   test.afterAll(async () => {
     await cleanupByPrefix(PREFIX)
-    // E2E 주문도 정리
     const { data: orders } = await adminClient
       .from("orders")
       .select("id")
@@ -57,142 +67,87 @@ test.describe("주문 결제 플로우", () => {
 
   test("상품 목록에서 상품이 표시됨", async ({ userPage: page }) => {
     await page.goto("/products")
-    await expect(page.getByText(testProduct.name)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(testProduct.name)).toBeVisible({
+      timeout: 10_000,
+    })
   })
 
   test("상품 상세 → 옵션 선택 → 장바구니 추가", async ({ userPage: page }) => {
     await page.goto(`/products/${testProduct.id}`)
-
-    // 상품명 확인
-    await expect(page.getByText(testProduct.name)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(testProduct.name)).toBeVisible({
+      timeout: 10_000,
+    })
 
     // 색상 선택: 블랙
-    await page.getByRole("button", { name: "블랙" }).click()
+    await page.getByRole("button", { name: "블랙", exact: true }).click()
 
-    // 사이즈 선택: M
-    await page.getByRole("button", { name: "M" }).click()
+    // 사이즈 선택: M (정확히 "M"만 매칭)
+    await page.getByRole("button", { name: "M", exact: true }).click()
 
-    // 선택된 옵션이 표시되는지 확인
+    // 선택된 옵션 표시
     await expect(page.getByText("블랙 / M")).toBeVisible()
 
-    // 장바구니 추가 (PC 버전 버튼)
+    // 장바구니 추가
     await page.locator("button:has-text('장바구니')").first().click()
 
-    // 토스트 메시지 확인
     await expect(page.getByText("장바구니에 추가했습니다")).toBeVisible({
       timeout: 5_000,
     })
   })
 
   test("장바구니 페이지에서 상품 확인", async ({ userPage: page }) => {
-    // 장바구니에 상품 주입
-    await page.goto("/")
-    await injectCart(page, [
-      {
-        product_id: testProduct.id,
-        product_option_id: testOptionId,
-        product_name: testProduct.name,
-        product_image: null,
-        color: "블랙",
-        size: "M",
-        price: 35000,
-        extra_price: 0,
-        quantity: 1,
-        stock: 10,
-      },
-    ])
+    await injectCart(page, [makeCartItem()])
     await page.goto("/cart")
 
-    // 상품명 확인
-    await expect(page.getByText(testProduct.name)).toBeVisible({ timeout: 10_000 })
-    // 옵션 확인
+    await expect(page.getByText(testProduct.name)).toBeVisible({
+      timeout: 10_000,
+    })
     await expect(page.getByText("블랙 / M")).toBeVisible()
-    // 가격 확인
     await expect(page.getByText("35,000원").first()).toBeVisible()
   })
 
   test("장바구니 수량 변경", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCart(page, [
-      {
-        product_id: testProduct.id,
-        product_option_id: testOptionId,
-        product_name: testProduct.name,
-        product_image: null,
-        color: "블랙",
-        size: "M",
-        price: 35000,
-        extra_price: 0,
-        quantity: 1,
-        stock: 10,
-      },
-    ])
+    await injectCart(page, [makeCartItem()])
     await page.goto("/cart")
 
-    await expect(page.getByText(testProduct.name)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(testProduct.name)).toBeVisible({
+      timeout: 10_000,
+    })
 
-    // + 버튼 클릭 (Plus 아이콘이 있는 버튼)
-    const plusButton = page.locator("button").filter({ has: page.locator(".lucide-plus") })
+    // + 버튼
+    const plusButton = page
+      .locator("button")
+      .filter({ has: page.locator(".lucide-plus") })
     await plusButton.click()
 
-    // 수량이 2로 변경
     await expect(page.locator("span.w-8.text-center").first()).toHaveText("2")
-
-    // 가격이 70,000원으로 업데이트
     await expect(page.getByText("70,000원").first()).toBeVisible()
   })
 
   test("장바구니 상품 삭제", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCart(page, [
-      {
-        product_id: testProduct.id,
-        product_option_id: testOptionId,
-        product_name: testProduct.name,
-        product_image: null,
-        color: "블랙",
-        size: "M",
-        price: 35000,
-        extra_price: 0,
-        quantity: 1,
-        stock: 10,
-      },
-    ])
+    await injectCart(page, [makeCartItem()])
     await page.goto("/cart")
 
-    await expect(page.getByText(testProduct.name)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(testProduct.name)).toBeVisible({
+      timeout: 10_000,
+    })
 
-    // 삭제 버튼 (Trash2 아이콘)
     const deleteButton = page
       .locator("button")
       .filter({ has: page.locator(".lucide-trash-2") })
     await deleteButton.click()
 
-    // 빈 장바구니 메시지
     await expect(page.getByText("장바구니가 비어있습니다")).toBeVisible()
   })
 
   test("장바구니 → 주문서 이동", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCart(page, [
-      {
-        product_id: testProduct.id,
-        product_option_id: testOptionId,
-        product_name: testProduct.name,
-        product_image: null,
-        color: "블랙",
-        size: "M",
-        price: 35000,
-        extra_price: 0,
-        quantity: 1,
-        stock: 10,
-      },
-    ])
+    await injectCart(page, [makeCartItem()])
     await page.goto("/cart")
 
-    await expect(page.getByText(testProduct.name)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(testProduct.name)).toBeVisible({
+      timeout: 10_000,
+    })
 
-    // 주문하기 버튼
     await page.locator("button:has-text('주문하기')").click()
     await expect(page).toHaveURL("/checkout", { timeout: 10_000 })
   })
@@ -216,59 +171,35 @@ test.describe("주문 결제 플로우", () => {
       }
     })
 
-    // 장바구니 주입 후 체크아웃 이동
-    await page.goto("/")
-    await injectCart(page, [
-      {
-        product_id: testProduct.id,
-        product_option_id: testOptionId,
-        product_name: testProduct.name,
-        product_image: null,
-        color: "블랙",
-        size: "M",
-        price: 35000,
-        extra_price: 0,
-        quantity: 1,
-        stock: 10,
-      },
-    ])
+    await injectCart(page, [makeCartItem()])
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
 
-    // 저장된 주소가 없으면 새 주소 입력 폼이 보임
-    // 수령인 입력
+    // 배송지 입력
     await page.getByPlaceholder("이름").fill(TEST_ADDRESS.recipient)
-    // 연락처 입력
     await page.getByPlaceholder("010-0000-0000").fill(TEST_ADDRESS.phone)
-    // 주소검색 버튼 클릭 (모킹된 다음 API)
     await page.getByText("주소검색").click()
-    // 우편번호와 기본주소가 자동 채워짐
+
     await expect(page.getByPlaceholder("우편번호")).toHaveValue("06234")
     await expect(page.getByPlaceholder("기본주소")).toHaveValue(
       "서울 강남구 테헤란로 123"
     )
-    // 상세주소 입력
     await page.getByPlaceholder("상세주소 입력").fill(TEST_ADDRESS.address2)
 
-    // 결제 수단 확인 (기본: 신용카드)
     await expect(page.getByText("신용카드")).toBeVisible()
-
-    // 결제금액 확인 (35000 + 3000 배송비 = 38000)
     await expect(page.getByText("38,000원 결제하기")).toBeVisible()
 
-    // POST /api/orders 요청 인터셉트
+    // POST /api/orders 인터셉트
     const orderRequestPromise = page.waitForRequest(
       (req) => req.url().includes("/api/orders") && req.method() === "POST"
     )
 
-    // 토스페이먼츠 SDK 차단 (결제창 열리지 않도록)
+    // 토스페이먼츠 SDK 차단
     await page.route("**/tosspayments**", (route) => route.abort())
 
-    // 결제하기 클릭
     await page.getByText("38,000원 결제하기").click()
 
-    // 주문 API 요청이 발생했는지 확인
     const orderRequest = await orderRequestPromise
     const body = orderRequest.postDataJSON()
     expect(body.items).toHaveLength(1)

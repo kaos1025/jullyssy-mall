@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test"
+import path from "path"
 import {
   ensureTestUser,
   deleteTestUser,
@@ -106,7 +107,7 @@ test.describe("인증 플로우", () => {
   test("일반 유저로 /admin 접근 시 홈으로 리다이렉트", async ({ browser }) => {
     // 일반 유저 storageState 사용
     const context = await browser.newContext({
-      storageState: "e2e/.auth/user.json",
+      storageState: path.join(__dirname, "..", ".auth", "user.json"),
     })
     const page = await context.newPage()
 
@@ -119,7 +120,7 @@ test.describe("인증 플로우", () => {
 
   test("어드민 유저로 /admin 접근 성공", async ({ browser }) => {
     const context = await browser.newContext({
-      storageState: "e2e/.auth/admin.json",
+      storageState: path.join(__dirname, "..", ".auth", "admin.json"),
     })
     const page = await context.newPage()
 
@@ -136,7 +137,7 @@ test.describe("인증 플로우", () => {
     browser,
   }) => {
     const context = await browser.newContext({
-      storageState: "e2e/.auth/user.json",
+      storageState: path.join(__dirname, "..", ".auth", "user.json"),
     })
     const page = await context.newPage()
 

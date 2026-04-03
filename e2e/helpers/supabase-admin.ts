@@ -196,7 +196,6 @@ export const issueCouponToUser = async (userId: string, couponId: string) => {
   const { error } = await adminClient.from("user_coupons").insert({
     user_id: userId,
     coupon_id: couponId,
-    is_used: false,
   })
 
   if (error) throw new Error(`Failed to issue coupon: ${error.message}`)
@@ -216,7 +215,6 @@ export const setUserPoint = async (userId: string, amount: number) => {
     user_id: userId,
     amount,
     reason: "E2E 테스트 포인트 지급",
-    type: "EARN",
   })
 }
 
