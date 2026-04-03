@@ -6,16 +6,47 @@ import ProductListFilter from "@/components/product/ProductListFilter"
 import { Button } from "@/components/ui/button"
 import type { Metadata } from "next"
 
-export const metadata: Metadata = {
-  title: "상품 목록 | 쥴리씨",
-  description: "쥴리씨의 트렌디한 여성의류를 만나보세요.",
-}
-
 interface ProductsPageProps {
   searchParams: {
     category?: string
     sort?: string
     page?: string
+  }
+}
+
+export const generateMetadata = async ({
+  searchParams,
+}: ProductsPageProps): Promise<Metadata> => {
+  const category = searchParams.category
+
+  if (category) {
+    try {
+      const supabase = await createClient()
+      const { data: cat } = await supabase
+        .from("categories")
+        .select("name")
+        .eq("slug", category)
+        .single()
+
+      if (cat) {
+        return {
+          title: `${cat.name} - 여성의류`,
+          description: `쥴리씨의 트렌디한 ${cat.name} 컬렉션. 다양한 스타일의 ${cat.name}를 만나보세요.`,
+          alternates: { canonical: `/products?category=${category}` },
+        }
+      }
+    } catch {
+      // 조회 실패 시 기본값 사용
+    }
+  }
+
+  return {
+    title: "전체 상품",
+    description:
+      "쥴리씨의 트렌디한 여성의류를 만나보세요. 신상품부터 베스트셀러까지.",
+    alternates: {
+      canonical: category ? `/products?category=${category}` : "/products",
+    },
   }
 }
 

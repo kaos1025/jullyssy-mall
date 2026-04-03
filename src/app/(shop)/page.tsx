@@ -8,6 +8,9 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "쥴리씨 | 트렌디한 여성의류 온라인 스토어",
   description: "쥴리씨에서 트렌디한 여성의류를 만나보세요.",
+  alternates: {
+    canonical: "/",
+  },
 }
 
 const categories = [

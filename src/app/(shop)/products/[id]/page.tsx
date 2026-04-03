@@ -23,15 +23,32 @@ export const generateMetadata = async ({
   const supabase = await createClient()
   const { data: product } = await supabase
     .from("products")
-    .select("name, description")
+    .select("id, slug, name, description, price, sale_price, product_images(url, is_thumbnail)")
     .or(`slug.eq.${params.id},id.eq.${params.id}`)
     .single()
 
   if (!product) return { title: "상품을 찾을 수 없습니다" }
 
+  const displayPrice = product.sale_price ?? product.price
+  const thumbnail =
+    product.product_images?.find(
+      (img: { is_thumbnail: boolean }) => img.is_thumbnail
+    )?.url || product.product_images?.[0]?.url
+
   return {
-    title: `${product.name} | 쥴리씨`,
-    description: product.description?.slice(0, 160) || product.name,
+    title: product.name,
+    description: `${product.name} | ${displayPrice.toLocaleString()}원 | 쥴리씨`,
+    openGraph: {
+      title: product.name,
+      description: product.description?.slice(0, 160) || product.name,
+      ...(thumbnail && {
+        images: [{ url: thumbnail, width: 800, height: 1067, alt: product.name }],
+      }),
+    },
+    // TODO: search_tags 컬럼 추가 후 keywords에 포함
+    alternates: {
+      canonical: `/products/${product.slug || product.id}`,
+    },
   }
 }
 
