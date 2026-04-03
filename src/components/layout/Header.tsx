@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Search, ShoppingBag, User, Heart, Menu } from "lucide-react"
@@ -23,8 +23,11 @@ interface HeaderProps {
 const Header = ({ categories }: HeaderProps) => {
   const router = useRouter()
   const itemCount = useCart((s) => s.getItemCount())
+  const [mounted, setMounted] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -193,7 +196,7 @@ const Header = ({ categories }: HeaderProps) => {
           <Button variant="ghost" size="icon" className="relative md:h-10 md:w-10" asChild>
             <Link href="/cart">
               <ShoppingBag className="h-5 w-5 md:h-6 md:w-6" strokeWidth={1.5} />
-              {itemCount > 0 && (
+              {mounted && itemCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] md:text-xs font-bold rounded-full h-4 w-4 md:min-w-[18px] md:h-[18px] flex items-center justify-center">
                   {itemCount > 99 ? "99" : itemCount}
                 </span>

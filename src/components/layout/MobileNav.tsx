@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Grid2X2, Heart, User, ShoppingBag } from "lucide-react"
@@ -17,6 +18,9 @@ const navItems = [
 const MobileNav = () => {
   const pathname = usePathname()
   const itemCount = useCart((s) => s.getItemCount())
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   return (
     <nav aria-label="모바일 네비게이션" className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white md:hidden pb-[env(safe-area-inset-bottom)]">
@@ -38,7 +42,7 @@ const MobileNav = () => {
             >
               <span className="relative">
                 <item.icon size={22} strokeWidth={1.5} />
-                {item.id === "cart" && itemCount > 0 && (
+                {item.id === "cart" && mounted && itemCount > 0 && (
                   <span className="absolute -top-1.5 -right-2.5 bg-primary text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">
                     {itemCount > 99 ? "99" : itemCount}
                   </span>
