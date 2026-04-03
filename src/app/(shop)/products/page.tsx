@@ -66,21 +66,24 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
   // 서브카테고리 조회: 선택된 카테고리의 children
   let subCategories: typeof categories = []
   let selectedParentId: string | null = null
+  let categoryName: string | null = null
 
   if (searchParams.category && categories) {
     // 선택된 slug가 1depth인지 확인
     const parentCat = categories.find((c) => c.slug === searchParams.category)
     if (parentCat) {
       selectedParentId = parentCat.id
+      categoryName = parentCat.name
     } else {
       // 2depth slug일 수 있음 → 부모를 찾기
       const { data: subCat } = await supabase
         .from("categories")
-        .select("parent_id")
+        .select("name, parent_id")
         .eq("slug", searchParams.category)
         .single()
       if (subCat?.parent_id) {
         selectedParentId = subCat.parent_id
+        categoryName = subCat.name
       }
     }
 
@@ -157,6 +160,10 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
 
   return (
     <div className="container py-6">
+      <h1 className="text-xl font-bold mb-4">
+        {categoryName || "전체 상품"}
+      </h1>
+
       <ProductListFilter
         categories={categories || []}
         subCategories={subCategories || []}

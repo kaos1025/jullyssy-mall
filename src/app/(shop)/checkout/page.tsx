@@ -153,7 +153,7 @@ const CheckoutPage = () => {
   if (!mounted) {
     return (
       <div className="container py-8">
-        <h1 className="text-xl font-bold">주문서</h1>
+        <h1 className="text-xl font-bold mb-6">주문서</h1>
         <div className="text-center py-20 text-muted-foreground">로딩 중...</div>
       </div>
     )
@@ -162,7 +162,7 @@ const CheckoutPage = () => {
   if (items.length === 0) {
     return (
       <div className="container py-8">
-        <h1 className="text-xl font-bold mb-8">주문서</h1>
+        <h1 className="text-xl font-bold mb-6">주문서</h1>
         <div className="text-center py-20 text-muted-foreground">
           주문할 상품이 없습니다.
         </div>

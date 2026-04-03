@@ -29,7 +29,7 @@ const MypageLayout = ({ children }: { children: React.ReactNode }) => {
       <h1 className="text-xl font-bold mb-6">마이페이지</h1>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         {/* 사이드 메뉴 */}
-        <nav className="md:col-span-1">
+        <nav aria-label="마이페이지 메뉴" className="md:col-span-1">
           <div className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0">
             {menuItems.map((item) => {
               const isActive = pathname.startsWith(item.href)

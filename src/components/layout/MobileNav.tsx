@@ -19,7 +19,7 @@ const MobileNav = () => {
   const itemCount = useCart((s) => s.getItemCount())
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white md:hidden pb-[env(safe-area-inset-bottom)]">
+    <nav aria-label="모바일 네비게이션" className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white md:hidden pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-around h-[60px]">
         {navItems.map((item) => {
           const key = item.id ?? item.label

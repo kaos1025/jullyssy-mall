@@ -54,8 +54,41 @@ const HomePage = async () => {
   const getColors = (product: { product_options?: { color: string }[] }) =>
     Array.from(new Set((product.product_options ?? []).map((o) => o.color)))
 
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "쥴리씨",
+    url: SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/products?keyword={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  }
+
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "쥴리씨",
+    url: SITE_URL,
+    logo: `${SITE_URL}/og-image.png`,
+  }
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
+
+      <h1 className="sr-only">쥴리씨 여성의류 쇼핑몰</h1>
+
       {/* 히어로 배너 */}
       <HeroBanner />
 

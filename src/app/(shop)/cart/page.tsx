@@ -27,7 +27,7 @@ const CartPage = () => {
   if (!mounted) {
     return (
       <div className="container py-8">
-        <h1 className="text-xl font-bold">장바구니</h1>
+        <h1 className="text-xl font-bold mb-6">장바구니</h1>
         <div className="text-center py-20 text-muted-foreground">로딩 중...</div>
       </div>
     )
@@ -60,7 +60,7 @@ const CartPage = () => {
   if (items.length === 0) {
     return (
       <div className="container py-8">
-        <h1 className="text-xl font-bold mb-8">장바구니</h1>
+        <h1 className="text-xl font-bold mb-6">장바구니</h1>
         <div className="text-center py-20 space-y-4">
           <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground/30" />
           <p className="text-muted-foreground">장바구니가 비어있습니다.</p>

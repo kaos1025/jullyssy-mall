@@ -46,7 +46,7 @@ const Header = ({ categories }: HeaderProps) => {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-[300px] overflow-y-auto">
-            <nav className="flex flex-col gap-1 mt-8">
+            <nav aria-label="사이드 메뉴" className="flex flex-col gap-1 mt-8">
               {/* 마이페이지 */}
               <Link
                 href="/mypage"
@@ -208,7 +208,7 @@ const Header = ({ categories }: HeaderProps) => {
       <div className="border-t border-border/50">
         <div className="container">
           {/* PC: hover 드롭다운 */}
-          <nav className="hidden md:flex items-center gap-6 h-11 text-sm">
+          <nav aria-label="카테고리 네비게이션" className="hidden md:flex items-center gap-6 h-11 text-sm">
             <Link
               href="/products"
               className="transition-colors hover:text-primary font-medium"
@@ -243,7 +243,7 @@ const Header = ({ categories }: HeaderProps) => {
           </nav>
 
           {/* 모바일: 가로 스크롤 */}
-          <nav className="md:hidden flex items-center gap-4 h-10 overflow-x-auto scrollbar-hide text-sm px-1">
+          <nav aria-label="카테고리" className="md:hidden flex items-center gap-4 h-10 overflow-x-auto scrollbar-hide text-sm px-1">
             <Link
               href="/products"
               className="shrink-0 transition-colors hover:text-primary font-medium"

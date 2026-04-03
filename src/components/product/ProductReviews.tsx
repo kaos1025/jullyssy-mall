@@ -109,7 +109,7 @@ const ProductReviews = ({ reviews, averageRating }: ProductReviewsProps) => {
                     >
                       <Image
                         src={img.url}
-                        alt="리뷰 이미지"
+                        alt={`${review.user?.name || "고객"}님의 리뷰 이미지`}
                         fill
                         className="object-cover"
                         sizes="80px"

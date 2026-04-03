@@ -102,7 +102,8 @@ const ProductCard = ({
   const displayColors = colors.slice(0, 5)
 
   return (
-    <Link href={`/products/${slug || id}`} className="group block">
+    <article className="group">
+    <Link href={`/products/${slug || id}`} className="block">
       {/* 이미지 */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
         {primaryImage ? (
@@ -241,6 +242,7 @@ const ProductCard = ({
         )}
       </div>
     </Link>
+    </article>
   )
 }
 
