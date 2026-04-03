@@ -55,6 +55,7 @@ export const PUT = async (
         care_info: productData.care_info || null,
         origin: productData.origin || null,
         status: productData.status || "ACTIVE",
+        search_tags: productData.search_tags || [],
       })
       .eq("id", productId)
 

@@ -55,6 +55,9 @@ interface OriginProduct {
     }
     [key: string]: unknown
   }
+  seoInfo?: {
+    sellerTags?: { code?: number; text?: string }[]
+  }
 }
 
 interface ChannelProductDetail {
@@ -90,6 +93,9 @@ const importSingleProduct = async (
   const origin = op.detailAttribute?.originAreaInfo?.content || null
   const naverCategoryId = op.leafCategoryId ? String(op.leafCategoryId) : null
   const naverCategoryName = op.wholeCategoryName || null
+  const searchTags = op.seoInfo?.sellerTags
+    ?.map((tag) => tag.text)
+    .filter(Boolean) as string[] ?? []
 
   // 이미 임포트된 상품인지 확인 (삭제된 상품은 제외)
   const { data: existing } = await admin
@@ -151,6 +157,7 @@ const importSingleProduct = async (
       origin,
       status: statusType === "SALE" ? "ACTIVE" : "HIDDEN",
       naver_product_no: originProductNo,
+      search_tags: searchTags,
     })
     .select()
     .single()

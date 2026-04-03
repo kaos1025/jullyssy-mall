@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, Upload } from "lucide-react"
+import { Plus, Trash2, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
@@ -66,6 +67,12 @@ const ProductForm = ({ product }: ProductFormProps) => {
       sku: o.sku || "",
     })) || [{ color: "", size: "", extra_price: 0, stock: 0, sku: "" }]
   )
+
+  const [searchTags, setSearchTags] = useState<string[]>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((product as any)?.search_tags as string[]) ?? []
+  )
+  const [tagInput, setTagInput] = useState("")
 
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [existingImages, setExistingImages] = useState<ProductImage[]>(
@@ -122,7 +129,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
 
     try {
       const formData = new FormData()
-      formData.append("product", JSON.stringify(form))
+      formData.append("product", JSON.stringify({ ...form, search_tags: searchTags }))
       formData.append("options", JSON.stringify(options))
       formData.append(
         "existing_image_ids",
@@ -353,6 +360,64 @@ const ProductForm = ({ product }: ProductFormProps) => {
               onChange={(e) => updateForm("origin", e.target.value)}
             />
           </div>
+        </div>
+
+        {/* 검색 태그 */}
+        <div>
+          <Label>검색 태그</Label>
+          <div className="flex gap-2 mt-1">
+            <Input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
+                  e.preventDefault()
+                  const tag = tagInput.trim().replace(/,/g, "")
+                  if (tag && !searchTags.includes(tag)) {
+                    setSearchTags((prev) => [...prev, tag])
+                  }
+                  setTagInput("")
+                }
+              }}
+              placeholder="태그 입력 후 Enter"
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const tag = tagInput.trim().replace(/,/g, "")
+                if (tag && !searchTags.includes(tag)) {
+                  setSearchTags((prev) => [...prev, tag])
+                }
+                setTagInput("")
+              }}
+            >
+              추가
+            </Button>
+          </div>
+          {searchTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {searchTags.map((tag) => (
+                <Badge key={tag} variant="secondary" className="gap-1">
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSearchTags((prev) => prev.filter((t) => t !== tag))
+                    }
+                    className="hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            쉼표 또는 Enter로 태그 추가. SEO 및 내부 검색에 활용됩니다.
+          </p>
         </div>
       </section>
 

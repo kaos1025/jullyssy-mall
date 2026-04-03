@@ -23,7 +23,7 @@ export const generateMetadata = async ({
   const supabase = await createClient()
   const { data: product } = await supabase
     .from("products")
-    .select("id, slug, name, description, price, sale_price, product_images(url, is_thumbnail)")
+    .select("id, slug, name, description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
     .or(`slug.eq.${params.id},id.eq.${params.id}`)
     .single()
 
@@ -45,7 +45,12 @@ export const generateMetadata = async ({
         images: [{ url: thumbnail, width: 800, height: 1067, alt: product.name }],
       }),
     },
-    // TODO: search_tags 컬럼 추가 후 keywords에 포함
+    keywords: [
+      product.name,
+      ...(product.search_tags ?? []),
+      "여성의류",
+      "쥴리씨",
+    ],
     alternates: {
       canonical: `/products/${product.slug || product.id}`,
     },
@@ -118,8 +123,54 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       )
     : 0
 
+  // JSON-LD 구조화 데이터
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jsonLd: Record<string, any> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    image: thumbnail ? [thumbnail] : [],
+    description: product.description
+      ? product.description
+          .replace(/<[^>]*>/g, "")
+          .replace(/\|/g, "")
+          .replace(/[\n\r\t]+/g, " ")
+          .replace(/\s{2,}/g, " ")
+          .trim()
+          .slice(0, 200)
+      : "",
+    brand: { "@type": "Brand", name: "쥴리씨" },
+    sku: product.id,
+    offers: {
+      "@type": "Offer",
+      price: product.sale_price || product.price,
+      priceCurrency: "KRW",
+      availability:
+        product.status === "ACTIVE"
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: "쥴리씨" },
+      url: `${SITE_URL}/products/${product.slug || product.id}`,
+    },
+  }
+
+  if (typedReviews.length > 0) {
+    jsonLd.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: averageRating.toFixed(1),
+      reviewCount: typedReviews.length,
+      bestRating: 5,
+      worstRating: 1,
+    }
+  }
+
   return (
     <div className="container py-4 md:py-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
         {/* 좌측: 이미지 갤러리 */}
         <ImageGallery images={images} />
