@@ -5,7 +5,7 @@ import {
   adminClient,
 } from "../helpers/supabase-admin"
 import { PREFIXES, TEST_ADDRESS } from "../helpers/test-data"
-import { injectCart } from "../helpers/cart"
+import { injectCartBeforeLoad } from "../helpers/cart"
 
 const PREFIX = PREFIXES.order
 
@@ -81,11 +81,15 @@ test.describe("주문 결제 플로우", () => {
     // 색상 선택: 블랙
     await page.getByRole("button", { name: "블랙", exact: true }).click()
 
-    // 사이즈 선택: M (정확히 "M"만 매칭)
+    // 사이즈 영역이 나타날 때까지 대기
+    await expect(page.getByText("사이즈")).toBeVisible({ timeout: 5_000 })
+
+    // 사이즈 선택: M
     await page.getByRole("button", { name: "M", exact: true }).click()
 
+    // 색상+사이즈 선택 후 자동으로 selectedItems에 추가됨 (useEffect)
     // 선택된 옵션 표시
-    await expect(page.getByText("블랙 / M")).toBeVisible()
+    await expect(page.getByText("블랙 / M")).toBeVisible({ timeout: 5_000 })
 
     // 장바구니 추가
     await page.locator("button:has-text('장바구니')").first().click()
@@ -96,7 +100,7 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 페이지에서 상품 확인", async ({ userPage: page }) => {
-    await injectCart(page, [makeCartItem()])
+    await injectCartBeforeLoad(page, [makeCartItem()])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -107,7 +111,7 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 수량 변경", async ({ userPage: page }) => {
-    await injectCart(page, [makeCartItem()])
+    await injectCartBeforeLoad(page, [makeCartItem()])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -125,7 +129,7 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 상품 삭제", async ({ userPage: page }) => {
-    await injectCart(page, [makeCartItem()])
+    await injectCartBeforeLoad(page, [makeCartItem()])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -141,7 +145,7 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 → 주문서 이동", async ({ userPage: page }) => {
-    await injectCart(page, [makeCartItem()])
+    await injectCartBeforeLoad(page, [makeCartItem()])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -171,7 +175,7 @@ test.describe("주문 결제 플로우", () => {
       }
     })
 
-    await injectCart(page, [makeCartItem()])
+    await injectCartBeforeLoad(page, [makeCartItem()])
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })

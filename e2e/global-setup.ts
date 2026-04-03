@@ -59,7 +59,21 @@ const login = async (
     }
   }
 
-  await context.storageState({ path: savePath })
+  // storageState 저장 (쿠키 + localStorage)
+  const state = await context.storageState()
+
+  // 디버그: 쿠키 확인
+  console.log(`[${email}] cookies: ${state.cookies.length}, origins: ${state.origins.length}`)
+  state.cookies.forEach((c) => console.log(`  cookie: ${c.name} @ ${c.domain}`))
+  state.origins.forEach((o) => {
+    console.log(`  origin: ${o.origin}, localStorage: ${o.localStorage.length}`)
+    o.localStorage.forEach((l) => console.log(`    ls: ${l.name}`))
+  })
+
+  // 저장
+  const fs = await import("fs")
+  fs.writeFileSync(savePath, JSON.stringify(state, null, 2))
+
   await context.close()
 }
 

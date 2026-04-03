@@ -146,7 +146,6 @@ export const createTestOrder = async (opts: {
     size: item.size,
     price: item.price,
     quantity: item.quantity,
-    extra_price: 0,
   }))
 
   const { error: itemErr } = await adminClient

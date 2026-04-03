@@ -32,19 +32,26 @@ export default defineConfig({
       testDir: "./e2e",
     },
     {
+      name: "auth-tests",
+      use: {
+        ...devices["Desktop Chrome"],
+        // storageState 없음 — 비로그인 상태
+      },
+      dependencies: ["setup"],
+      testMatch: /auth\.spec/,
+    },
+    {
       name: "user-tests",
       use: {
         ...devices["Desktop Chrome"],
-        storageState: path.join(authDir, "user.json"),
       },
       dependencies: ["setup"],
-      testIgnore: /admin-/,
+      testIgnore: /admin-|auth\.spec/,
     },
     {
       name: "admin-tests",
       use: {
         ...devices["Desktop Chrome"],
-        storageState: path.join(authDir, "admin.json"),
       },
       dependencies: ["setup"],
       testMatch: /admin-/,

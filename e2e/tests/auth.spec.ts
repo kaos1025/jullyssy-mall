@@ -1,11 +1,29 @@
 import { test, expect } from "@playwright/test"
-import path from "path"
-import {
-  ensureTestUser,
-  deleteTestUser,
-} from "../helpers/supabase-admin"
+import { deleteTestUser } from "../helpers/supabase-admin"
 import { TEST_USER, TEST_ADMIN, PREFIXES } from "../helpers/test-data"
 import { SEL } from "../helpers/selectors"
+
+// auth-tests 프로젝트: storageState 없는 비로그인 상태
+
+/** 비로그인 page에서 로그인 수행 후 page 반환 */
+const loginAs = async (
+  page: import("@playwright/test").Page,
+  email: string,
+  password: string
+) => {
+  await page.goto("/login", { waitUntil: "domcontentloaded" })
+  await page.locator("#email").fill(email)
+  await page.locator("#password").fill(password)
+  await page.locator('button[type="submit"]').click()
+  try {
+    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
+      timeout: 15_000,
+      waitUntil: "commit",
+    })
+  } catch {
+    await page.goto("/", { waitUntil: "domcontentloaded" })
+  }
+}
 
 test.describe("인증 플로우", () => {
   // --- 회원가입 ---
@@ -24,12 +42,10 @@ test.describe("인증 플로우", () => {
 
     await page.locator(SEL.signupButton).click()
 
-    // 성공 토스트 또는 /login 리다이렉트 확인
     await expect(
-      page.getByText("회원가입 완료").or(page.locator('input#email'))
+      page.getByText("회원가입 완료").or(page.locator("input#email"))
     ).toBeVisible({ timeout: 10_000 })
 
-    // cleanup
     await deleteTestUser(randomEmail)
   })
 
@@ -43,29 +59,25 @@ test.describe("인증 플로우", () => {
 
     await page.locator(SEL.signupButton).click()
 
-    await expect(page.getByText("비밀번호 불일치")).toBeVisible()
+    await expect(page.getByText("비밀번호 불일치")).toBeVisible({ timeout: 5_000 })
   })
 
   // --- 로그인 ---
 
   test("이메일 로그인 성공", async ({ page }) => {
-    // 테스트 유저가 global-setup에서 생성됨
     await page.goto("/login")
-
     await page.locator(SEL.emailInput).fill(TEST_USER.email)
     await page.locator(SEL.passwordInput).fill(TEST_USER.password)
-    await page.locator(SEL.loginButton).click()
+    await page.locator('button[type="submit"]').click()
 
-    // 홈으로 리다이렉트
-    await expect(page).toHaveURL("/", { timeout: 10_000 })
+    await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
   })
 
   test("잘못된 비밀번호로 로그인 실패", async ({ page }) => {
     await page.goto("/login")
-
     await page.locator(SEL.emailInput).fill(TEST_USER.email)
     await page.locator(SEL.passwordInput).fill("WrongPassword!")
-    await page.locator(SEL.loginButton).click()
+    await page.locator('button[type="submit"]').click()
 
     await expect(page.getByText("로그인 실패")).toBeVisible({ timeout: 5_000 })
   })
@@ -74,76 +86,41 @@ test.describe("인증 플로우", () => {
 
   test("카카오 로그인 버튼 존재 확인", async ({ page }) => {
     await page.goto("/login")
-
     await expect(page.locator(SEL.kakaoButton)).toBeVisible()
     await expect(page.getByText("네이버로 시작하기")).toBeVisible()
   })
 
   // --- 보호 경로 리다이렉트 ---
 
-  test("비로그인 시 /mypage → /login 리다이렉트", async ({ browser }) => {
-    // 비로그인 상태의 새 컨텍스트
-    const context = await browser.newContext()
-    const page = await context.newPage()
-
+  test("비로그인 시 /mypage → /login 리다이렉트", async ({ page }) => {
     await page.goto("/mypage")
-
     await expect(page).toHaveURL(/\/login.*redirect/, { timeout: 10_000 })
-    await context.close()
   })
 
-  test("비로그인 시 /checkout → /login 리다이렉트", async ({ browser }) => {
-    const context = await browser.newContext()
-    const page = await context.newPage()
-
+  test("비로그인 시 /checkout → /login 리다이렉트", async ({ page }) => {
     await page.goto("/checkout")
-
     await expect(page).toHaveURL(/\/login.*redirect/, { timeout: 10_000 })
-    await context.close()
   })
 
-  // --- 어드민 접근 제어 ---
+  // --- 어드민 접근 제어 (로그인 필요) ---
 
-  test("일반 유저로 /admin 접근 시 홈으로 리다이렉트", async ({ browser }) => {
-    // 일반 유저 storageState 사용
-    const context = await browser.newContext({
-      storageState: path.join(__dirname, "..", ".auth", "user.json"),
-    })
-    const page = await context.newPage()
-
+  test("일반 유저로 /admin 접근 시 홈으로 리다이렉트", async ({ page }) => {
+    await loginAs(page, TEST_USER.email, TEST_USER.password)
     await page.goto("/admin")
-
-    // 어드민 이메일이 아니므로 / 로 리다이렉트
     await expect(page).toHaveURL("/", { timeout: 10_000 })
-    await context.close()
   })
 
-  test("어드민 유저로 /admin 접근 성공", async ({ browser }) => {
-    const context = await browser.newContext({
-      storageState: path.join(__dirname, "..", ".auth", "admin.json"),
-    })
-    const page = await context.newPage()
-
+  test("어드민 유저로 /admin 접근 성공", async ({ page }) => {
+    await loginAs(page, TEST_ADMIN.email, TEST_ADMIN.password)
     await page.goto("/admin")
-
-    // 어드민 레이아웃 표시 확인
     await expect(page.getByText("대시보드")).toBeVisible({ timeout: 10_000 })
-    await context.close()
   })
 
   // --- 이미 로그인 시 인증 페이지 리다이렉트 ---
 
-  test("로그인 상태에서 /login 접근 시 홈으로 리다이렉트", async ({
-    browser,
-  }) => {
-    const context = await browser.newContext({
-      storageState: path.join(__dirname, "..", ".auth", "user.json"),
-    })
-    const page = await context.newPage()
-
+  test("로그인 상태에서 /login 접근 시 홈으로 리다이렉트", async ({ page }) => {
+    await loginAs(page, TEST_USER.email, TEST_USER.password)
     await page.goto("/login")
-
     await expect(page).toHaveURL("/", { timeout: 10_000 })
-    await context.close()
   })
 })

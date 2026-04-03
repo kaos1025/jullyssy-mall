@@ -9,7 +9,7 @@ import {
   adminClient,
 } from "../helpers/supabase-admin"
 import { PREFIXES, TEST_USER } from "../helpers/test-data"
-import { injectCart } from "../helpers/cart"
+import { injectCartBeforeLoad } from "../helpers/cart"
 
 const PREFIX = PREFIXES.coupon
 
@@ -83,7 +83,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
 
   test("쿠폰 적용 시 할인 금액 반영", async ({ userPage: page }) => {
     await page.goto("/")
-    await injectCart(page, getCartItems())
+    await injectCartBeforeLoad(page, getCartItems())
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -106,7 +106,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
 
   test("쿠폰 취소", async ({ userPage: page }) => {
     await page.goto("/")
-    await injectCart(page, getCartItems())
+    await injectCartBeforeLoad(page, getCartItems())
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -125,7 +125,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
 
   test("포인트 사용", async ({ userPage: page }) => {
     await page.goto("/")
-    await injectCart(page, getCartItems())
+    await injectCartBeforeLoad(page, getCartItems())
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -149,7 +149,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
 
   test("포인트 전액사용", async ({ userPage: page }) => {
     await page.goto("/")
-    await injectCart(page, getCartItems())
+    await injectCartBeforeLoad(page, getCartItems())
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -170,7 +170,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
 
   test("쿠폰 + 포인트 동시 적용", async ({ userPage: page }) => {
     await page.goto("/")
-    await injectCart(page, getCartItems())
+    await injectCartBeforeLoad(page, getCartItems())
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })

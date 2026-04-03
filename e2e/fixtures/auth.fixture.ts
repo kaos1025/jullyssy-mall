@@ -4,9 +4,8 @@ import path from "path"
 const authDir = path.join(__dirname, "..", ".auth")
 
 /**
- * 인증 상태가 주입된 커스텀 fixture.
- * - userPage: 일반 유저 로그인 상태
- * - adminPage: 어드민 유저 로그인 상태
+ * global-setup에서 저장한 storageState를 사용하는 fixture.
+ * 프로젝트 레벨 storageState 대신 fixture에서 직접 context를 생성합니다.
  */
 export const test = base.extend<{
   userPage: Page
@@ -17,6 +16,8 @@ export const test = base.extend<{
       storageState: path.join(authDir, "user.json"),
     })
     const page = await context.newPage()
+    // 미들웨어가 세션을 갱신하도록 한번 방문
+    await page.goto("/", { waitUntil: "domcontentloaded" })
     await use(page)
     await context.close()
   },
@@ -26,6 +27,7 @@ export const test = base.extend<{
       storageState: path.join(authDir, "admin.json"),
     })
     const page = await context.newPage()
+    await page.goto("/", { waitUntil: "domcontentloaded" })
     await use(page)
     await context.close()
   },
