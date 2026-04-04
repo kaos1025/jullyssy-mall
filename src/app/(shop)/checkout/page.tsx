@@ -1,9 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import Image from "next/image"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useCart } from "@/hooks/use-cart"
@@ -40,6 +43,9 @@ const CheckoutPage = () => {
     memo: "",
   })
 
+  // 결제 동의
+  const [orderAgreed, setOrderAgreed] = useState(false)
+
   // 할인
   const [couponDiscount, setCouponDiscount] = useState(0)
   const [couponId, setCouponId] = useState<string | null>(null)
@@ -68,6 +74,14 @@ const CheckoutPage = () => {
       toast({
         variant: "destructive",
         title: "배송지를 입력해주세요",
+      })
+      return
+    }
+
+    if (!orderAgreed) {
+      toast({
+        variant: "destructive",
+        title: "결제 동의가 필요합니다",
       })
       return
     }
@@ -310,11 +324,38 @@ const CheckoutPage = () => {
               <span>최종 결제금액</span>
               <span>{finalAmount.toLocaleString()}원</span>
             </div>
+            {/* 결제 동의 */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="orderAgree"
+                  checked={orderAgreed}
+                  onCheckedChange={(checked) => setOrderAgreed(!!checked)}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="orderAgree" className="text-sm leading-snug">
+                  주문 내용을 확인했으며, 아래 내용에 동의합니다.
+                </Label>
+              </div>
+              <div className="ml-6 mt-2 space-y-1 text-xs text-muted-foreground">
+                <p>
+                  · 개인정보 수집·이용 동의{" "}
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    className="underline"
+                  >
+                    (보기)
+                  </Link>
+                </p>
+                <p>· 개인정보 제3자 제공 동의 (배송업체, 결제대행사)</p>
+              </div>
+            </div>
             <Button
               className="w-full"
               size="lg"
               onClick={handlePayment}
-              disabled={loading}
+              disabled={loading || !orderAgreed}
             >
               {loading ? "처리 중..." : `${finalAmount.toLocaleString()}원 결제하기`}
             </Button>

@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 
@@ -20,9 +22,24 @@ const SignupPage = () => {
     passwordConfirm: "",
     name: "",
     phone: "",
-    marketingAgreed: false,
+  })
+  const [agreements, setAgreements] = useState({
+    terms: false,
+    privacy: false,
+    marketing: false,
   })
   const [loading, setLoading] = useState(false)
+
+  const allRequired = agreements.terms && agreements.privacy
+  const allChecked = agreements.terms && agreements.privacy && agreements.marketing
+
+  const handleAllAgree = (checked: boolean) => {
+    setAgreements({ terms: checked, privacy: checked, marketing: checked })
+  }
+
+  const updateAgreement = (field: keyof typeof agreements, checked: boolean) => {
+    setAgreements((prev) => ({ ...prev, [field]: checked }))
+  }
 
   const updateField = (field: string, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -49,6 +66,14 @@ const SignupPage = () => {
       return
     }
 
+    if (!allRequired) {
+      toast({
+        variant: "destructive",
+        title: "필수 약관에 동의해주세요",
+      })
+      return
+    }
+
     setLoading(true)
 
     const supabase = createClient()
@@ -59,7 +84,7 @@ const SignupPage = () => {
         data: {
           name: form.name,
           phone: form.phone,
-          marketing_agreed: form.marketingAgreed,
+          marketing_agreed: agreements.marketing,
         },
       },
     })
@@ -147,20 +172,70 @@ const SignupPage = () => {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              id="marketing"
-              type="checkbox"
-              checked={form.marketingAgreed}
-              onChange={(e) => updateField("marketingAgreed", e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor="marketing" className="text-sm font-normal">
-              마케팅 수신 동의 (선택)
-            </Label>
+          {/* 약관 동의 */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="agreeAll"
+                checked={allChecked}
+                onCheckedChange={(checked) => handleAllAgree(!!checked)}
+              />
+              <Label htmlFor="agreeAll" className="font-medium">
+                전체 동의
+              </Label>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="agreeTerms"
+                checked={agreements.terms}
+                onCheckedChange={(checked) => updateAgreement("terms", !!checked)}
+              />
+              <Label htmlFor="agreeTerms" className="text-sm font-normal">
+                <span className="text-primary">[필수]</span> 이용약관 동의
+              </Label>
+              <Link
+                href="/terms"
+                target="_blank"
+                className="text-xs underline text-muted-foreground ml-auto"
+              >
+                보기
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="agreePrivacy"
+                checked={agreements.privacy}
+                onCheckedChange={(checked) => updateAgreement("privacy", !!checked)}
+              />
+              <Label htmlFor="agreePrivacy" className="text-sm font-normal">
+                <span className="text-primary">[필수]</span> 개인정보 수집·이용 동의
+              </Label>
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="text-xs underline text-muted-foreground ml-auto"
+              >
+                보기
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="agreeMarketing"
+                checked={agreements.marketing}
+                onCheckedChange={(checked) => updateAgreement("marketing", !!checked)}
+              />
+              <Label htmlFor="agreeMarketing" className="text-sm font-normal">
+                <span className="text-muted-foreground">[선택]</span> 마케팅 정보 수신 동의
+              </Label>
+            </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !allRequired}>
             {loading ? "가입 중..." : "회원가입"}
           </Button>
         </form>
