@@ -269,6 +269,7 @@ export interface UserCouponWithDetails extends UserCoupon {
 // =============================================
 
 export interface CartItem {
+  id?: string
   product_id: string
   product_option_id: string
   product_name: string
@@ -279,4 +280,5 @@ export interface CartItem {
   extra_price: number
   quantity: number
   stock: number
+  soldout?: boolean
 }

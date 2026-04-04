@@ -40,5 +40,15 @@ export const POST = async (request: Request) => {
     )
   }
 
+  // 주문한 상품만 장바구니에서 삭제
+  const orderedOptionIds = items.map(
+    (i: { product_option_id: string }) => i.product_option_id
+  )
+  await admin
+    .from("cart_items")
+    .delete()
+    .eq("user_id", user.id)
+    .in("product_option_id", orderedOptionIds)
+
   return NextResponse.json(data)
 }

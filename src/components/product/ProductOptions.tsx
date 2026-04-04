@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { ToastAction } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
 import { useCart } from "@/hooks/use-cart"
+import { useUser } from "@/hooks/use-user"
 import { cn } from "@/lib/utils"
 import { getColorStyle, isLightColor } from "@/constants/colors"
 import type { ProductOption } from "@/types"
@@ -44,6 +45,7 @@ const ProductOptions = ({
   const router = useRouter()
   const { toast } = useToast()
   const { addItem } = useCart()
+  const { user } = useUser()
 
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
   const [selectedSize, setSelectedSize] = useState<string | null>(null)
@@ -117,11 +119,15 @@ const ProductOptions = ({
     setSelectedItems((prev) => prev.filter((item) => item.optionId !== optionId))
   }
 
-  const doAddToCart = () => {
-    selectedItems.forEach((item) => {
+  const doAddToCart = async (): Promise<boolean> => {
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      return false
+    }
+    for (const item of selectedItems) {
       const option = options.find((o) => o.id === item.optionId)
-      if (!option) return
-      addItem({
+      if (!option) continue
+      const success = await addItem({
         product_id: productId,
         product_option_id: item.optionId,
         product_name: productName,
@@ -133,10 +139,19 @@ const ProductOptions = ({
         quantity: item.quantity,
         stock: item.stock,
       })
-    })
+      if (!success) {
+        toast({
+          variant: "destructive",
+          title: "장바구니 추가 실패",
+          description: "잠시 후 다시 시도해주세요.",
+        })
+        return false
+      }
+    }
+    return true
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (selectedItems.length === 0) {
       toast({
         variant: "destructive",
@@ -145,7 +160,8 @@ const ProductOptions = ({
       })
       return
     }
-    doAddToCart()
+    const success = await doAddToCart()
+    if (!success) return
     toast({
       title: "장바구니에 담았습니다 ✓",
       action: (
@@ -158,7 +174,7 @@ const ProductOptions = ({
     setSheetOpen(false)
   }
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (selectedItems.length === 0) {
       toast({
         variant: "destructive",
@@ -167,7 +183,8 @@ const ProductOptions = ({
       })
       return
     }
-    doAddToCart()
+    const success = await doAddToCart()
+    if (!success) return
     setSheetOpen(false)
     router.push("/cart")
   }

@@ -9,6 +9,7 @@ import type { User } from "@supabase/supabase-js"
 export const useUser = () => {
   const router = useRouter()
   const clearCart = useCart((s) => s.clearCart)
+  const fetchCart = useCart((s) => s.fetchCart)
   const [user, setUser] = useState<User | null>(null)
   const [mounted, setMounted] = useState(false)
 
@@ -18,15 +19,22 @@ export const useUser = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user)
       setMounted(true)
+      if (user) fetchCart()
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
+      if (event === "SIGNED_IN") {
+        fetchCart()
+      } else if (event === "SIGNED_OUT") {
+        clearCart()
+      }
     })
 
     return () => subscription.unsubscribe()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const signOut = async () => {

@@ -4,6 +4,7 @@ import { CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/server"
+import CartSyncer from "./CartSyncer"
 
 interface OrderCompletePageProps {
   searchParams: { order_id?: string }
@@ -23,6 +24,7 @@ const OrderCompletePage = async ({ searchParams }: OrderCompletePageProps) => {
 
   return (
     <div className="container max-w-lg py-12">
+      <CartSyncer />
       <div className="text-center space-y-4">
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
         <h1 className="text-2xl font-bold">주문이 완료되었습니다!</h1>
