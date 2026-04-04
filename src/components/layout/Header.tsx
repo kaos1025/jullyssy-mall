@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Search, ShoppingBag, User, Heart, Menu } from "lucide-react"
+import { Search, ShoppingBag, User, Heart, Menu, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -13,7 +13,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useCart } from "@/hooks/use-cart"
+import { useUser } from "@/hooks/use-user"
 import type { CategoryWithChildren } from "@/types"
 
 interface HeaderProps {
@@ -23,6 +30,7 @@ interface HeaderProps {
 const Header = ({ categories }: HeaderProps) => {
   const router = useRouter()
   const itemCount = useCart((s) => s.getItemCount())
+  const { user, mounted: authMounted, signOut } = useUser()
   const [mounted, setMounted] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -50,24 +58,53 @@ const Header = ({ categories }: HeaderProps) => {
           </SheetTrigger>
           <SheetContent side="left" className="w-[300px] overflow-y-auto">
             <nav aria-label="사이드 메뉴" className="flex flex-col gap-1 mt-8">
-              {/* 마이페이지 */}
-              <Link
-                href="/mypage"
-                onClick={() => setSheetOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-3 text-sm font-medium border-b border-border/50"
-              >
-                <User className="h-4 w-4" strokeWidth={1.5} />
-                마이페이지
-              </Link>
-              {/* 찜 */}
-              <Link
-                href="/mypage"
-                onClick={() => setSheetOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-3 text-sm font-medium border-b border-border/50 mb-1"
-              >
-                <Heart className="h-4 w-4" strokeWidth={1.5} />
-                찜한 상품
-              </Link>
+              {authMounted && !user ? (
+                <div className="flex items-center gap-3 px-3 py-3 border-b border-border/50 mb-1">
+                  <Button asChild size="sm" className="flex-1">
+                    <Link href="/login" onClick={() => setSheetOpen(false)}>
+                      로그인
+                    </Link>
+                  </Button>
+                  <Link
+                    href="/signup"
+                    onClick={() => setSheetOpen(false)}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    회원가입
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <Link
+                    href="/mypage"
+                    onClick={() => setSheetOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-3 text-sm font-medium border-b border-border/50"
+                  >
+                    <User className="h-4 w-4" strokeWidth={1.5} />
+                    마이페이지
+                  </Link>
+                  <Link
+                    href="/mypage"
+                    onClick={() => setSheetOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-3 text-sm font-medium border-b border-border/50"
+                  >
+                    <Heart className="h-4 w-4" strokeWidth={1.5} />
+                    찜한 상품
+                  </Link>
+                  {authMounted && user && (
+                    <button
+                      onClick={async () => {
+                        setSheetOpen(false)
+                        await signOut()
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-3 text-sm font-medium text-muted-foreground border-b border-border/50 mb-1 w-full text-left"
+                    >
+                      <LogOut className="h-4 w-4" strokeWidth={1.5} />
+                      로그아웃
+                    </button>
+                  )}
+                </>
+              )}
 
               {/* 전체상품 */}
               <Link
@@ -168,18 +205,42 @@ const Header = ({ categories }: HeaderProps) => {
               <span className="sr-only">검색</span>
             </Link>
           </Button>
-          {/* PC: 마이페이지 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden md:flex h-10 w-10"
-            asChild
-          >
-            <Link href="/mypage">
-              <User className="h-6 w-6" strokeWidth={1.5} />
-              <span className="sr-only">마이페이지</span>
+          {/* PC: 마이페이지 드롭다운 / 로그인 */}
+          {authMounted && !user ? (
+            <Link
+              href="/login"
+              className="hidden md:flex items-center h-10 px-2 text-sm text-foreground hover:text-primary transition-colors"
+            >
+              로그인
             </Link>
-          </Button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden md:flex h-10 w-10"
+                >
+                  <User className="h-6 w-6" strokeWidth={1.5} />
+                  <span className="sr-only">마이페이지</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-40" align="end">
+                <DropdownMenuItem asChild className="text-sm cursor-pointer">
+                  <Link href="/mypage">마이페이지</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="text-sm cursor-pointer">
+                  <Link href="/mypage/orders">주문내역</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={signOut}
+                  className="text-sm text-destructive cursor-pointer focus:text-destructive"
+                >
+                  로그아웃
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {/* PC: 찜 */}
           <Button
             variant="ghost"

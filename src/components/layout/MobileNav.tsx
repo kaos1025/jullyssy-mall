@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Grid2X2, Heart, User, ShoppingBag } from "lucide-react"
 import { useCart } from "@/hooks/use-cart"
+import { useUser } from "@/hooks/use-user"
 
 const navItems = [
   { href: "/", label: "홈", icon: Home },
@@ -18,6 +19,7 @@ const navItems = [
 const MobileNav = () => {
   const pathname = usePathname()
   const itemCount = useCart((s) => s.getItemCount())
+  const { user, mounted: authMounted } = useUser()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
@@ -27,15 +29,19 @@ const MobileNav = () => {
       <div className="flex items-center justify-around h-[60px]">
         {navItems.map((item) => {
           const key = item.id ?? item.label
+          const resolvedHref =
+            item.id === "mypage" && authMounted && !user
+              ? "/login"
+              : item.href
           const isActive =
-            item.href === "/"
+            resolvedHref === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href)
+              : pathname.startsWith(resolvedHref)
 
           return (
             <Link
               key={key}
-              href={item.href}
+              href={resolvedHref}
               className={`flex flex-col items-center justify-center gap-1 w-full h-full ${
                 isActive ? "text-primary" : "text-gray-400"
               }`}
