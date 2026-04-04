@@ -12,8 +12,7 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
   EXCHANGED: "교환완료",
 }
 
-export const SHIPPING_FEE = 3000
-export const FREE_SHIPPING_THRESHOLD = 50000
+export { SHIPPING_FEE, FREE_SHIPPING_THRESHOLD } from "./shipping"
 
 export const SORT_OPTIONS = [
   { value: "newest", label: "신상품순" },
