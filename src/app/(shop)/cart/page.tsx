@@ -8,7 +8,7 @@ import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useCart } from "@/hooks/use-cart"
-import { SHIPPING_FEE, FREE_SHIPPING_THRESHOLD } from "@/constants"
+import { calculateShippingFee, SHIPPING_CONFIG } from "@/constants/shipping"
 
 const CartPage = () => {
   const router = useRouter()
@@ -54,7 +54,7 @@ const CartPage = () => {
     (sum, item) => sum + (item.price + item.extra_price) * item.quantity,
     0
   )
-  const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : subtotal > 0 ? SHIPPING_FEE : 0
+  const shippingFee = calculateShippingFee(subtotal)
   const total = subtotal + shippingFee
 
   if (items.length === 0) {
@@ -207,9 +207,9 @@ const CartPage = () => {
                     : `${shippingFee.toLocaleString()}원`}
                 </span>
               </div>
-              {subtotal > 0 && subtotal < FREE_SHIPPING_THRESHOLD && (
+              {subtotal > 0 && subtotal < SHIPPING_CONFIG.freeShippingThreshold && (
                 <p className="text-xs text-primary">
-                  {(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString()}원 더 담으면
+                  {(SHIPPING_CONFIG.freeShippingThreshold - subtotal).toLocaleString()}원 더 담으면
                   무료배송!
                 </p>
               )}

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useCart } from "@/hooks/use-cart"
-import { SHIPPING_FEE, FREE_SHIPPING_THRESHOLD } from "@/constants"
+import { calculateShippingFee } from "@/constants/shipping"
 import AddressSelector from "@/components/checkout/AddressSelector"
 import CouponSelector from "@/components/checkout/CouponSelector"
 import PointInput from "@/components/checkout/PointInput"
@@ -56,8 +56,8 @@ const CheckoutPage = () => {
   }, [])
 
   const subtotal = mounted ? getTotal() : 0
-  const shippingFee =
-    subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : subtotal > 0 ? SHIPPING_FEE : 0
+  // TODO: P2 - 배송지 주소 기반 제주/도서산간 판별 후 calculateShippingFee(subtotal, isJeju, isRemote) 호출
+  const shippingFee = calculateShippingFee(subtotal)
   const totalDiscount = couponDiscount + pointUsed
   const finalAmount = subtotal - totalDiscount + shippingFee
 
