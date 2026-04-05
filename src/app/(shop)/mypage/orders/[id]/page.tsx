@@ -7,6 +7,13 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
 import type { OrderWithItems } from "@/types"
@@ -24,6 +31,7 @@ const OrderDetailPage = () => {
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -219,7 +227,7 @@ const OrderDetailPage = () => {
           {canCancel && (
             <Button
               variant="outline"
-              onClick={() => handleAction("cancel")}
+              onClick={() => setCancelDialogOpen(true)}
               disabled={actionLoading}
             >
               취소 신청
@@ -240,6 +248,37 @@ const OrderDetailPage = () => {
           )}
         </div>
       )}
+
+      {/* 취소 확인 Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>주문을 취소하시겠습니까?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            정말 주문을 취소하시겠습니까? 취소된 주문은 복구할 수 없습니다.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={actionLoading}
+            >
+              닫기
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await handleAction("cancel")
+                setCancelDialogOpen(false)
+              }}
+              disabled={actionLoading}
+            >
+              {actionLoading ? "처리 중..." : "취소 신청"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

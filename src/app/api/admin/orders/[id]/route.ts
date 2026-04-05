@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { cancelOrder } from "@/lib/order/cancel-order"
 
 export const PATCH = async (
   request: NextRequest,
@@ -9,7 +10,21 @@ export const PATCH = async (
   const body = await request.json()
   const orderId = params.id
 
-  // 송장입력 또는 상태변경
+  // CANCELLED 상태로 변경 시 전체 취소 플로우 실행
+  if (body.status === "CANCELLED") {
+    const result = await cancelOrder(orderId)
+
+    if ("error" in result) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  }
+
+  // 그 외 상태 변경 (송장입력 포함)
   const updateData: Record<string, string> = {}
 
   if (body.status) updateData.status = body.status
