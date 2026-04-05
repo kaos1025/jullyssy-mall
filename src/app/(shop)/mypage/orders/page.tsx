@@ -3,6 +3,7 @@ import Image from "next/image"
 import { createClient } from "@/lib/supabase/server"
 import { Badge } from "@/components/ui/badge"
 import { ORDER_STATUS_LABEL } from "@/constants"
+import { OrderCancelButton } from "@/components/mypage/order-cancel-button"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -74,9 +75,14 @@ const OrdersPage = async ({ searchParams }: OrdersPageProps) => {
                   {ORDER_STATUS_LABEL[order.status] || order.status}
                 </Badge>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {new Date(order.created_at).toLocaleDateString("ko-KR")}
-              </span>
+              <div className="flex items-center gap-2">
+                {["PAID", "PREPARING"].includes(order.status) && (
+                  <OrderCancelButton orderId={order.id} />
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {new Date(order.created_at).toLocaleDateString("ko-KR")}
+                </span>
+              </div>
             </div>
 
             <div className="flex gap-3">
