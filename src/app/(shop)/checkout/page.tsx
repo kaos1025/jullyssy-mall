@@ -29,7 +29,7 @@ const CheckoutPage = () => {
   const { items, getTotal } = useCart()
   const [mounted, setMounted] = useState(false)
 
-  const [showItems, setShowItems] = useState(false)
+  const [showItems, setShowItems] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("CARD")
   const [loading, setLoading] = useState(false)
 
@@ -91,6 +91,11 @@ const CheckoutPage = () => {
     setLoading(true)
 
     try {
+      // 0. 새 배송지 저장 (체크한 경우)
+      const saveAddr = (window as unknown as Record<string, unknown>)
+        .__saveNewAddress as (() => Promise<void>) | undefined
+      if (saveAddr) await saveAddr()
+
       // 1. 주문 생성
       const res = await fetch("/api/orders", {
         method: "POST",

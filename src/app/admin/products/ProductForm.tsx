@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Plus, Trash2, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -275,10 +276,11 @@ const ProductForm = ({ product }: ProductFormProps) => {
                 key={img.id}
                 className="relative h-20 w-20 rounded border overflow-hidden group"
               >
-                <img
+                <Image
                   src={img.url}
                   alt=""
-                  className="h-full w-full object-cover"
+                  fill
+                  className="object-cover"
                 />
                 <button
                   type="button"

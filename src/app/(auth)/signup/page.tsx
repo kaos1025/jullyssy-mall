@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { formatPhoneNumber } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -168,7 +169,8 @@ const SignupPage = () => {
               type="tel"
               placeholder="010-0000-0000"
               value={form.phone}
-              onChange={(e) => updateField("phone", e.target.value)}
+              onChange={(e) => updateField("phone", formatPhoneNumber(e.target.value))}
+              maxLength={13}
             />
           </div>
 

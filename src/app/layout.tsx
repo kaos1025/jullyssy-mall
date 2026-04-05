@@ -25,14 +25,6 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
     siteName: "쥴리씨",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "쥴리씨 여성의류 쇼핑몰",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",

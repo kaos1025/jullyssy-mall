@@ -22,6 +22,11 @@ const OrderCompletePage = async ({ searchParams }: OrderCompletePageProps) => {
 
   if (!order) redirect("/")
 
+  const { data: orderItems } = await supabase
+    .from("order_items")
+    .select("product_name, color, size, quantity, price")
+    .eq("order_id", searchParams.order_id)
+
   return (
     <div className="container max-w-lg py-12">
       <CartSyncer />
@@ -44,6 +49,27 @@ const OrderCompletePage = async ({ searchParams }: OrderCompletePageProps) => {
             {order.paid_amount.toLocaleString()}원
           </span>
         </div>
+        {orderItems && orderItems.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-2 text-sm">
+              <p className="font-medium">주문 상품</p>
+              {orderItems.map((item, i) => (
+                <div key={i} className="flex justify-between gap-2">
+                  <p className="flex-1 min-w-0">
+                    <span className="line-clamp-1">{item.product_name}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {item.color}/{item.size} · {item.quantity}개
+                    </span>
+                  </p>
+                  <span className="flex-shrink-0">
+                    {(item.price * item.quantity).toLocaleString()}원
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <Separator />
         <div className="space-y-2 text-sm">
           <p className="font-medium">배송지 정보</p>

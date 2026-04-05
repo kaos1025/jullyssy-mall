@@ -4,14 +4,15 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { createClient } from "@/lib/supabase/client"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { formatPhoneNumber } from "@/lib/utils"
 import type { Address } from "@/types"
 
 interface AddressSelectorProps {
@@ -25,11 +26,22 @@ interface AddressSelectorProps {
   }) => void
 }
 
+const MEMO_OPTIONS = [
+  "문 앞에 놓아주세요",
+  "경비실에 맡겨주세요",
+  "배송 전 연락 부탁드립니다",
+  "부재 시 문 앞에 놓아주세요",
+]
+
 const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isNew, setIsNew] = useState(false)
   const [memo, setMemo] = useState("")
+  const [memoOption, setMemoOption] = useState("")
+  const [isCustomMemo, setIsCustomMemo] = useState(false)
+  const [saveAddress, setSaveAddress] = useState(false)
+  const [addressLabel, setAddressLabel] = useState("")
   const [newAddress, setNewAddress] = useState({
     recipient: "",
     phone: "",
@@ -40,14 +52,11 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("addresses")
-        .select("*")
-        .order("is_default", { ascending: false })
-        .order("created_at", { ascending: false })
+      const res = await fetch("/api/addresses")
+      if (!res.ok) return
 
-      if (data && data.length > 0) {
+      const data: Address[] = await res.json()
+      if (data.length > 0) {
         setAddresses(data)
         const defaultAddr = data.find((a) => a.is_default) || data[0]
         setSelectedId(defaultAddr.id)
@@ -67,8 +76,18 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSelectAddress = (addr: Address) => {
-    setSelectedId(addr.id)
+  const handleSelectChange = (value: string) => {
+    if (value === "new") {
+      setSelectedId(null)
+      setIsNew(true)
+      setNewAddress({ recipient: "", phone: "", zipcode: "", address1: "", address2: "" })
+      onSelect({ recipient: "", phone: "", zipcode: "", address1: "", address2: "", memo })
+      return
+    }
+
+    const addr = addresses.find((a) => a.id === value)
+    if (!addr) return
+    setSelectedId(value)
     setIsNew(false)
     onSelect({
       recipient: addr.recipient,
@@ -87,7 +106,6 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
   }
 
   const openPostcodeSearch = () => {
-    // 다음 우편번호 API
     if (typeof window === "undefined") return
     const daum = (window as unknown as Record<string, unknown>).daum as {
       Postcode: new (config: {
@@ -117,69 +135,75 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
     }).open()
   }
 
+  const updateMemo = (memoValue: string) => {
+    setMemo(memoValue)
+    const selected = addresses.find((a) => a.id === selectedId)
+    if (!isNew && selected) {
+      onSelect({
+        recipient: selected.recipient,
+        phone: selected.phone,
+        zipcode: selected.zipcode,
+        address1: selected.address1,
+        address2: selected.address2 || "",
+        memo: memoValue,
+      })
+    } else {
+      onSelect({ ...newAddress, memo: memoValue })
+    }
+  }
+
+  const handleSaveNewAddress = async () => {
+    if (!saveAddress) return
+    await fetch("/api/addresses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        label: addressLabel || "배송지",
+        ...newAddress,
+        is_default: false,
+      }),
+    })
+  }
+
+  // checkout 페이지에서 결제 전에 호출할 수 있도록 expose
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__saveNewAddress =
+      handleSaveNewAddress
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__saveNewAddress
+    }
+  })
+
   const selected = addresses.find((a) => a.id === selectedId)
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">배송지</h3>
-        {addresses.length > 0 && (
-          <div className="flex gap-2">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  주소록
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>배송지 선택</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {addresses.map((addr) => (
-                    <button
-                      key={addr.id}
-                      onClick={() => handleSelectAddress(addr)}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                        selectedId === addr.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/50"
-                      }`}
-                    >
-                      <p className="font-medium text-sm">
-                        {addr.label}
-                        {addr.is_default && (
-                          <span className="ml-2 text-xs text-primary">
-                            기본
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-sm">
-                        {addr.recipient} / {addr.phone}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        [{addr.zipcode}] {addr.address1} {addr.address2}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setIsNew(true)
-                setSelectedId(null)
-              }}
-            >
-              새 주소
-            </Button>
-          </div>
-        )}
-      </div>
+      <h3 className="font-semibold">배송지</h3>
 
-      {!isNew && selected ? (
+      {/* 저장된 배송지 Select */}
+      {addresses.length > 0 && (
+        <Select
+          value={isNew ? "new" : selectedId || undefined}
+          onValueChange={handleSelectChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="배송지를 선택해주세요" />
+          </SelectTrigger>
+          <SelectContent>
+            {addresses.map((addr) => (
+              <SelectItem key={addr.id} value={addr.id}>
+                {addr.label}
+                {addr.is_default ? " (기본)" : ""} — {addr.recipient},{" "}
+                {addr.address1}
+              </SelectItem>
+            ))}
+            <SelectItem value="new">새 배송지 직접 입력</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* 선택된 배송지 표시 */}
+      {!isNew && selected && (
         <div className="p-4 rounded-lg border bg-muted/30">
           <p className="font-medium text-sm">{selected.recipient}</p>
           <p className="text-sm">{selected.phone}</p>
@@ -187,7 +211,10 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
             [{selected.zipcode}] {selected.address1} {selected.address2}
           </p>
         </div>
-      ) : (
+      )}
+
+      {/* 새 배송지 입력 폼 */}
+      {isNew && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -203,11 +230,16 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
             <div>
               <Label className="text-xs">연락처</Label>
               <Input
+                type="tel"
                 placeholder="010-0000-0000"
                 value={newAddress.phone}
                 onChange={(e) =>
-                  handleNewAddressChange("phone", e.target.value)
+                  handleNewAddressChange(
+                    "phone",
+                    formatPhoneNumber(e.target.value)
+                  )
                 }
+                maxLength={13}
               />
             </div>
           </div>
@@ -238,31 +270,65 @@ const AddressSelector = ({ onSelect }: AddressSelectorProps) => {
               handleNewAddressChange("address2", e.target.value)
             }
           />
+
+          {/* 이 배송지 저장 */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="saveAddr"
+                checked={saveAddress}
+                onCheckedChange={(checked) => setSaveAddress(!!checked)}
+              />
+              <Label htmlFor="saveAddr" className="text-sm">
+                이 배송지를 저장
+              </Label>
+            </div>
+            {saveAddress && (
+              <Input
+                placeholder="배송지명 (예: 집, 회사)"
+                value={addressLabel}
+                onChange={(e) => setAddressLabel(e.target.value)}
+              />
+            )}
+          </div>
         </div>
       )}
 
       {/* 배송 메모 */}
-      <div>
+      <div className="space-y-2">
         <Label className="text-xs">배송 메모</Label>
-        <Input
-          placeholder="배송 시 요청사항 (선택)"
-          value={memo}
-          onChange={(e) => {
-            setMemo(e.target.value)
-            if (!isNew && selected) {
-              onSelect({
-                recipient: selected.recipient,
-                phone: selected.phone,
-                zipcode: selected.zipcode,
-                address1: selected.address1,
-                address2: selected.address2 || "",
-                memo: e.target.value,
-              })
+        <Select
+          value={memoOption}
+          onValueChange={(value) => {
+            setMemoOption(value)
+            if (value === "custom") {
+              setIsCustomMemo(true)
+              updateMemo("")
             } else {
-              onSelect({ ...newAddress, memo: e.target.value })
+              setIsCustomMemo(false)
+              updateMemo(value)
             }
           }}
-        />
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="배송 시 요청사항을 선택해주세요" />
+          </SelectTrigger>
+          <SelectContent>
+            {MEMO_OPTIONS.map((opt) => (
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
+            <SelectItem value="custom">직접 입력</SelectItem>
+          </SelectContent>
+        </Select>
+        {isCustomMemo && (
+          <Input
+            placeholder="배송 시 요청사항을 입력해주세요"
+            value={memo}
+            onChange={(e) => updateMemo(e.target.value)}
+          />
+        )}
       </div>
     </div>
   )
