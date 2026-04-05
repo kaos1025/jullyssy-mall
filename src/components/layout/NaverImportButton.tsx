@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import Image from "next/image"
 import { Upload, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -258,10 +259,12 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
                       </td>
                       <td className="p-2">
                         {product.imageUrl ? (
-                          <img
+                          <Image
                             src={product.imageUrl}
                             alt=""
-                            className="w-10 h-10 object-cover rounded"
+                            width={40}
+                            height={40}
+                            className="object-cover rounded"
                           />
                         ) : (
                           <div className="w-10 h-10 bg-muted rounded" />
