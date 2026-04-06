@@ -16,13 +16,9 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
+import { COURIER_TRACKING_URLS } from "@/constants/courier"
+import type { CourierName } from "@/constants/courier"
 import type { OrderWithItems } from "@/types"
-
-const COURIER_TRACKING_URL: Record<string, string> = {
-  CJ대한통운: "https://trace.cjlogistics.com/web/detail.jsp?slipno=",
-  롯데택배: "https://www.lotteglogis.com/home/reservation/tracking/link498?InvNo=",
-  한진택배: "https://www.hanjin.com/kor/CMS/DeliveryMgr/WaybillResult.do?mession-id=&wblnumText2=&schLang=KR&wblnumText=",
-}
 
 const OrderDetailPage = () => {
   const params = useParams()
@@ -172,17 +168,24 @@ const OrderDetailPage = () => {
         {order.courier && order.tracking_no && (
           <div className="pt-2">
             <Separator className="mb-2" />
-            <p className="text-sm">
-              {order.courier}{" "}
-              <a
-                href={`${COURIER_TRACKING_URL[order.courier] || ""}${order.tracking_no}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {order.tracking_no}
-              </a>
-            </p>
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <span className="text-muted-foreground">택배사:</span> {order.courier}
+                <br />
+                <span className="text-muted-foreground">송장번호:</span> {order.tracking_no}
+              </div>
+              {COURIER_TRACKING_URLS[order.courier as CourierName] && (
+                <a
+                  href={COURIER_TRACKING_URLS[order.courier as CourierName](order.tracking_no)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="outline" size="sm">
+                    배송 조회
+                  </Button>
+                </a>
+              )}
+            </div>
           </div>
         )}
       </div>

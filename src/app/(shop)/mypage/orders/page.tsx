@@ -105,6 +105,11 @@ const OrdersPage = async ({ searchParams }: OrdersPageProps) => {
                 <p className="text-sm font-bold mt-1">
                   {order.paid_amount.toLocaleString()}원
                 </p>
+                {["SHIPPING", "DELIVERED"].includes(order.status) && order.courier && order.tracking_no && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {order.courier} {order.tracking_no}
+                  </p>
+                )}
               </div>
             </div>
           </Link>

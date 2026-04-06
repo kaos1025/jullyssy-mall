@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
+import { COURIERS } from "@/constants/courier"
 import dayjs from "dayjs"
 
 const STATUS_TABS = [
@@ -32,8 +33,6 @@ const STATUS_TABS = [
   { value: "CANCELLED", label: "취소/교환/반품" },
 ]
 
-const COURIERS = ["CJ대한통운", "롯데택배", "한진택배", "우체국택배", "로젠택배"]
-
 interface OrderRow {
   id: string
   order_no: string
@@ -42,6 +41,8 @@ interface OrderRow {
   created_at: string
   recipient: string
   recipient_phone: string
+  courier: string | null
+  tracking_no: string | null
   order_items: { product_name: string; quantity: number }[]
 }
 
@@ -55,7 +56,7 @@ const AdminOrdersPage = () => {
 
   // 송장 입력 다이얼로그
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
-  const [courier, setCourier] = useState(COURIERS[0])
+  const [courier, setCourier] = useState<string>(COURIERS[0])
   const [trackingNo, setTrackingNo] = useState("")
 
   const fetchOrders = useCallback(async () => {
@@ -273,12 +274,16 @@ const AdminOrdersPage = () => {
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button
-                          variant="ghost"
+                          variant={order.tracking_no ? "ghost" : order.status === "PAID" || order.status === "PREPARING" ? "outline" : "ghost"}
                           size="sm"
-                          className="text-xs"
-                          onClick={() => setTrackingOrderId(order.id)}
+                          className={`text-xs ${order.tracking_no ? "text-green-600" : order.status === "PAID" || order.status === "PREPARING" ? "text-orange-600 border-orange-300" : ""}`}
+                          onClick={() => {
+                            setTrackingOrderId(order.id)
+                            setCourier(order.courier || COURIERS[0])
+                            setTrackingNo(order.tracking_no || "")
+                          }}
                         >
-                          송장
+                          {order.tracking_no ? "송장 ✓" : "송장"}
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
