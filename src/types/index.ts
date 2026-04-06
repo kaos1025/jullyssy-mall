@@ -174,15 +174,16 @@ export interface Coupon {
   name: string
   code: string
   type: CouponType
-  discount_value: number
-  min_order_amount: number
+  value: number
+  min_order_price: number
   max_discount: number | null
   starts_at: string
-  expires_at: string
-  max_issues: number | null
+  expires_at: string | null
+  total_quantity: number | null
   issued_count: number
   is_active: boolean
   created_at: string
+  updated_at: string
 }
 
 export interface UserCoupon {

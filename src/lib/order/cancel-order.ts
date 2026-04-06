@@ -103,7 +103,14 @@ export const cancelOrder = async (
     }
   }
 
-  // 6. 쿠폰 반환 — TODO: Day 6 쿠폰 시스템 구현 시 연동
+  // 6. 쿠폰 원복
+  if (order.coupon_id) {
+    await admin
+      .from("user_coupons")
+      .update({ used_at: null, order_id: null })
+      .eq("order_id", orderId)
+      .eq("coupon_id", order.coupon_id)
+  }
 
   // 7. payments 상태 변경
   await admin
