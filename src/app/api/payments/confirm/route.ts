@@ -58,6 +58,29 @@ export const GET = async (request: Request) => {
       .update({ status: "PAID" })
       .eq("id", orderUuid)
 
+    // 결제 승인 성공 후 장바구니에서 주문 상품 삭제
+    const { data: order } = await admin
+      .from("orders")
+      .select("user_id")
+      .eq("id", orderUuid)
+      .single()
+
+    if (order) {
+      const { data: orderItems } = await admin
+        .from("order_items")
+        .select("product_option_id")
+        .eq("order_id", orderUuid)
+
+      if (orderItems?.length) {
+        const optionIds = orderItems.map((i) => i.product_option_id)
+        await admin
+          .from("cart_items")
+          .delete()
+          .eq("user_id", order.user_id)
+          .in("product_option_id", optionIds)
+      }
+    }
+
     return NextResponse.redirect(
       `${origin}/order-complete?order_id=${orderUuid}`
     )
