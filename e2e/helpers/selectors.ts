@@ -28,6 +28,15 @@ export const SEL = {
   newProductButton: "상품 등록",
   searchButton: 'button:has-text("검색")',
 
+  // Order cancel
+  cancelConfirmButton: 'button:has-text("취소 신청")',
+  cancelDialogTitle: "주문을 취소하시겠습니까?",
+  cancelSuccessToast: "주문이 취소되었습니다",
+  cancelledBadge: "취소완료",
+
+  // Empty checkout
+  emptyCheckoutText: "주문할 상품이 없습니다",
+
   // Toast (Radix Toast)
   toast: "[data-radix-toast-viewport] li",
 } as const

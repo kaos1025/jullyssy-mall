@@ -13,16 +13,9 @@ export default defineConfig({
   timeout: 60_000,
 
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "https://jullyssy.shop",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-  },
-
-  webServer: {
-    command: "npm run dev",
-    port: 3000,
-    reuseExistingServer: true,
-    timeout: 60_000,
   },
 
   projects: [
@@ -38,7 +31,7 @@ export default defineConfig({
         // storageState 없음 — 비로그인 상태
       },
       dependencies: ["setup"],
-      testMatch: /auth\.spec/,
+      testMatch: /auth\.spec|guest-/,
     },
     {
       name: "user-tests",

@@ -26,4 +26,7 @@ export const PREFIXES = {
   adminProd: "[E2E-admin-prod]",
   adminOrder: "[E2E-admin-order]",
   coupon: "[E2E-coupon]",
+  orderCancel: "[E2E-cancel]",
+  guestCart: "[E2E-guest]",
+  errorCase: "[E2E-error]",
 } as const

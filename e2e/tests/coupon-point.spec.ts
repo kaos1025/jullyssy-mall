@@ -6,10 +6,11 @@ import {
   setUserPoint,
   cleanupByPrefix,
   getUserIdByEmail,
+  cleanupCartItems,
   adminClient,
 } from "../helpers/supabase-admin"
 import { PREFIXES, TEST_USER } from "../helpers/test-data"
-import { injectCartBeforeLoad } from "../helpers/cart"
+import { injectCartViaDB, clearCartDB } from "../helpers/cart"
 
 const PREFIX = PREFIXES.coupon
 
@@ -58,6 +59,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
   })
 
   test.afterAll(async () => {
+    await cleanupCartItems(testUserId)
     await cleanupByPrefix(PREFIX)
     // 포인트 원복
     await adminClient
@@ -66,24 +68,13 @@ test.describe("쿠폰 + 포인트 결제", () => {
       .eq("id", testUserId)
   })
 
-  const getCartItems = () => [
-    {
-      product_id: testProduct.id,
-      product_option_id: testOptionId,
-      product_name: testProduct.name,
-      product_image: null,
-      color: "베이지",
-      size: "FREE",
-      price: 60000,
-      extra_price: 0,
-      quantity: 1,
-      stock: 10,
-    },
-  ]
+  const setupCart = async () => {
+    await clearCartDB(testUserId)
+    await injectCartViaDB(testUserId, [{ productOptionId: testOptionId, quantity: 1 }])
+  }
 
   test("쿠폰 적용 시 할인 금액 반영", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCartBeforeLoad(page, getCartItems())
+    await setupCart()
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -105,8 +96,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
   })
 
   test("쿠폰 취소", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCartBeforeLoad(page, getCartItems())
+    await setupCart()
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -124,8 +114,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
   })
 
   test("포인트 사용", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCartBeforeLoad(page, getCartItems())
+    await setupCart()
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -148,8 +137,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
   })
 
   test("포인트 전액사용", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCartBeforeLoad(page, getCartItems())
+    await setupCart()
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })
@@ -169,8 +157,7 @@ test.describe("쿠폰 + 포인트 결제", () => {
   })
 
   test("쿠폰 + 포인트 동시 적용", async ({ userPage: page }) => {
-    await page.goto("/")
-    await injectCartBeforeLoad(page, getCartItems())
+    await setupCart()
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })

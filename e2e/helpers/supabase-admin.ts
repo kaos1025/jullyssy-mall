@@ -217,6 +217,41 @@ export const setUserPoint = async (userId: string, amount: number) => {
   })
 }
 
+// --- 장바구니 (DB 직접 조작) ---
+
+export const addCartItem = async (
+  userId: string,
+  productOptionId: string,
+  quantity: number
+) => {
+  // 기존 아이템 확인
+  const { data: existing } = await adminClient
+    .from("cart_items")
+    .select("id, quantity")
+    .eq("user_id", userId)
+    .eq("product_option_id", productOptionId)
+    .single()
+
+  if (existing) {
+    const { error } = await adminClient
+      .from("cart_items")
+      .update({ quantity: existing.quantity + quantity })
+      .eq("id", existing.id)
+    if (error) throw new Error(`Failed to update cart item: ${error.message}`)
+  } else {
+    const { error } = await adminClient.from("cart_items").insert({
+      user_id: userId,
+      product_option_id: productOptionId,
+      quantity,
+    })
+    if (error) throw new Error(`Failed to add cart item: ${error.message}`)
+  }
+}
+
+export const cleanupCartItems = async (userId: string) => {
+  await adminClient.from("cart_items").delete().eq("user_id", userId)
+}
+
 // --- Cleanup ---
 
 export const cleanupByPrefix = async (prefix: string) => {
@@ -259,6 +294,9 @@ export const cleanupAllE2E = async () => {
     "[E2E-admin-prod]",
     "[E2E-admin-order]",
     "[E2E-coupon]",
+    "[E2E-cancel]",
+    "[E2E-guest]",
+    "[E2E-error]",
   ]
   for (const prefix of prefixes) {
     await cleanupByPrefix(prefix)

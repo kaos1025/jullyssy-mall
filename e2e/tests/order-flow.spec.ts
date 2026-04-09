@@ -3,31 +3,24 @@ import {
   createTestProduct,
   cleanupByPrefix,
   adminClient,
+  getUserIdByEmail,
+  cleanupCartItems,
 } from "../helpers/supabase-admin"
-import { PREFIXES, TEST_ADDRESS } from "../helpers/test-data"
-import { injectCartBeforeLoad } from "../helpers/cart"
+import { PREFIXES, TEST_ADDRESS, TEST_USER } from "../helpers/test-data"
+import { injectCartViaDB, clearCartDB } from "../helpers/cart"
 
 const PREFIX = PREFIXES.order
 
 let testProduct: { id: string; name: string; price: number }
 let testOptionId: string
-
-const makeCartItem = () => ({
-  product_id: testProduct.id,
-  product_option_id: testOptionId,
-  product_name: testProduct.name,
-  product_image: null,
-  color: "블랙",
-  size: "M",
-  price: 35000,
-  extra_price: 0,
-  quantity: 1,
-  stock: 10,
-})
+let testUserId: string
 
 test.describe("주문 결제 플로우", () => {
   test.beforeAll(async () => {
     await cleanupByPrefix(PREFIX)
+
+    testUserId = (await getUserIdByEmail(TEST_USER.email))!
+    if (!testUserId) throw new Error("Test user not found")
 
     const product = await createTestProduct({
       name: `${PREFIX} 니트 원피스`,
@@ -53,6 +46,7 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test.afterAll(async () => {
+    await cleanupCartItems(testUserId)
     await cleanupByPrefix(PREFIX)
     const { data: orders } = await adminClient
       .from("orders")
@@ -100,7 +94,8 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 페이지에서 상품 확인", async ({ userPage: page }) => {
-    await injectCartBeforeLoad(page, [makeCartItem()])
+    await clearCartDB(testUserId)
+    await injectCartViaDB(testUserId, [{ productOptionId: testOptionId, quantity: 1 }])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -111,7 +106,8 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 수량 변경", async ({ userPage: page }) => {
-    await injectCartBeforeLoad(page, [makeCartItem()])
+    await clearCartDB(testUserId)
+    await injectCartViaDB(testUserId, [{ productOptionId: testOptionId, quantity: 1 }])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -129,7 +125,8 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 상품 삭제", async ({ userPage: page }) => {
-    await injectCartBeforeLoad(page, [makeCartItem()])
+    await clearCartDB(testUserId)
+    await injectCartViaDB(testUserId, [{ productOptionId: testOptionId, quantity: 1 }])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -145,7 +142,8 @@ test.describe("주문 결제 플로우", () => {
   })
 
   test("장바구니 → 주문서 이동", async ({ userPage: page }) => {
-    await injectCartBeforeLoad(page, [makeCartItem()])
+    await clearCartDB(testUserId)
+    await injectCartViaDB(testUserId, [{ productOptionId: testOptionId, quantity: 1 }])
     await page.goto("/cart")
 
     await expect(page.getByText(testProduct.name)).toBeVisible({
@@ -175,7 +173,8 @@ test.describe("주문 결제 플로우", () => {
       }
     })
 
-    await injectCartBeforeLoad(page, [makeCartItem()])
+    await clearCartDB(testUserId)
+    await injectCartViaDB(testUserId, [{ productOptionId: testOptionId, quantity: 1 }])
     await page.goto("/checkout")
 
     await expect(page.getByText("주문서")).toBeVisible({ timeout: 10_000 })

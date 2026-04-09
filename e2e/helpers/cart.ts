@@ -1,35 +1,22 @@
-import type { Page } from "@playwright/test"
+import { addCartItem, cleanupCartItems } from "./supabase-admin"
 
-interface CartItem {
-  product_id: string
-  product_option_id: string
-  product_name: string
-  product_image: string | null
-  color: string
-  size: string
-  price: number
-  extra_price: number
-  quantity: number
-  stock: number
+/**
+ * DB를 통해 장바구니에 상품을 추가합니다.
+ * cart_items 테이블에 직접 insert하므로 로그인 유저만 가능합니다.
+ * 주의: 테스트 시작 전 또는 goto() 전에 호출하세요. 페이지 로드 시 useCart().fetchCart()가 DB에서 읽습니다.
+ */
+export const injectCartViaDB = async (
+  userId: string,
+  items: Array<{ productOptionId: string; quantity: number }>
+) => {
+  for (const item of items) {
+    await addCartItem(userId, item.productOptionId, item.quantity)
+  }
 }
 
 /**
- * addInitScript로 장바구니를 주입합니다.
- * 페이지 로드 전에 localStorage에 기록되므로 Zustand hydration 시 반영됩니다.
- * 주의: goto() 전에 호출해야 합니다.
+ * DB 장바구니를 비웁니다.
  */
-export const injectCartBeforeLoad = async (page: Page, items: CartItem[]) => {
-  const cartJson = JSON.stringify({ state: { items }, version: 0 })
-  await page.addInitScript((json: string) => {
-    localStorage.setItem("julie-cart", json)
-  }, cartJson)
-}
-
-/**
- * localStorage 장바구니를 비웁니다.
- */
-export const clearCart = async (page: Page) => {
-  await page.evaluate(() => {
-    localStorage.removeItem("julie-cart")
-  })
+export const clearCartDB = async (userId: string) => {
+  await cleanupCartItems(userId)
 }
