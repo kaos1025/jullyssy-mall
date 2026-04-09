@@ -17,6 +17,7 @@ interface ProductCardProps {
   slug?: string | null
   status?: string
   created_at?: string
+  free_shipping?: boolean
 }
 
 const isNew = (createdAt?: string) => {
@@ -90,6 +91,7 @@ const ProductCard = ({
   slug,
   status,
   created_at,
+  free_shipping,
 }: ProductCardProps) => {
   const discountRate = sale_price
     ? Math.round(((price - sale_price) / price) * 100)
@@ -209,6 +211,11 @@ const ProductCard = ({
             </span>
           )}
         </div>
+
+        {/* 무료배송 뱃지 */}
+        {free_shipping && (
+          <span className="text-[11px] text-primary font-medium mt-0.5">무료배송</span>
+        )}
 
         {/* 상품명 */}
         <h3 className="text-sm text-foreground/80 mt-1 line-clamp-2 leading-snug">

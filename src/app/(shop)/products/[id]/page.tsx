@@ -240,6 +240,13 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
             </div>
           </div>
 
+          {/* 무료배송 뱃지 */}
+          {product.free_shipping && (
+            <span className="inline-block text-xs text-primary font-medium border border-primary/30 rounded px-1.5 py-0.5">
+              무료배송
+            </span>
+          )}
+
           {/* 리뷰 요약 */}
           {typedReviews.length > 0 && (
             <a
@@ -357,6 +364,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
                       colors={rpColors}
                       status={rp.status}
                       created_at={rp.created_at}
+                      free_shipping={rp.free_shipping}
                     />
                   )
                 })}

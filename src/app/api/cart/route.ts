@@ -30,6 +30,7 @@ export const GET = async () => {
           price,
           sale_price,
           status,
+          free_shipping,
           product_images ( url, is_thumbnail )
         )
       )
@@ -64,6 +65,7 @@ export const GET = async () => {
       quantity: isSoldout ? ci.quantity : Math.min(ci.quantity, po.stock),
       stock: po.stock,
       soldout: isSoldout,
+      free_shipping: p.free_shipping === true,
     }
   })
 

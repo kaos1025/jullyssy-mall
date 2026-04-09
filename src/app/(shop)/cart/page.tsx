@@ -54,7 +54,8 @@ const CartPage = () => {
     (sum, item) => sum + (item.price + item.extra_price) * item.quantity,
     0
   )
-  const shippingFee = calculateShippingFee(subtotal)
+  const hasFreeShippingItem = selectedItems.some((item) => item.free_shipping)
+  const shippingFee = calculateShippingFee(subtotal, { hasFreeShippingItem })
   const total = subtotal + shippingFee
 
   if (items.length === 0) {

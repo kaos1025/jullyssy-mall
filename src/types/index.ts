@@ -92,6 +92,7 @@ export interface Product {
   material: string | null
   care_info: string | null
   origin: string | null
+  free_shipping: boolean
   naver_product_no: string | null
   view_count: number
   sell_count: number
@@ -282,4 +283,5 @@ export interface CartItem {
   quantity: number
   stock: number
   soldout?: boolean
+  free_shipping?: boolean
 }

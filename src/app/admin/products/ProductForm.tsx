@@ -56,6 +56,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
     care_info: product?.care_info || "",
     origin: product?.origin || "",
     status: product?.status || "ACTIVE",
+    free_shipping: product?.free_shipping === true,
   })
 
   const [options, setOptions] = useState<OptionRow[]>(
@@ -98,7 +99,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
 
   const childCategories = categories.filter((c) => c.parent_id)
 
-  const updateForm = (field: string, value: string | number) => {
+  const updateForm = (field: string, value: string | number | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -262,6 +263,15 @@ const ProductForm = ({ product }: ProductFormProps) => {
             />
           </div>
         </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.free_shipping}
+            onChange={(e) => updateForm("free_shipping", e.target.checked)}
+            className="h-4 w-4 rounded"
+          />
+          <span className="text-sm">무료배송 상품</span>
+        </label>
       </section>
 
       <Separator />

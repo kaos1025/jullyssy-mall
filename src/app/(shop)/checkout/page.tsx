@@ -56,8 +56,8 @@ const CheckoutPage = () => {
   }, [])
 
   const subtotal = mounted ? getTotal() : 0
-  // TODO: P2 - 배송지 주소 기반 제주/도서산간 판별 후 calculateShippingFee(subtotal, isJeju, isRemote) 호출
-  const shippingFee = calculateShippingFee(subtotal)
+  const hasFreeShippingItem = mounted && items.some((item) => item.free_shipping)
+  const shippingFee = calculateShippingFee(subtotal, { hasFreeShippingItem })
   const totalDiscount = couponDiscount + pointUsed
   const finalAmount = subtotal - totalDiscount + shippingFee
 

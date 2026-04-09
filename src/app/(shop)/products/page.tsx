@@ -201,6 +201,7 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
                 review_count={product.reviews?.length || 0}
                 status={product.status}
                 created_at={product.created_at}
+                free_shipping={product.free_shipping}
               />
             ))}
           </div>

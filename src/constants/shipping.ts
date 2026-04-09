@@ -10,22 +10,16 @@ export const SHIPPING_CONFIG = {
 /** 배송비 계산 함수 */
 export function calculateShippingFee(
   totalPrice: number,
-  // TODO: P2 - 제주/도서산간 추가배송비 (주소 기반 판별 로직 필요)
-  // isJeju?: boolean,
-  // isRemote?: boolean,
+  options?: { hasFreeShippingItem?: boolean },
 ): number {
   if (totalPrice <= 0) return 0
 
-  const fee =
-    totalPrice >= SHIPPING_CONFIG.freeShippingThreshold
-      ? 0
-      : SHIPPING_CONFIG.baseFee
+  // 무료배송 상품이 포함되면 전체 주문 무료배송
+  if (options?.hasFreeShippingItem) return 0
 
-  // TODO: P2 - 제주/도서산간 추가배송비 활성화 시 let으로 변경
-  // if (isJeju) fee += SHIPPING_CONFIG.jejuExtraFee
-  // if (isRemote) fee += SHIPPING_CONFIG.remoteExtraFee
-
-  return fee
+  return totalPrice >= SHIPPING_CONFIG.freeShippingThreshold
+    ? 0
+    : SHIPPING_CONFIG.baseFee
 }
 
 // 하위 호환용 re-export

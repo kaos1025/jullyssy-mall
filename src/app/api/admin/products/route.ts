@@ -89,6 +89,7 @@ export const POST = async (request: Request) => {
         care_info: productData.care_info || null,
         origin: productData.origin || null,
         status: productData.status || "ACTIVE",
+        free_shipping: productData.free_shipping === true,
         search_tags: productData.search_tags || [],
       })
       .select()

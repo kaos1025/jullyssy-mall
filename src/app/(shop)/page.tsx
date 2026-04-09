@@ -147,6 +147,7 @@ const HomePage = async () => {
                   colors={getColors(product)}
                   status={product.status}
                   created_at={product.created_at}
+                  free_shipping={product.free_shipping}
                 />
               ))}
             </div>
@@ -188,6 +189,7 @@ const HomePage = async () => {
                   colors={getColors(product)}
                   status={product.status}
                   created_at={product.created_at}
+                  free_shipping={product.free_shipping}
                 />
               ))}
             </div>
