@@ -34,6 +34,7 @@ const CategoryMappingPage = () => {
   const [mappings, setMappings] = useState<CategoryMapping[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [changes, setChanges] = useState<Map<string, string | null>>(new Map())
+  const [parentSelections, setParentSelections] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -53,17 +54,6 @@ const CategoryMappingPage = () => {
   const parentCategories = categories.filter((c) => !c.parent_id)
   const childCategories = categories.filter((c) => c.parent_id)
 
-  const getCategoryLabel = (categoryId: string | null) => {
-    if (!categoryId) return null
-    const cat = categories.find((c) => c.id === categoryId)
-    if (!cat) return null
-    if (cat.parent_id) {
-      const parent = categories.find((c) => c.id === cat.parent_id)
-      return parent ? `${parent.name} > ${cat.name}` : cat.name
-    }
-    return cat.name
-  }
-
   const handleChange = (mappingId: string, categoryId: string | null) => {
     setChanges((prev) => {
       const next = new Map(prev)
@@ -77,6 +67,17 @@ const CategoryMappingPage = () => {
       return changes.get(mapping.id) || "none"
     }
     return mapping.category_id || "none"
+  }
+
+  const getParentForCategory = (categoryId: string | null): string => {
+    if (!categoryId) return "none"
+    const cat = categories.find((c) => c.id === categoryId)
+    if (!cat) return "none"
+    return cat.parent_id || cat.id
+  }
+
+  const getChildrenOf = (parentId: string) => {
+    return childCategories.filter((c) => c.parent_id === parentId)
   }
 
   const handleSave = async () => {
@@ -103,6 +104,7 @@ const CategoryMappingPage = () => {
     } else {
       toast({ title: `${changes.size}건 매핑 저장 완료` })
       setChanges(new Map())
+      setParentSelections(new Map())
       // 새로고침
       const refreshRes = await fetch("/api/admin/category-mapping")
       const refreshData = await refreshRes.json()
@@ -177,33 +179,105 @@ const CategoryMappingPage = () => {
                     </td>
                     <td className="p-3 text-center text-muted-foreground">→</td>
                     <td className="p-3">
-                      <Select
-                        value={currentValue}
-                        onValueChange={(v) => handleChange(mapping.id, v === "none" ? null : v)}
-                      >
-                        <SelectTrigger className="w-[250px]">
-                          <SelectValue placeholder="선택해주세요">
-                            {isMapped ? getCategoryLabel(currentValue === "none" ? null : currentValue) : "선택해주세요"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">선택해주세요</SelectItem>
-                          {parentCategories.map((parent) => (
-                            <div key={parent.id}>
-                              <SelectItem value={parent.id} className="font-medium">
-                                {parent.name}
-                              </SelectItem>
-                              {childCategories
-                                .filter((c) => c.parent_id === parent.id)
-                                .map((child) => (
-                                  <SelectItem key={child.id} value={child.id} className="pl-6">
+                      {(() => {
+                        const selectedCategoryId = currentValue === "none" ? null : currentValue
+                        // 상위 카테고리: parentSelections에 있으면 우선, 없으면 현재 값에서 유도
+                        const derivedParentId = parentSelections.has(mapping.id)
+                          ? parentSelections.get(mapping.id)!
+                          : getParentForCategory(selectedCategoryId)
+                        const children = derivedParentId !== "none" ? getChildrenOf(derivedParentId) : []
+                        const hasChildren = children.length > 0
+                        const isChildSelected = selectedCategoryId
+                          ? !!categories.find((c) => c.id === selectedCategoryId && c.parent_id)
+                          : false
+
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={derivedParentId}
+                              onValueChange={(v) => {
+                                if (v === "none") {
+                                  handleChange(mapping.id, null)
+                                  setParentSelections((prev) => {
+                                    const next = new Map(prev)
+                                    next.delete(mapping.id)
+                                    return next
+                                  })
+                                } else {
+                                  const kids = getChildrenOf(v)
+                                  if (kids.length === 0) {
+                                    // 하위 없음 → 상위 ID가 최종값
+                                    handleChange(mapping.id, v)
+                                    setParentSelections((prev) => {
+                                      const next = new Map(prev)
+                                      next.delete(mapping.id)
+                                      return next
+                                    })
+                                  } else {
+                                    // 하위 있음 → 상위 선택만 기억, 최종값은 아직 null
+                                    handleChange(mapping.id, null)
+                                    setParentSelections((prev) => {
+                                      const next = new Map(prev)
+                                      next.set(mapping.id, v)
+                                      return next
+                                    })
+                                  }
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="상위 카테고리">
+                                  {derivedParentId !== "none"
+                                    ? parentCategories.find((c) => c.id === derivedParentId)?.name
+                                    : "상위 카테고리"}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">선택해주세요</SelectItem>
+                                {parentCategories.map((parent) => (
+                                  <SelectItem key={parent.id} value={parent.id}>
+                                    {parent.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={isChildSelected && selectedCategoryId ? selectedCategoryId : "none"}
+                              onValueChange={(v) => {
+                                if (v === "none") {
+                                  handleChange(mapping.id, null)
+                                } else {
+                                  handleChange(mapping.id, v)
+                                  // 하위 선택 완료 → parentSelections 정리
+                                  setParentSelections((prev) => {
+                                    const next = new Map(prev)
+                                    next.delete(mapping.id)
+                                    return next
+                                  })
+                                }
+                              }}
+                              disabled={!hasChildren || derivedParentId === "none"}
+                            >
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="하위 카테고리">
+                                  {isChildSelected && selectedCategoryId
+                                    ? children.find((c) => c.id === selectedCategoryId)?.name
+                                    : "하위 카테고리"}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">선택해주세요</SelectItem>
+                                {children.map((child) => (
+                                  <SelectItem key={child.id} value={child.id}>
                                     {child.name}
                                   </SelectItem>
                                 ))}
-                            </div>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="p-3 text-center">
                       <Badge variant={isMapped ? "default" : "destructive"}>
