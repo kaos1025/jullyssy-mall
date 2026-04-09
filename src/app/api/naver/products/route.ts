@@ -67,7 +67,7 @@ export const GET = async (request: NextRequest) => {
       (imported || []).map((p) => p.naver_product_no)
     )
 
-    const contents = naverProducts.map((item) => {
+    const allMapped = naverProducts.map((item) => {
       const cp = item.channelProducts?.[0]
       return {
         productNo: String(item.originProductNo),
@@ -81,9 +81,14 @@ export const GET = async (request: NextRequest) => {
       }
     })
 
+    // 이미 임포트된 상품 제외
+    const excludedCount = allMapped.filter((p) => p.alreadyImported).length
+    const contents = allMapped.filter((p) => !p.alreadyImported)
+
     return NextResponse.json({
       contents,
-      total: keyword && !isProductNoSearch ? contents.length : total,
+      total: keyword && !isProductNoSearch ? contents.length : total - excludedCount,
+      excludedCount,
       page,
       size,
     })

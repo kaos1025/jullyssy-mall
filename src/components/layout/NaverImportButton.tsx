@@ -23,7 +23,6 @@ interface NaverProductItem {
   salePrice: number | null
   status: string
   imageUrl: string | null
-  alreadyImported: boolean
 }
 
 const DISPLAY_STEP = 20
@@ -38,6 +37,7 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
   const [importing, setImporting] = useState(false)
   const [displayCount, setDisplayCount] = useState(DISPLAY_STEP)
   const [searched, setSearched] = useState(false)
+  const [excludedCount, setExcludedCount] = useState(0)
 
   const fetchProducts = useCallback(async (keyword: string) => {
     setLoading(true)
@@ -57,6 +57,7 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
       }
 
       setProducts(data.contents || [])
+      setExcludedCount(data.excludedCount || 0)
     } catch {
       toast({ variant: "destructive", title: "조회 실패" })
       setProducts([])
@@ -73,6 +74,7 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
       setSearch("")
       setSearched(false)
       setDisplayCount(DISPLAY_STEP)
+      setExcludedCount(0)
     } else {
       onClose?.()
     }
@@ -107,26 +109,17 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
   const displayedProducts = products.slice(0, displayCount)
   const hasMore = displayCount < products.length
 
-  const selectableProducts = products.filter((p) => !p.alreadyImported)
-  const allSelectableSelected =
-    selectableProducts.length > 0 &&
-    selectableProducts.every((p) => selectedNos.has(p.productNo))
+  const allSelected =
+    products.length > 0 &&
+    products.every((p) => selectedNos.has(p.productNo))
 
   const toggleSelectAll = () => {
-    if (selectableProducts.length === 0) return
+    if (products.length === 0) return
 
-    if (allSelectableSelected) {
-      setSelectedNos((prev) => {
-        const next = new Set(prev)
-        selectableProducts.forEach((p) => next.delete(p.productNo))
-        return next
-      })
+    if (allSelected) {
+      setSelectedNos(new Set())
     } else {
-      setSelectedNos((prev) => {
-        const next = new Set(prev)
-        selectableProducts.forEach((p) => next.add(p.productNo))
-        return next
-      })
+      setSelectedNos(new Set(products.map((p) => p.productNo)))
     }
   }
 
@@ -218,7 +211,7 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
                   <th className="p-2 w-8">
                     <input
                       type="checkbox"
-                      checked={allSelectableSelected}
+                      checked={allSelected}
                       onChange={toggleSelectAll}
                       className="h-4 w-4 rounded"
                     />
@@ -246,14 +239,13 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
                   displayedProducts.map((product) => (
                     <tr
                       key={product.productNo}
-                      className={`border-t hover:bg-muted/30 ${product.alreadyImported ? "opacity-50" : ""}`}
+                      className="border-t hover:bg-muted/30"
                     >
                       <td className="p-2 text-center">
                         <input
                           type="checkbox"
                           checked={selectedNos.has(product.productNo)}
                           onChange={() => toggleSelect(product.productNo)}
-                          disabled={product.alreadyImported}
                           className="h-4 w-4 rounded"
                         />
                       </td>
@@ -272,11 +264,6 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
                       </td>
                       <td className="p-2 max-w-[200px] truncate">
                         {product.name}
-                        {product.alreadyImported && (
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                            임포트됨
-                          </Badge>
-                        )}
                       </td>
                       <td className="p-2 text-right whitespace-nowrap">
                         {product.salePrice ? (
@@ -320,8 +307,13 @@ const NaverImportButton = ({ onClose }: { onClose?: () => void }) => {
         {/* 하단 액션 */}
         <div className="flex items-center justify-between pt-2">
           <p className="text-sm text-muted-foreground">
-            {searched ? `${products.length}개 결과` : ""}{" "}
-            {selectedNos.size > 0 && `${selectedNos.size}개 선택`}
+            {searched ? `${products.length}개 결과` : ""}
+            {excludedCount > 0 && (
+              <span className="text-primary ml-1">
+                (이미 임포트된 상품 {excludedCount}건 제외됨)
+              </span>
+            )}
+            {selectedNos.size > 0 && ` · ${selectedNos.size}개 선택`}
           </p>
           <Button
             onClick={handleImport}
