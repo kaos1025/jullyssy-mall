@@ -157,6 +157,48 @@ export const PUT = async (
   }
 }
 
+export const PATCH = async (
+  request: Request,
+  { params }: { params: { id: string } }
+) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
+  const admin = createAdminClient()
+  const productId = params.id
+
+  try {
+    const body = await request.json()
+    const allowed = ["name", "price", "sale_price", "status", "category_id"]
+    const updates: Record<string, unknown> = {}
+
+    for (const key of allowed) {
+      if (key in body) {
+        updates[key] = body[key]
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "변경할 항목이 없습니다" }, { status: 400 })
+    }
+
+    const { error } = await admin
+      .from("products")
+      .update(updates)
+      .eq("id", productId)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: "상품 수정 실패" }, { status: 500 })
+  }
+}
+
 export const DELETE = async (
   _request: Request,
   { params }: { params: { id: string } }

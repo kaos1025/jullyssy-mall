@@ -23,9 +23,21 @@ export const GET = async (request: NextRequest) => {
   const status = searchParams.get("status") || "ALL"
   const search = searchParams.get("search") || ""
 
+  // 카테고리 전체 조회 (self-join 대신 별도 쿼리)
+  const { data: allCategories } = await admin
+    .from("categories")
+    .select("id, name, parent_id")
+
+  const categoryMap = new Map<string, { name: string; parent_id: string | null }>()
+  if (allCategories) {
+    for (const c of allCategories) {
+      categoryMap.set(c.id, { name: c.name, parent_id: c.parent_id })
+    }
+  }
+
   let query = admin
     .from("products")
-    .select("*, product_options(stock)")
+    .select("*, product_options(stock), product_images(url, is_thumbnail)")
     .neq("status", "DELETED")
     .order("created_at", { ascending: false })
 
@@ -43,16 +55,36 @@ export const GET = async (request: NextRequest) => {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const products = (data || []).map((p) => ({
-    ...p,
-    stock_sum:
-      p.product_options?.reduce(
-        (sum: number, o: { stock: number }) => sum + o.stock,
-        0
-      ) || 0,
-  }))
+  const products = (data || []).map((p) => {
+    // 썸네일: is_thumbnail=true 우선, 없으면 첫 번째 이미지
+    const images = p.product_images || []
+    const thumb = images.find((img: { is_thumbnail: boolean }) => img.is_thumbnail) || images[0]
+    const thumbnail_url = thumb?.url || null
 
-  return NextResponse.json(products)
+    // 카테고리명: 상위 > 하위
+    let category_name: string | null = null
+    if (p.category_id && categoryMap.has(p.category_id)) {
+      const cat = categoryMap.get(p.category_id)!
+      if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+        category_name = `${categoryMap.get(cat.parent_id)!.name} > ${cat.name}`
+      } else {
+        category_name = cat.name
+      }
+    }
+
+    return {
+      ...p,
+      stock_sum:
+        p.product_options?.reduce(
+          (sum: number, o: { stock: number }) => sum + o.stock,
+          0
+        ) || 0,
+      thumbnail_url,
+      category_name,
+    }
+  })
+
+  return NextResponse.json({ products, categories: allCategories || [] })
 }
 
 export const POST = async (request: Request) => {

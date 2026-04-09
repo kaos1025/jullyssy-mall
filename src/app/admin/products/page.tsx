@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { Plus, Search, Trash2 } from "lucide-react"
+import Image from "next/image"
+import { Plus, Search, Trash2, ImageIcon, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -16,11 +17,10 @@ import {
 import NaverImportButton from "@/components/layout/NaverImportButton"
 import { useToast } from "@/hooks/use-toast"
 
-const statusLabel: Record<string, string> = {
-  ACTIVE: "판매중",
-  SOLDOUT: "품절",
-  HIDDEN: "숨김",
-  DELETED: "삭제",
+interface CategoryItem {
+  id: string
+  name: string
+  parent_id: string | null
 }
 
 interface ProductRow {
@@ -31,14 +31,152 @@ interface ProductRow {
   status: string
   created_at: string
   stock_sum: number
+  thumbnail_url: string | null
+  category_id: string | null
+  category_name: string | null
+}
+
+type EditingCell = { id: string; field: "name" | "price" | "sale_price" } | null
+
+const InlineInput = ({
+  value,
+  onSave,
+  onCancel,
+  type = "text",
+}: {
+  value: string
+  onSave: (v: string) => void
+  onCancel: () => void
+  type?: "text" | "number"
+}) => {
+  const ref = useRef<HTMLInputElement>(null)
+  const [v, setV] = useState(value)
+
+  useEffect(() => {
+    ref.current?.focus()
+    ref.current?.select()
+  }, [])
+
+  const handleSave = () => {
+    if (v !== value) onSave(v)
+    else onCancel()
+  }
+
+  return (
+    <Input
+      ref={ref}
+      type={type}
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={handleSave}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") handleSave()
+        if (e.key === "Escape") onCancel()
+      }}
+      className="h-8 text-sm"
+    />
+  )
+}
+
+const CategoryInlineEditor = ({
+  currentCategoryId,
+  parentCategories,
+  getChildrenOf,
+  getParentForCategory,
+  onSave,
+  onCancel,
+}: {
+  currentCategoryId: string | null
+  parentCategories: CategoryItem[]
+  getChildrenOf: (parentId: string) => CategoryItem[]
+  getParentForCategory: (categoryId: string | null) => string
+  onSave: (categoryId: string | null) => void
+  onCancel: () => void
+}) => {
+  const initialParent = getParentForCategory(currentCategoryId)
+  const [selectedParent, setSelectedParent] = useState(initialParent)
+  const children = selectedParent !== "none" ? getChildrenOf(selectedParent) : []
+  const hasChildren = children.length > 0
+
+  // 현재값이 하위 카테고리인지 확인
+  const isCurrentChild = currentCategoryId
+    ? parentCategories.every((p) => p.id !== currentCategoryId)
+    : false
+  const [selectedChild, setSelectedChild] = useState(
+    isCurrentChild && currentCategoryId ? currentCategoryId : "none"
+  )
+
+  return (
+    <div className="flex items-center gap-1">
+      <Select
+        value={selectedParent}
+        onValueChange={(v) => {
+          setSelectedParent(v)
+          setSelectedChild("none")
+          if (v === "none") {
+            onSave(null)
+          } else {
+            const kids = getChildrenOf(v)
+            if (kids.length === 0) {
+              onSave(v)
+            }
+          }
+        }}
+      >
+        <SelectTrigger className="w-[110px] h-8 text-xs">
+          <SelectValue placeholder="상위">
+            {selectedParent !== "none"
+              ? parentCategories.find((c) => c.id === selectedParent)?.name
+              : "상위"}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">없음</SelectItem>
+          {parentCategories.map((p) => (
+            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        value={selectedChild}
+        onValueChange={(v) => {
+          setSelectedChild(v)
+          if (v === "none") return
+          onSave(v)
+        }}
+        disabled={!hasChildren || selectedParent === "none"}
+      >
+        <SelectTrigger className="w-[110px] h-8 text-xs">
+          <SelectValue placeholder="하위">
+            {selectedChild !== "none"
+              ? children.find((c) => c.id === selectedChild)?.name
+              : "하위"}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">선택</SelectItem>
+          {children.map((c) => (
+            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onCancel}>
+        취소
+      </Button>
+    </div>
+  )
 }
 
 const AdminProductsPage = () => {
   const { toast } = useToast()
   const [products, setProducts] = useState<ProductRow[]>([])
+  const [categories, setCategories] = useState<CategoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("ALL")
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [editingCell, setEditingCell] = useState<EditingCell>(null)
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -48,7 +186,14 @@ const AdminProductsPage = () => {
 
     const res = await fetch(`/api/admin/products?${params}`)
     const data = await res.json()
-    setProducts(data.error ? [] : data)
+    if (data.error) {
+      setProducts([])
+    } else {
+      setProducts(data.products || [])
+      setCategories(data.categories || [])
+    }
+    setSelectedIds(new Set())
+    setEditingCategoryId(null)
     setLoading(false)
   }, [statusFilter, search])
 
@@ -60,6 +205,136 @@ const AdminProductsPage = () => {
     e.preventDefault()
     fetchProducts()
   }
+
+  // 인라인 편집 PATCH
+  const patchProduct = async (id: string, updates: Record<string, unknown>) => {
+    const res = await fetch(`/api/admin/products/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    })
+    if (!res.ok) {
+      toast({ variant: "destructive", title: "수정 실패" })
+      return false
+    }
+    toast({ title: "수정 완료" })
+    return true
+  }
+
+  const handleInlineSave = async (id: string, field: string, value: string) => {
+    setEditingCell(null)
+    const numFields = ["price", "sale_price"]
+    const parsed = numFields.includes(field) ? parseInt(value) || 0 : value
+    const updates = { [field]: field === "sale_price" && parsed === 0 ? null : parsed }
+
+    const ok = await patchProduct(id, updates)
+    if (ok) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      )
+    }
+  }
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    const ok = await patchProduct(id, { status: newStatus })
+    if (ok) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
+      )
+    }
+  }
+
+  // 카테고리 편집
+  const parentCategories = categories.filter((c) => !c.parent_id)
+  const getChildrenOf = (parentId: string) => categories.filter((c) => c.parent_id === parentId)
+
+  const getParentForCategory = (categoryId: string | null): string => {
+    if (!categoryId) return "none"
+    const cat = categories.find((c) => c.id === categoryId)
+    if (!cat) return "none"
+    return cat.parent_id || cat.id
+  }
+
+  const getCategoryName = (categoryId: string | null): string | null => {
+    if (!categoryId) return null
+    const cat = categories.find((c) => c.id === categoryId)
+    if (!cat) return null
+    if (cat.parent_id) {
+      const parent = categories.find((c) => c.id === cat.parent_id)
+      return parent ? `${parent.name} > ${cat.name}` : cat.name
+    }
+    return cat.name
+  }
+
+  const handleCategoryChange = async (productId: string, categoryId: string | null) => {
+    const ok = await patchProduct(productId, { category_id: categoryId })
+    if (ok) {
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId
+            ? { ...p, category_id: categoryId, category_name: getCategoryName(categoryId) }
+            : p
+        )
+      )
+      setEditingCategoryId(null)
+    }
+  }
+
+  // 체크박스
+  const allSelected = products.length > 0 && selectedIds.size === products.length
+  const someSelected = selectedIds.size > 0
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(products.map((p) => p.id)))
+    }
+  }
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // 일괄 작업
+  const bulkChangeStatus = async (newStatus: string) => {
+    const ids = Array.from(selectedIds)
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/products/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        })
+      )
+    )
+    const successCount = results.filter((r) => r.ok).length
+    toast({ title: `${successCount}건 상태 변경 완료` })
+    setSelectedIds(new Set())
+    fetchProducts()
+  }
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (!confirm(`${ids.length}개 상품을 삭제하시겠습니까?`)) return
+
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/products/${id}`, { method: "DELETE" })
+      )
+    )
+    const successCount = results.filter((r) => r.ok).length
+    toast({ title: `${successCount}건 삭제 완료` })
+    setSelectedIds(new Set())
+    fetchProducts()
+  }
+
+  const colSpan = 10
 
   return (
     <div className="space-y-6">
@@ -103,99 +378,208 @@ const AdminProductsPage = () => {
         </Button>
       </form>
 
+      {/* 일괄 액션바 */}
+      {someSelected && (
+        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+          <span className="text-sm font-medium">{selectedIds.size}개 선택</span>
+          <Select onValueChange={bulkChangeStatus}>
+            <SelectTrigger className="w-[140px] h-8">
+              <SelectValue placeholder="일괄 상태 변경" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ACTIVE">판매중</SelectItem>
+              <SelectItem value="SOLDOUT">품절</SelectItem>
+              <SelectItem value="HIDDEN">숨김</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="destructive" size="sm" onClick={bulkDelete}>
+            <Trash2 className="h-4 w-4 mr-1" />
+            일괄 삭제
+          </Button>
+        </div>
+      )}
+
       {/* 테이블 */}
       <div className="border rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
+              <th className="p-3 w-10">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleAll}
+                />
+              </th>
+              <th className="p-3 w-[50px]"></th>
               <th className="p-3 text-left">상품명</th>
-              <th className="p-3 text-right">가격</th>
+              <th className="p-3 text-left hidden lg:table-cell">카테고리</th>
+              <th className="p-3 text-right">정가</th>
+              <th className="p-3 text-right">할인가</th>
+              <th className="p-3 text-center">판매상태</th>
               <th className="p-3 text-right hidden md:table-cell">재고</th>
-              <th className="p-3 text-center">상태</th>
               <th className="p-3 text-left hidden md:table-cell">등록일</th>
-              <th className="p-3 text-center">관리</th>
+              <th className="p-3 text-center w-16">수정</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="text-center py-10 text-muted-foreground"
-                >
+                <td colSpan={colSpan} className="text-center py-10 text-muted-foreground">
                   로딩 중...
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="text-center py-10 text-muted-foreground"
-                >
+                <td colSpan={colSpan} className="text-center py-10 text-muted-foreground">
                   상품이 없습니다.
                 </td>
               </tr>
             ) : (
               products.map((product) => (
                 <tr key={product.id} className="border-t hover:bg-muted/30">
-                  <td className="p-3 font-medium max-w-[200px] truncate">
-                    {product.name}
+                  {/* 체크박스 */}
+                  <td className="p-3">
+                    <Checkbox
+                      checked={selectedIds.has(product.id)}
+                      onCheckedChange={() => toggleOne(product.id)}
+                    />
                   </td>
-                  <td className="p-3 text-right">
-                    {product.sale_price ? (
-                      <span>
-                        <span className="line-through text-muted-foreground mr-1">
-                          {product.price.toLocaleString()}
-                        </span>
-                        {product.sale_price.toLocaleString()}
-                      </span>
+
+                  {/* 썸네일 */}
+                  <td className="p-3">
+                    {product.thumbnail_url ? (
+                      <Image
+                        src={product.thumbnail_url}
+                        alt={product.name}
+                        width={50}
+                        height={50}
+                        className="rounded object-cover w-[50px] h-[50px]"
+                      />
                     ) : (
-                      product.price.toLocaleString()
+                      <div className="w-[50px] h-[50px] rounded bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                      </div>
                     )}
-                    원
                   </td>
+
+                  {/* 상품명 (인라인 편집) */}
+                  <td className="p-3 max-w-[250px]">
+                    {editingCell?.id === product.id && editingCell.field === "name" ? (
+                      <InlineInput
+                        value={product.name}
+                        onSave={(v) => handleInlineSave(product.id, "name", v)}
+                        onCancel={() => setEditingCell(null)}
+                      />
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="cursor-pointer hover:underline truncate font-medium"
+                          onClick={() => setEditingCell({ id: product.id, field: "name" })}
+                        >
+                          {product.name}
+                        </span>
+                        <Link
+                          href={`/products/${product.id}`}
+                          target="_blank"
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                    )}
+                  </td>
+
+                  {/* 카테고리 (인라인 편집) */}
+                  <td className="p-3 hidden lg:table-cell">
+                    {editingCategoryId === product.id ? (
+                      <CategoryInlineEditor
+                        currentCategoryId={product.category_id}
+                        parentCategories={parentCategories}
+                        getChildrenOf={getChildrenOf}
+                        getParentForCategory={getParentForCategory}
+                        onSave={(catId) => handleCategoryChange(product.id, catId)}
+                        onCancel={() => setEditingCategoryId(null)}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer hover:underline text-sm"
+                        onClick={() => setEditingCategoryId(product.id)}
+                      >
+                        {product.category_name || <span className="text-muted-foreground">미설정</span>}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* 정가 (인라인 편집) */}
+                  <td className="p-3 text-right">
+                    {editingCell?.id === product.id && editingCell.field === "price" ? (
+                      <InlineInput
+                        value={String(product.price)}
+                        type="number"
+                        onSave={(v) => handleInlineSave(product.id, "price", v)}
+                        onCancel={() => setEditingCell(null)}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer hover:underline"
+                        onClick={() => setEditingCell({ id: product.id, field: "price" })}
+                      >
+                        {product.price.toLocaleString()}원
+                      </span>
+                    )}
+                  </td>
+
+                  {/* 할인가 (인라인 편집) */}
+                  <td className="p-3 text-right">
+                    {editingCell?.id === product.id && editingCell.field === "sale_price" ? (
+                      <InlineInput
+                        value={String(product.sale_price || "")}
+                        type="number"
+                        onSave={(v) => handleInlineSave(product.id, "sale_price", v)}
+                        onCancel={() => setEditingCell(null)}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer hover:underline"
+                        onClick={() => setEditingCell({ id: product.id, field: "sale_price" })}
+                      >
+                        {product.sale_price ? `${product.sale_price.toLocaleString()}원` : "-"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* 판매상태 (드롭다운) */}
+                  <td className="p-3 text-center">
+                    <Select
+                      value={product.status}
+                      onValueChange={(v) => handleStatusChange(product.id, v)}
+                    >
+                      <SelectTrigger className="w-[100px] h-8 mx-auto">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACTIVE">판매중</SelectItem>
+                        <SelectItem value="SOLDOUT">품절</SelectItem>
+                        <SelectItem value="HIDDEN">숨김</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+
+                  {/* 재고 */}
                   <td className="p-3 text-right hidden md:table-cell">
                     {product.stock_sum}
                   </td>
-                  <td className="p-3 text-center">
-                    <Badge
-                      variant={
-                        product.status === "ACTIVE"
-                          ? "default"
-                          : product.status === "SOLDOUT"
-                            ? "destructive"
-                            : "secondary"
-                      }
-                    >
-                      {statusLabel[product.status]}
-                    </Badge>
-                  </td>
+
+                  {/* 등록일 */}
                   <td className="p-3 text-muted-foreground hidden md:table-cell">
                     {new Date(product.created_at).toLocaleDateString("ko-KR")}
                   </td>
+
+                  {/* 수정 */}
                   <td className="p-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/admin/products/${product.id}`}>수정</Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={async () => {
-                          if (!confirm(`"${product.name}" 상품을 삭제하시겠습니까?`)) return
-                          const res = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" })
-                          if (res.ok) {
-                            toast({ title: "상품 삭제 완료" })
-                            fetchProducts()
-                          } else {
-                            toast({ variant: "destructive", title: "삭제 실패" })
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/admin/products/${product.id}`}>수정</Link>
+                    </Button>
                   </td>
                 </tr>
               ))
