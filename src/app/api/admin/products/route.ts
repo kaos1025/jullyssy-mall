@@ -22,6 +22,8 @@ export const GET = async (request: NextRequest) => {
   const { searchParams } = request.nextUrl
   const status = searchParams.get("status") || "ALL"
   const search = searchParams.get("search") || ""
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get("per_page") || "20")))
 
   // 카테고리 전체 조회 (self-join 대신 별도 쿼리)
   const { data: allCategories } = await admin
@@ -37,7 +39,7 @@ export const GET = async (request: NextRequest) => {
 
   let query = admin
     .from("products")
-    .select("*, product_options(stock), product_images(url, is_thumbnail)")
+    .select("*, product_options(stock), product_images(url, is_thumbnail)", { count: "exact" })
     .neq("status", "DELETED")
     .order("created_at", { ascending: false })
 
@@ -49,11 +51,17 @@ export const GET = async (request: NextRequest) => {
     query = query.ilike("name", `%${search}%`)
   }
 
-  const { data, error } = await query
+  const from = (page - 1) * perPage
+  const to = from + perPage - 1
+  query = query.range(from, to)
+
+  const { data, error, count } = await query
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const totalCount = count ?? 0
 
   const products = (data || []).map((p) => {
     // 썸네일: is_thumbnail=true 우선, 없으면 첫 번째 이미지
@@ -84,7 +92,7 @@ export const GET = async (request: NextRequest) => {
     }
   })
 
-  return NextResponse.json({ products, categories: allCategories || [] })
+  return NextResponse.json({ products, categories: allCategories || [], totalCount })
 }
 
 export const POST = async (request: Request) => {

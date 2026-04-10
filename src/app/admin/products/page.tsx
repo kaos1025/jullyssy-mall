@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Plus, Search, Trash2, ImageIcon, ExternalLink } from "lucide-react"
+import { Plus, Search, Trash2, ImageIcon, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -177,25 +177,34 @@ const AdminProductsPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingCell, setEditingCell] = useState<EditingCell>(null)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
+  const [totalCount, setTotalCount] = useState(0)
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (statusFilter !== "ALL") params.set("status", statusFilter)
     if (search) params.set("search", search)
+    params.set("page", String(page))
+    params.set("per_page", String(perPage))
 
     const res = await fetch(`/api/admin/products?${params}`)
     const data = await res.json()
     if (data.error) {
       setProducts([])
+      setTotalCount(0)
     } else {
       setProducts(data.products || [])
       setCategories(data.categories || [])
+      setTotalCount(data.totalCount ?? 0)
     }
     setSelectedIds(new Set())
     setEditingCategoryId(null)
     setLoading(false)
-  }, [statusFilter, search])
+  }, [statusFilter, search, page, perPage])
 
   useEffect(() => {
     fetchProducts()
@@ -203,7 +212,7 @@ const AdminProductsPage = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    fetchProducts()
+    setPage(1)
   }
 
   // 인라인 편집 PATCH
@@ -362,7 +371,7 @@ const AdminProductsPage = () => {
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[140px]">
             <SelectValue />
           </SelectTrigger>
@@ -587,6 +596,66 @@ const AdminProductsPage = () => {
           </tbody>
         </table>
       </div>
+
+      {/* 페이지네이션 */}
+      {!loading && totalCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">전체 {totalCount.toLocaleString()}개</span>
+            <div className="flex items-center gap-1.5">
+              <span>페이지당</span>
+              <Select value={String(perPage)} onValueChange={(v) => { setPerPage(Number(v)); setPage(1) }}>
+                <SelectTrigger className="w-[75px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span>개</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {(() => {
+              const pages: number[] = []
+              const maxVisible = 5
+              let start = Math.max(1, page - Math.floor(maxVisible / 2))
+              const end = Math.min(totalPages, start + maxVisible - 1)
+              start = Math.max(1, end - maxVisible + 1)
+              for (let i = start; i <= end; i++) pages.push(i)
+              return pages.map((p) => (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  className="w-8 h-8 p-0"
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </Button>
+              ))
+            })()}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
