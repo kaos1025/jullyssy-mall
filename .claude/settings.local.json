@@ -21,7 +21,15 @@
       "Bash(node -e \"const j=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\);const d=JSON.parse\\(j\\);console.log\\('cookies:', d.cookies?.length || 0\\);d.cookies?.forEach\\(c=>console.log\\(c.name, c.domain, c.path, c.value?.substring\\(0,30\\)+'...'\\)\\);console.log\\('origins:', d.origins?.length || 0\\);d.origins?.forEach\\(o=>{console.log\\(o.origin\\);o.localStorage?.forEach\\(l=>console.log\\('  ls:', l.name, l.value?.substring\\(0,50\\)+'...'\\)\\)}\\)\")",
       "Bash(curl -s http://localhost:3000/robots.txt)",
       "Bash(curl -s http://localhost:3000/sitemap.xml)",
-      "Bash(ls src/components/ui/toast*.tsx src/hooks/use-toast.ts)"
+      "Bash(ls src/components/ui/toast*.tsx src/hooks/use-toast.ts)",
+      "Bash(find:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI\")",
+      "Bash(gh --version)",
+      "Read(//c/Program Files/GitHub CLI/**)",
+      "Read(//c/Program Files \\(x86\\)/GitHub CLI/**)",
+      "Read(//c/Users/**)",
+      "Bash(/c/Program Files/GitHub CLI/gh.exe auth:*)",
+      "Bash('/c/Program Files/GitHub CLI/gh.exe' pr create --title 'feat\\(order\\): 주문 취소 기능 및 UX 개선' --body ':*)"
     ]
   }
 }
