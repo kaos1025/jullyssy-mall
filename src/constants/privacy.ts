@@ -1,10 +1,10 @@
 import { TermsArticle } from "@/constants/terms"
+import { BUSINESS_INFO } from "./business"
 
 export const PRIVACY_POLICY: TermsArticle[] = [
   {
     title: "제1조 (개인정보의 수집 및 이용 목적)",
-    description:
-      '쥴리씨(이하 "몰")는 수집한 개인정보를 다음의 목적을 위해 이용합니다.',
+    description: `${BUSINESS_INFO.companyName}(이하 "몰")는 수집한 개인정보를 다음의 목적을 위해 이용합니다.`,
     items: [
       "회원가입 및 관리: 회원 식별, 가입의사 확인, 본인인증, 서비스 부정이용 방지",
       "상품 구매 및 배송: 구매 상품 배송, 서비스 제공, 계약서·청구서 발송, 본인인증, 구매 및 결제, 물품배송 또는 청구지 등 발송",
@@ -90,8 +90,8 @@ export const PRIVACY_POLICY: TermsArticle[] = [
     description:
       "몰은 개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 이용자의 불만처리 및 피해구제 등을 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.",
     items: [
-      "개인정보 보호책임자: 이진주",
-      "연락처: jullyssy@naver.com",
+      `개인정보 보호책임자: ${BUSINESS_INFO.privacyOfficer.name}`,
+      `연락처(이메일): ${BUSINESS_INFO.privacyOfficer.email} / 전화: ${BUSINESS_INFO.privacyOfficer.phone}`,
       "이용자는 몰의 서비스를 이용하시면서 발생한 모든 개인정보보호 관련 문의, 불만처리, 피해구제 등에 관한 사항을 개인정보 보호책임자에게 문의하실 수 있습니다.",
       "기타 개인정보침해에 대한 신고나 상담이 필요하신 경우 아래 기관에 문의하시기 바랍니다: 개인정보침해신고센터 (privacy.kisa.or.kr / 국번없이 118), 개인정보분쟁조정위원회 (www.kopico.go.kr / 1833-6972), 대검찰청 사이버수사과 (www.spo.go.kr / 국번없이 1301), 경찰청 사이버안전국 (ecrm.cyber.go.kr / 국번없이 182)",
     ],

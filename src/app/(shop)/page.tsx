@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import ProductCard from "@/components/product/ProductCard"
 import HeroBanner from "@/components/home/HeroBanner"
+import { BUSINESS_INFO, BUSINESS_POSTAL_ADDRESS } from "@/constants/business"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -59,7 +60,7 @@ const HomePage = async () => {
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "쥴리씨",
+    name: BUSINESS_INFO.companyName,
     url: SITE_URL,
     potentialAction: {
       "@type": "SearchAction",
@@ -71,9 +72,20 @@ const HomePage = async () => {
   const organizationJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "쥴리씨",
+    name: BUSINESS_INFO.companyName,
     url: SITE_URL,
     logo: `${SITE_URL}/og-image.png`,
+    address: BUSINESS_POSTAL_ADDRESS,
+    telephone: BUSINESS_INFO.customerCenter.phoneTel,
+    email: BUSINESS_INFO.customerCenter.email,
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer service",
+      telephone: BUSINESS_INFO.customerCenter.phoneTel,
+      email: BUSINESS_INFO.customerCenter.email,
+      areaServed: "KR",
+      availableLanguage: ["Korean"],
+    },
   }
 
   return (

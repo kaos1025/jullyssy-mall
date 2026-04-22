@@ -1,3 +1,5 @@
+import { BUSINESS_INFO } from "./business"
+
 export type TermsArticle = {
   title: string
   description?: string
@@ -7,13 +9,12 @@ export type TermsArticle = {
 export const TERMS_OF_SERVICE: TermsArticle[] = [
   {
     title: "제1조 (목적)",
-    description:
-      '이 약관은 쥴리씨(이하 "몰")가 운영하는 인터넷 쇼핑몰(www.jullyssy.com)에서 제공하는 인터넷 관련 서비스(이하 "서비스")를 이용함에 있어 몰과 이용자의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.',
+    description: `이 약관은 ${BUSINESS_INFO.companyName}(이하 "몰")가 운영하는 인터넷 쇼핑몰(${BUSINESS_INFO.domain})에서 제공하는 인터넷 관련 서비스(이하 "서비스")를 이용함에 있어 몰과 이용자의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.`,
   },
   {
     title: "제2조 (정의)",
     items: [
-      '"몰"이란 쥴리씨가 재화 또는 용역을 이용자에게 제공하기 위하여 컴퓨터 등 정보통신설비를 이용하여 재화 또는 용역을 거래할 수 있도록 설정한 가상의 영업장(www.jullyssy.com)을 말합니다.',
+      `"몰"이란 ${BUSINESS_INFO.companyName}가 재화 또는 용역을 이용자에게 제공하기 위하여 컴퓨터 등 정보통신설비를 이용하여 재화 또는 용역을 거래할 수 있도록 설정한 가상의 영업장(${BUSINESS_INFO.domain})을 말합니다.`,
       '"이용자"란 몰에 접속하여 이 약관에 따라 몰이 제공하는 서비스를 받는 회원 및 비회원을 말합니다.',
       '"회원"이란 몰에 개인정보를 제공하여 회원등록을 한 자로서, 몰의 정보를 지속적으로 제공받으며 서비스를 이용할 수 있는 자를 말합니다.',
       '"비회원"이란 회원에 가입하지 않고 몰이 제공하는 서비스를 이용하는 자를 말합니다.',

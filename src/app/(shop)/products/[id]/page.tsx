@@ -16,6 +16,7 @@ import ProductDescription from "@/components/product/ProductDescription"
 import ProductCard from "@/components/product/ProductCard"
 import ShareButton from "@/components/product/ShareButton"
 import { SHOPPING_GUIDE } from "@/constants/shopping-guide"
+import { BUSINESS_INFO } from "@/constants/business"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
 
@@ -174,7 +175,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
         product.status === "ACTIVE"
           ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",
-      seller: { "@type": "Organization", name: "쥴리씨" },
+      seller: { "@type": "Organization", name: BUSINESS_INFO.companyName },
       url: `${SITE_URL}/products/${product.slug || product.id}`,
     },
   }

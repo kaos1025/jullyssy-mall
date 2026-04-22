@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, Camera, MessageCircle } from "lucide-react"
+import { BUSINESS_INFO } from "@/constants/business"
 
 const Footer = () => {
   const [showBizInfo, setShowBizInfo] = useState(false)
@@ -18,7 +19,7 @@ const Footer = () => {
           <div>
             <Link href="/" className="inline-block">
               <span className="font-display text-xl tracking-wider text-primary">
-                쥴리씨
+                {BUSINESS_INFO.companyName}
               </span>
             </Link>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
@@ -50,13 +51,24 @@ const Footer = () => {
           {/* 고객센터 */}
           <div>
             <h4 className="text-sm font-semibold mb-3">고객센터</h4>
-            <p className="text-2xl font-bold tracking-tight">1234-5678</p>
+            <a
+              href={`tel:${BUSINESS_INFO.customerCenter.phone}`}
+              className="text-2xl font-bold tracking-tight hover:text-primary transition-colors"
+            >
+              {BUSINESS_INFO.customerCenter.phoneDisplay}
+            </a>
             <p className="text-sm text-muted-foreground mt-1">
-              평일 10:00 - 17:00
+              {BUSINESS_INFO.customerCenter.hours}
             </p>
             <p className="text-sm text-muted-foreground">
-              점심 12:00 - 13:00 / 주말·공휴일 휴무
+              {BUSINESS_INFO.customerCenter.lunch} / {BUSINESS_INFO.customerCenter.holiday}
             </p>
+            <a
+              href={`mailto:${BUSINESS_INFO.customerCenter.email}`}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1 inline-block"
+            >
+              {BUSINESS_INFO.customerCenter.email}
+            </a>
             <Button
               variant="outline"
               size="sm"
@@ -88,12 +100,6 @@ const Footer = () => {
               >
                 개인정보처리방침
               </Link>
-              <Link
-                href="/guide"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                이용안내
-              </Link>
             </nav>
           </div>
 
@@ -118,13 +124,21 @@ const Footer = () => {
                 showBizInfo ? "block" : "hidden"
               }`}
             >
-              <p>상호: 쥴리씨</p>
-              <p>대표: 홍길동</p>
-              <p>사업자등록번호: 000-00-00000</p>
-              <p>통신판매업 신고번호: 2025-서울강남-00000</p>
+              <p>상호: {BUSINESS_INFO.companyName}</p>
+              <p>대표: {BUSINESS_INFO.representative}</p>
+              <p>사업자등록번호: {BUSINESS_INFO.businessNumber}</p>
+              <p>통신판매업 신고번호: {BUSINESS_INFO.mailOrderNumber}</p>
               <p className="pt-1">
-                주소: 서울특별시 강남구 테헤란로 123
+                주소: {BUSINESS_INFO.address} {BUSINESS_INFO.addressDetail}
               </p>
+              <Link
+                href={`https://www.ftc.go.kr/bizCommPop.do?wrkr_no=${BUSINESS_INFO.businessNumberDigits}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs underline pt-1 inline-block hover:text-foreground transition-colors"
+              >
+                사업자정보확인
+              </Link>
             </div>
           </div>
         </div>
@@ -132,7 +146,7 @@ const Footer = () => {
         {/* 하단 카피라이트 */}
         <Separator className="my-6 bg-border/50" />
         <p className="text-xs text-muted-foreground text-center md:text-left">
-          &copy; {new Date().getFullYear()} 쥴리씨. All rights reserved.
+          &copy; {new Date().getFullYear()} {BUSINESS_INFO.companyName}. All rights reserved.
         </p>
       </div>
     </footer>
