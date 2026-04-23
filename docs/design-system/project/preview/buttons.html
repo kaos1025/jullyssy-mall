@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Buttons</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:22px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900);letter-spacing:-.01em}
+ h4{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-500);margin:0 0 10px;font-weight:600}
+ .row{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+ button{font-family:inherit;cursor:pointer;border:0;letter-spacing:-.01em;font-weight:500;transition:all .15s}
+ .btn-primary{background:#F97316;color:#fff;border-radius:8px;padding:0 24px;height:40px;font-size:14px}
+ .btn-primary:hover{background:#E85D04}
+ .btn-primary.lg{height:48px;padding:0 32px;font-size:15px}
+ .btn-primary.sm{height:36px;padding:0 14px;font-size:13px}
+ .btn-outline{background:#fff;color:#171717;border:1px solid #E8E8E8;border-radius:8px;padding:0 20px;height:40px;font-size:14px}
+ .btn-outline:hover{background:#F4F4F5}
+ .btn-ghost{background:transparent;color:#374151;border-radius:8px;padding:0 16px;height:40px;font-size:14px}
+ .btn-ghost:hover{background:#F4F4F5}
+ .btn-pill{background:#fff;color:#171717;border-radius:9999px;padding:0 22px;height:36px;font-size:14px;border:0}
+ .btn-pill.active{background:#F97316;color:#fff}
+ .btn-full{background:#F97316;color:#fff;border-radius:0;width:100%;height:52px;font-weight:700;font-size:15px}
+ .meta{font-size:10px;color:var(--gray-500);margin-top:-10px;margin-bottom:16px;font-family:ui-monospace,Menlo,monospace}
+</style></head><body>
+<h4>Primary · sm / md / lg</h4>
+<div class="row">
+  <button class="btn-primary sm">쇼핑하기</button>
+  <button class="btn-primary">장바구니 담기</button>
+  <button class="btn-primary lg">바로구매</button>
+</div>
+<div class="meta">bg #F97316 · radius 8 · hover bg-primary/90</div>
+<h4>Outline &nbsp; · &nbsp; Ghost</h4>
+<div class="row">
+  <button class="btn-outline">사이즈 추가알림</button>
+  <button class="btn-ghost">더보기 →</button>
+</div>
+<h4>Pill CTA (hero) &nbsp; · &nbsp; Full-bleed PDP CTA</h4>
+<div class="row">
+  <button class="btn-pill" style="background:#fff;border:1px solid #F4F4F5">쇼핑하기 →</button>
+  <button class="btn-full">구매하기</button>
+</div>
+</body></html>

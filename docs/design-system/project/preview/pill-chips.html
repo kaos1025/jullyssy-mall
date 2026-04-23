@@ -1,0 +1,28 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Pills</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:22px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900);letter-spacing:-.01em}
+ h4{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-500);margin:0 0 10px;font-weight:600}
+ .scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px}
+ .scroll::-webkit-scrollbar{display:none}
+ .pill{flex:0 0 auto;height:36px;padding:0 22px;border-radius:9999px;background:#F4F4F5;color:#374151;font-size:14px;display:inline-flex;align-items:center;border:0;font-family:inherit;cursor:pointer;letter-spacing:-.01em}
+ .pill.active{background:#F97316;color:#fff;font-weight:500}
+ .pill:hover:not(.active){background:#E8E8E8}
+ .meta{font-size:10px;color:var(--gray-500);font-family:ui-monospace,Menlo,monospace;margin-top:-8px}
+ .no-icon{font-size:11px;color:#D94B4B;margin-top:10px}
+</style></head><body>
+<h4>Category pills · horizontal scroll (mobile)</h4>
+<div class="scroll">
+  <button class="pill active">전체</button>
+  <button class="pill">상의</button>
+  <button class="pill">하의</button>
+  <button class="pill">아우터</button>
+  <button class="pill">원피스/세트</button>
+  <button class="pill">가방</button>
+  <button class="pill">신발</button>
+  <button class="pill">악세서리</button>
+</div>
+<div class="meta">active = bg-primary / inactive = bg-muted text-muted-foreground</div>
+<div class="no-icon">❌ 원형 아이콘 카테고리는 금지 — 의류에는 메타포가 없음. 텍스트 pill 만 사용.</div>
+</body></html>

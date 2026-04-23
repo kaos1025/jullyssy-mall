@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Badges</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:22px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900);letter-spacing:-.01em}
+ h4{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-500);margin:0 0 10px;font-weight:600}
+ .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+ .b-new{background:#0A0A0A;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px}
+ .b-disc{background:#F97316;color:#fff;font-size:11px;font-weight:700;width:36px;height:36px;border-radius:9999px;display:inline-flex;align-items:center;justify-content:center}
+ .b-sold{background:rgba(0,0,0,.5);color:#fff;font-size:12px;font-weight:700;letter-spacing:.15em;padding:8px 16px;border-radius:4px}
+ .b-ship{font-size:11px;color:#F97316;font-weight:500}
+ .b-freeout{font-size:11px;color:#F97316;font-weight:500;border:1px solid rgba(249,115,22,.3);border-radius:4px;padding:2px 6px}
+ .b-save{background:#16A34A;color:#fff;font-size:11px;padding:3px 8px;border-radius:4px}
+ .b-warn{background:#F59E0B;color:#fff;font-size:11px;padding:3px 8px;border-radius:4px}
+ .meta{font-size:10px;color:var(--gray-500);font-family:ui-monospace,Menlo,monospace;margin:-8px 0 12px}
+</style></head><body>
+<h4>Product card badges</h4>
+<div class="row">
+  <span class="b-new">NEW</span>
+  <span class="b-disc">-12%</span>
+  <span class="b-sold">SOLD OUT</span>
+</div>
+<div class="meta">NEW: rounded-sm, black · 할인율: rounded-full, primary accent · 품절: black/50 overlay</div>
+
+<h4>Shipping / PDP inline</h4>
+<div class="row">
+  <span class="b-ship">무료배송</span>
+  <span class="b-freeout">무료배송</span>
+  <span class="b-save">결제완료</span>
+  <span class="b-warn">품절 임박</span>
+</div>
+<div class="meta">salesy 뱃지 지양 — "최대할인!!!", "🔥초특가" 금지</div>
+</body></html>

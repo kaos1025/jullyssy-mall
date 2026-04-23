@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>쥴리씨 — 트렌디한 여성의류 온라인 스토어</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../colors_and_type.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root{
+    --primary:#F97316; --primary-hover:#E85D04;
+    --fg:#171717; --fg2:#374151; --muted:#6B7280; --mute2:#9CA3AF;
+    --bg:#fff; --bg-subtle:#FAFAF8; --bg-peach:#FBE7D7; --bg-warm:#F5F0EB;
+    --line:#E8E8E8; --line-soft:#F4F4F5;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#F4F4F5;font-family:'Pretendard Variable','Pretendard',system-ui,sans-serif;color:var(--fg);letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+  .display{font-family:'Cormorant Garamond',serif;font-weight:500;letter-spacing:.12em}
+  .eyebrow{font-size:11px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;letter-spacing:-.01em;border:0;cursor:pointer;background:none;padding:0;color:inherit}
+  svg{display:block}
+  [data-lucide]{stroke-width:1.5}
+  .scrollbar-hide{scrollbar-width:none}
+  .scrollbar-hide::-webkit-scrollbar{display:none}
+  .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* === mobile phone frame === */
+  .stage{display:flex;justify-content:center;padding:24px 12px 48px}
+  .phone{width:390px;max-width:100%;background:#fff;border-radius:20px;overflow:hidden;border:1px solid #E8E8E8;position:relative;box-shadow:0 20px 50px -20px rgba(0,0,0,.12)}
+  .screen{position:relative;height:844px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .screen::-webkit-scrollbar{display:none}
+
+  /* === header === */
+  .header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .header-row{display:flex;align-items:center;height:56px;padding:0 16px;gap:12px}
+  .logo{font-family:'Cormorant Garamond',serif;font-weight:500;color:var(--primary);font-size:22px;letter-spacing:.12em;margin:0 auto}
+  .header-row .icn{width:22px;height:22px;color:var(--fg)}
+  .cats{display:flex;gap:18px;height:40px;align-items:center;padding:0 16px;font-size:13px;overflow-x:auto;border-top:1px solid var(--line-soft);background:#fff}
+  .cats a{flex:0 0 auto;color:var(--muted)}
+  .cats a.active{color:var(--fg);font-weight:500;position:relative}
+  .cats a.active::after{content:"";position:absolute;left:0;right:0;bottom:-12px;height:2px;background:var(--fg)}
+
+  /* === hero === */
+  .hero{position:relative;width:100%;height:40vh;min-height:280px;max-height:360px;background:linear-gradient(135deg,#FBE7D7 0%,#F5D9C0 100%);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .hero-inner{text-align:center;padding:0 20px}
+  .hero-eyebrow{font-size:11px;letter-spacing:.3em;color:rgba(23,23,23,.55);margin-bottom:10px}
+  .hero-title{font-family:'Cormorant Garamond',serif;font-weight:500;letter-spacing:.12em;font-size:34px;line-height:1.15;margin:0 0 8px;color:var(--fg)}
+  .hero-sub{font-size:13px;color:var(--fg2);margin:0 0 24px}
+  .hero-cta{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--fg);border-radius:999px;padding:10px 22px;font-size:13px;font-weight:500;transition:all .2s}
+  .hero-cta:hover{background:var(--fg);color:#fff}
+  .hero-arrow{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:var(--fg)}
+  .hero-arrow.l{left:10px} .hero-arrow.r{right:10px}
+  .hero-dots{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+  .hero-dots span{width:8px;height:8px;border-radius:999px;background:rgba(23,23,23,.3);transition:all .3s}
+  .hero-dots span.on{width:22px;background:var(--fg)}
+
+  /* === category pills === */
+  .pills{padding:24px 16px 8px}
+  .pills .scroll{display:flex;gap:8px;overflow-x:auto}
+  .pill{flex:0 0 auto;height:36px;padding:0 20px;border-radius:999px;background:#F4F4F5;color:var(--fg2);font-size:13px;display:inline-flex;align-items:center;cursor:pointer;transition:background .15s,color .15s}
+  .pill.active{background:var(--primary);color:#fff;font-weight:500}
+  .pill:hover:not(.active){background:#E8E8E8}
+
+  /* === section === */
+  .section{padding:32px 16px 8px}
+  .section.subtle{background:var(--bg-subtle)}
+  .section-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+  .section-head h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:22px;letter-spacing:.12em;margin:0}
+  .section-head p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+  .more{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+
+  /* === product grid === */
+  .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .card{display:block;cursor:pointer}
+  .card .img{position:relative;aspect-ratio:3/4;border-radius:8px;overflow:hidden;background:#F4F4F5;transition:transform .5s}
+  .card:hover .img>.cover{transform:scale(1.05)}
+  .cover{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .5s}
+  .badge-new{position:absolute;top:8px;left:8px;background:#0A0A0A;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;z-index:2}
+  .badge-disc{position:absolute;top:8px;right:8px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;z-index:2}
+  .badge-sold{position:absolute;inset:0;background:rgba(0,0,0,.5);color:#fff;font-weight:700;letter-spacing:.18em;font-size:13px;display:flex;align-items:center;justify-content:center;z-index:2}
+  .card .meta{margin-top:10px;min-height:88px}
+  .row-price{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .strike{font-size:12px;color:var(--mute2);text-decoration:line-through}
+  .final{font-size:14px;font-weight:700}
+  .ship{font-size:11px;color:var(--primary);margin-top:2px;font-weight:500}
+  .name{font-size:13px;color:var(--fg2);margin-top:4px;line-height:1.4}
+  .dots{display:flex;gap:4px;margin-top:6px}
+  .dot{width:10px;height:10px;border-radius:999px;border:1px solid rgba(0,0,0,.1)}
+
+  /* === promo banners === */
+  .promos{padding:16px;display:grid;gap:12px}
+  .promo{position:relative;border-radius:8px;padding:28px 24px;min-height:108px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+  .promo.a{background:linear-gradient(120deg,rgba(249,115,22,.1),rgba(224,108,72,.1))}
+  .promo.b{background:linear-gradient(120deg,rgba(229,214,200,.55),var(--bg-warm))}
+  .promo .ey{font-size:10px;letter-spacing:.22em;color:var(--muted);margin-bottom:6px}
+  .promo h3{margin:0 0 3px;font-size:16px;font-weight:700;color:var(--fg)}
+  .promo p{margin:0;font-size:12px;color:var(--muted)}
+  .promo .arr{position:absolute;right:18px;top:50%;transform:translateY(-50%);color:rgba(107,114,128,.4)}
+
+  /* === footer === */
+  .footer{background:var(--bg-warm);padding:36px 20px 24px;margin-top:24px}
+  .footer .brand{font-family:'Cormorant Garamond',serif;color:var(--primary);font-size:20px;letter-spacing:.12em}
+  .footer .tag{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .sns{display:flex;gap:8px;margin-top:14px}
+  .sns a{width:36px;height:36px;border-radius:999px;border:1px solid #E4DCCF;color:var(--muted);display:flex;align-items:center;justify-content:center}
+  .footer h4{font-size:13px;margin:22px 0 10px;font-weight:600}
+  .footer .cs-num{font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .footer .cs-hr{font-size:12px;color:var(--muted);margin:4px 0 2px}
+  .footer a.kakao{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;color:var(--fg2);margin-top:10px}
+  .biz{font-size:11px;color:var(--muted);line-height:1.6;margin-top:4px}
+  .biz p{margin:1px 0}
+  .copy{font-size:11px;color:var(--muted);border-top:1px solid rgba(107,114,128,.15);margin-top:22px;padding-top:14px}
+
+  /* === tab bar === */
+  .tabbar{position:sticky;bottom:0;display:flex;height:60px;background:#fff;border-top:1px solid var(--line-soft);z-index:50}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#9CA3AF;cursor:pointer;transition:color .15s}
+  .tab.active{color:var(--primary)}
+  .tab .lbl{font-size:10px;font-weight:500;line-height:1}
+  .tab .icnw{position:relative;display:inline-flex}
+  .tab .badge{position:absolute;top:-4px;right:-8px;background:var(--primary);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;padding:0 4px;display:flex;align-items:center;justify-content:center}
+
+  /* === PDP view === */
+  .pdp{display:none}
+  .view-pdp .home{display:none}
+  .view-pdp .pdp{display:block}
+  .pdp-gallery{position:relative;aspect-ratio:1/1.25;background:#F4F4F5}
+  .pdp-gallery .cover{background-size:cover;background-position:center}
+  .pdp-dots{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+  .pdp-dots span{width:6px;height:6px;border-radius:999px;background:rgba(23,23,23,.25)}
+  .pdp-dots span.on{background:var(--fg)}
+  .pdp-arrow{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:999px;background:rgba(255,255,255,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center}
+  .pdp-arrow.r{right:10px}
+  .pdp-wish{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center}
+  .thumbs{display:flex;gap:8px;padding:12px 16px;overflow-x:auto}
+  .thumbs .th{flex:0 0 60px;height:76px;border-radius:6px;overflow:hidden;border:1px solid transparent;background:#F4F4F5}
+  .thumbs .th.active{border-color:var(--primary)}
+  .thumbs .th .cover{width:100%;height:100%;background-size:cover;background-position:center;display:block}
+  .pdp-body{padding:4px 16px 140px}
+  .breadcrumb{font-size:11px;color:var(--muted)}
+  .share{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+  .pdp-title{font-size:16px;font-weight:700;margin:12px 0 12px;line-height:1.45}
+  .pdp-price-row{display:flex;align-items:baseline;gap:8px}
+  .pdp-rate{font-size:18px;font-weight:700;color:var(--primary)}
+  .pdp-final{font-size:18px;font-weight:700}
+  .pdp-strike{font-size:13px;color:var(--mute2);text-decoration:line-through}
+  .pdp-ship{display:inline-block;font-size:11px;color:var(--primary);border:1px solid rgba(249,115,22,.3);border-radius:4px;padding:2px 6px;margin-top:8px;font-weight:500}
+  .pdp-review{font-size:12px;color:var(--muted);margin-top:10px;display:block}
+  .acc{border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);margin-top:16px;padding:14px 0;font-size:13px;font-weight:500;display:flex;justify-content:space-between;align-items:center;color:var(--fg2)}
+  .acc svg{width:16px;height:16px;color:var(--mute2)}
+  .sizes{display:flex;gap:8px;margin-top:16px}
+  .size{height:34px;padding:0 16px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:13px;color:var(--fg2)}
+  .size.on{border-color:var(--fg);color:var(--fg);font-weight:500}
+  .size.off{opacity:.35;text-decoration:line-through}
+  .tabs{display:grid;grid-template-columns:repeat(4,1fr);margin-top:24px;border-bottom:1px solid var(--line)}
+  .tabs .t{text-align:center;padding:12px 0;font-size:12px;color:var(--muted);border-bottom:2px solid transparent}
+  .tabs .t.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:500}
+  .buy-bar{position:absolute;left:0;right:0;bottom:60px;background:#fff;border-top:1px solid var(--line-soft);display:flex;gap:0}
+  .buy-bar .ic{flex:0 0 52px;display:flex;align-items:center;justify-content:center;color:var(--fg2);border-right:1px solid var(--line-soft)}
+  .buy-bar .cart{flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--fg);background:#fff;height:52px}
+  .buy-bar .buy{flex:1;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;background:var(--primary);height:52px}
+  .buy-bar .buy:hover{background:var(--primary-hover)}
+
+  /* caption */
+  .caption{max-width:700px;margin:0 auto 24px;padding:0 16px;text-align:center;font-size:13px;color:#374151}
+  .caption small{color:#6B7280;font-size:11px}
+  .flip-hint{font-size:11px;color:#6B7280;margin:16px 0 -8px;text-align:center}
+  .flip-btns{display:flex;gap:8px;justify-content:center;margin:0 0 12px}
+  .flip-btns button{background:#fff;border:1px solid var(--line);padding:6px 14px;border-radius:999px;font-size:12px;color:#374151}
+  .flip-btns button.on{background:#171717;color:#fff;border-color:#171717}
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <strong>Jullyssy — Mobile UI Kit</strong><br/>
+  <small>Live recreation from <code>kaos1025/jullyssy-mall</code>. Mobile-first, 390×844. Tap images/cards to explore.</small>
+</div>
+
+<div class="flip-btns">
+  <button id="btn-home" class="on">홈</button>
+  <button id="btn-pdp">상품 상세</button>
+</div>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="screen" id="screen">
+
+      <!-- ============ HEADER ============ -->
+      <header class="header">
+        <div class="header-row">
+          <i data-lucide="menu" class="icn"></i>
+          <div class="logo">쥴리씨</div>
+          <i data-lucide="search" class="icn"></i>
+          <i data-lucide="shopping-bag" class="icn"></i>
+        </div>
+        <nav class="cats scrollbar-hide">
+          <a class="active">전체</a>
+          <a>상의</a>
+          <a>하의</a>
+          <a>아우터</a>
+          <a>원피스/세트</a>
+          <a>가방/악세서리</a>
+        </nav>
+      </header>
+
+      <!-- ============ HOME VIEW ============ -->
+      <main class="home">
+        <!-- HERO -->
+        <section class="hero">
+          <button class="hero-arrow l" aria-label="prev"><i data-lucide="chevron-left"></i></button>
+          <button class="hero-arrow r" aria-label="next"><i data-lucide="chevron-right"></i></button>
+          <div class="hero-inner">
+            <div class="hero-eyebrow">JULLYSSY</div>
+            <h1 class="hero-title">WEEKLY BEST</h1>
+            <p class="hero-sub">이번 주 가장 사랑받는 아이템</p>
+            <a href="#" class="hero-cta">쇼핑하기 <i data-lucide="arrow-right" style="width:14px;height:14px"></i></a>
+          </div>
+          <div class="hero-dots"><span></span><span></span><span class="on"></span></div>
+        </section>
+
+        <!-- CATEGORY PILLS -->
+        <section class="pills">
+          <div class="scroll scrollbar-hide">
+            <button class="pill active">전체</button>
+            <button class="pill">상의</button>
+            <button class="pill">하의</button>
+            <button class="pill">아우터</button>
+            <button class="pill">원피스/세트</button>
+            <button class="pill">가방/악세서리</button>
+          </div>
+        </section>
+
+        <!-- NEW ARRIVAL -->
+        <section class="section">
+          <div class="section-head">
+            <div>
+              <h2>NEW ARRIVAL</h2>
+              <p>지금 막 도착한 신상품</p>
+            </div>
+            <a class="more" href="#">더보기 <i data-lucide="arrow-right" style="width:12px;height:12px"></i></a>
+          </div>
+          <div class="pgrid" id="grid-new"></div>
+        </section>
+
+        <!-- PROMOS -->
+        <section class="promos">
+          <a class="promo a">
+            <div class="ey">EVENT</div>
+            <h3>신규 가입 혜택</h3>
+            <p>회원가입 시 3,000원 쿠폰 즉시 발급</p>
+            <span class="arr"><i data-lucide="arrow-right"></i></span>
+          </a>
+          <a class="promo b">
+            <div class="ey">SHIPPING</div>
+            <h3>무료배송</h3>
+            <p>5만원 이상 구매 시 무료배송</p>
+            <span class="arr"><i data-lucide="arrow-right"></i></span>
+          </a>
+        </section>
+
+        <!-- WEEKLY BEST -->
+        <section class="section subtle">
+          <div class="section-head">
+            <div>
+              <h2>WEEKLY BEST</h2>
+              <p>이번 주 가장 사랑받은</p>
+            </div>
+            <a class="more" href="#">더보기 <i data-lucide="arrow-right" style="width:12px;height:12px"></i></a>
+          </div>
+          <div class="pgrid" id="grid-best"></div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+          <div class="brand">쥴리씨</div>
+          <p class="tag">화면 너머의 여러분에게 따뜻한 쇼핑메이트</p>
+          <div class="sns">
+            <a><i data-lucide="camera" style="width:16px;height:16px"></i></a>
+            <a><i data-lucide="message-circle" style="width:16px;height:16px"></i></a>
+          </div>
+
+          <h4>고객센터</h4>
+          <div class="cs-num">1544-0000</div>
+          <div class="cs-hr">평일 10:00 - 17:00</div>
+          <div class="cs-hr">점심 12:30 - 13:30 / 주말·공휴일 휴무</div>
+          <a class="kakao"><i data-lucide="message-circle" style="width:14px;height:14px"></i> 카카오톡 문의하기</a>
+
+          <h4>ABOUT</h4>
+          <div class="biz">
+            <p>상호: 쥴리씨 · 대표: 이진주</p>
+            <p>사업자등록번호: 291-25-00254</p>
+            <p>통신판매업 신고번호: 제 2025-서울중구-659호</p>
+            <p>주소: 서울특별시 중구 장충단로13길 20, 현대시티타워 12층 B-10/1,3호</p>
+          </div>
+          <div class="copy">© 2026 쥴리씨. All rights reserved.</div>
+        </footer>
+      </main>
+
+      <!-- ============ PDP VIEW ============ -->
+      <div class="pdp">
+        <div class="pdp-gallery">
+          <div class="cover" id="pdp-cover"></div>
+          <button class="pdp-wish"><i data-lucide="heart" style="width:18px;height:18px"></i></button>
+          <button class="pdp-arrow r"><i data-lucide="chevron-right"></i></button>
+          <div class="pdp-dots"><span></span><span class="on"></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="thumbs scrollbar-hide" id="pdp-thumbs"></div>
+
+        <div class="pdp-body">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="breadcrumb">상의 &gt; 블라우스</span>
+            <button class="share"><i data-lucide="share-2" style="width:16px;height:16px"></i></button>
+          </div>
+          <h1 class="pdp-title">얼굴소멸 로맨틱 실루엣 니트 배색 레이어드 셔츠 여성 상의 블라우스</h1>
+
+          <div class="pdp-price-row">
+            <span class="pdp-rate">12%</span>
+            <span class="pdp-final">43,900원</span>
+            <span class="pdp-strike">50,000원</span>
+          </div>
+          <span class="pdp-ship">무료배송</span>
+          <a class="pdp-review">★ 4.8 (23개의 리뷰)</a>
+
+          <div class="acc">상품 정보 <i data-lucide="chevron-down"></i></div>
+
+          <div style="margin-top:16px;font-size:13px;color:var(--fg2);font-weight:500">사이즈</div>
+          <div class="sizes">
+            <button class="size on">S</button>
+            <button class="size">M</button>
+            <button class="size off">L</button>
+          </div>
+
+          <div class="tabs">
+            <div class="t active">상세설명</div>
+            <div class="t">관련상품</div>
+            <div class="t">구매후기 (23)</div>
+            <div class="t">상품문의</div>
+          </div>
+
+          <div style="padding:24px 0;font-size:13px;color:var(--fg2);line-height:1.7;text-align:center">
+            <p style="color:var(--muted)">상품 상세 이미지가 이곳에 표시됩니다.</p>
+          </div>
+        </div>
+
+        <!-- fixed buy bar -->
+        <div class="buy-bar">
+          <button class="ic"><i data-lucide="heart" style="width:20px;height:20px"></i></button>
+          <button class="ic"><i data-lucide="package" style="width:20px;height:20px"></i></button>
+          <button class="cart">장바구니</button>
+          <button class="buy">구매하기</button>
+        </div>
+      </div>
+
+      <!-- ============ TAB BAR ============ -->
+      <nav class="tabbar">
+        <a class="tab active" data-tab="home"><i data-lucide="home"></i><span class="lbl">홈</span></a>
+        <a class="tab" data-tab="cat"><i data-lucide="grid-2x2"></i><span class="lbl">카테고리</span></a>
+        <a class="tab" data-tab="wish"><i data-lucide="heart"></i><span class="lbl">찜</span></a>
+        <a class="tab" data-tab="my"><i data-lucide="user"></i><span class="lbl">마이</span></a>
+        <a class="tab" data-tab="cart"><div class="icnw"><i data-lucide="shopping-bag"></i><span class="badge">3</span></div><span class="lbl">장바구니</span></a>
+      </nav>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- product data (placeholder images via themed gradients) ---
+  const TONES = [
+    ['#EFE7DD','#C9B99A'], ['#F2E4D6','#D9B890'], ['#E8DCCF','#B8A28A'],
+    ['#F5E6D3','#CBB190'], ['#E4D5C3','#A8967E'], ['#EEE0CE','#C2A583'],
+    ['#F0E4D4','#D6BFA3'], ['#E8DDCB','#BFA789']
+  ];
+  const tile = (i) => `linear-gradient(135deg, ${TONES[i%TONES.length][0]} 0%, ${TONES[i%TONES.length][1]} 100%)`;
+
+  const NEW = [
+    {name:'얼굴소멸 로맨틱 실루엣 니트 배색 레이어드 셔츠 여성 상의 블라우스 테스트', rate:12, was:50000, now:43900, ship:true, new:true, colors:['#000','#D4C5B0']},
+    {name:'남녀공용 컴팩터피 기모 융털 쫀쫀 슬림핏 롱기모 워머 국내생산', rate:11, was:9000, now:8000, ship:false, new:false, colors:['#000','#6B5D4F']},
+    {name:'[숙바지/D/국내생산] 군실커버 펜턴 주름 A라인 미니 스커트 블랙 저파', rate:10, was:46000, now:41600, ship:false, new:true, colors:['#000','#1B2A4A']},
+    {name:'국내생산 라운드넥 금장단추 하객룩 오피스룩 블랙 아이보리', rate:8, was:80000, now:74000, ship:false, new:false, colors:['#FFF8E7','#000']}
+  ];
+  const BEST = [
+    {name:'오버핏 린넨 블레이저 자켓', rate:15, was:89000, now:75650, ship:true, new:false, colors:['#F0E4D4','#000','#D4B896']},
+    {name:'데일리 피크닉 셔링 원피스', rate:0, now:49000, ship:true, new:true, colors:['#FFFFFF','#F5C6D0','#87CEEB']},
+    {name:'하이웨이스트 세미와이드 슬랙스', sold:true, now:39000, colors:['#000','#1B2A4A','#C8B99A']},
+    {name:'라운드넥 크롭 니트 탑 봄 신상', rate:20, was:32000, now:25600, ship:false, new:true, colors:['#EADDCA','#000']}
+  ];
+
+  const fmt = n => n.toLocaleString();
+
+  const cardHTML = (p, i) => `
+    <a class="card" data-p="${i}">
+      <div class="img">
+        <div class="cover" style="background:${tile(i)}"></div>
+        ${p.new ? '<span class="badge-new">NEW</span>' : ''}
+        ${p.rate ? `<span class="badge-disc">-${p.rate}%</span>` : ''}
+        ${p.sold ? '<div class="badge-sold">SOLD OUT</div>' : ''}
+      </div>
+      <div class="meta">
+        <div class="row-price">
+          ${p.rate ? `<span class="strike">${fmt(p.was)}원</span>` : ''}
+          <span class="final">${fmt(p.now)}원</span>
+        </div>
+        ${p.ship ? '<div class="ship">무료배송</div>' : ''}
+        <div class="name line-clamp-2">${p.name}</div>
+        <div class="dots">${(p.colors||[]).map(c=>`<span class="dot" style="background:${c}"></span>`).join('')}</div>
+      </div>
+    </a>`;
+
+  document.getElementById('grid-new').innerHTML  = NEW.map(cardHTML).join('');
+  document.getElementById('grid-best').innerHTML = BEST.map((p,i)=>cardHTML(p,i+4)).join('');
+
+  // --- PDP gallery + thumbs ---
+  const pdpCover = document.getElementById('pdp-cover');
+  const pdpThumbs = document.getElementById('pdp-thumbs');
+  const gallery = [0,1,2,3,4].map(i=>tile(i));
+  pdpCover.style.background = gallery[1];
+  pdpCover.style.backgroundSize = 'cover';
+  pdpCover.style.backgroundPosition = 'center';
+  pdpThumbs.innerHTML = gallery.map((g,i)=>`<button class="th ${i===1?'active':''}" data-i="${i}"><span class="cover" style="background:${g}"></span></button>`).join('');
+  pdpThumbs.addEventListener('click', e=>{
+    const btn = e.target.closest('.th'); if(!btn) return;
+    [...pdpThumbs.children].forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    pdpCover.style.background = gallery[+btn.dataset.i];
+    pdpCover.style.backgroundSize='cover'; pdpCover.style.backgroundPosition='center';
+  });
+
+  // --- view toggle: persist in localStorage ---
+  const phone = document.getElementById('phone');
+  const screen = document.getElementById('screen');
+  const btnHome = document.getElementById('btn-home');
+  const btnPdp = document.getElementById('btn-pdp');
+
+  const setView = (v) => {
+    if (v === 'pdp') phone.classList.add('view-pdp'); else phone.classList.remove('view-pdp');
+    btnHome.classList.toggle('on', v==='home');
+    btnPdp.classList.toggle('on', v==='pdp');
+    screen.scrollTop = 0;
+    try{ localStorage.setItem('jl-view', v); }catch{}
+  };
+  btnHome.onclick = () => setView('home');
+  btnPdp.onclick  = () => setView('pdp');
+  document.body.addEventListener('click', e=>{
+    if (e.target.closest('.card')) { setView('pdp'); }
+  });
+
+  try { setView(localStorage.getItem('jl-view') || 'home'); } catch { setView('home'); }
+
+  // icons
+  lucide.createIcons({ attrs: { 'stroke-width': 1.5 } });
+</script>
+</body>
+</html>

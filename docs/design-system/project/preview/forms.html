@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Forms</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:22px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900);letter-spacing:-.01em}
+ h4{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-500);margin:14px 0 8px;font-weight:600}
+ .lbl{font-size:12px;color:#374151;margin-bottom:4px;display:block}
+ .input{width:100%;max-width:320px;height:40px;border:1px solid #E8E8E8;border-radius:8px;padding:0 12px;font-size:14px;font-family:inherit;letter-spacing:-.01em;background:#fff;color:#171717;box-sizing:border-box}
+ .input:focus{outline:none;border-color:#F97316;box-shadow:0 0 0 3px rgba(249,115,22,.15)}
+ .input.err{border-color:#D94B4B}
+ .err-msg{font-size:12px;color:#D94B4B;margin-top:4px}
+ .row{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+ .check{width:18px;height:18px;border:1px solid #D1D5DB;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;background:#fff}
+ .check.on{background:#F97316;border-color:#F97316;color:#fff}
+ .swatch{height:28px;padding:0 14px;border:1px solid #E8E8E8;border-radius:6px;background:#fff;display:inline-flex;align-items:center;font-size:13px;color:#374151;cursor:pointer}
+ .swatch.on{border-color:#171717;color:#171717;font-weight:500}
+</style></head><body>
+<h4>Text input</h4>
+<label class="lbl">이메일</label>
+<input class="input" placeholder="이메일을 입력해주세요" />
+
+<h4 style="margin-top:14px">Focused / error</h4>
+<div class="row">
+  <input class="input" value="hello@jullyssy.shop" style="border-color:#F97316;box-shadow:0 0 0 3px rgba(249,115,22,.15)" />
+  <div>
+    <input class="input err" value="pwd" />
+    <div class="err-msg">비밀번호는 8자 이상이어야 해요.</div>
+  </div>
+</div>
+
+<h4>Checkbox &nbsp; · &nbsp; Size selector</h4>
+<div class="row">
+  <span class="check on">✓</span><span style="font-size:14px">이용약관 동의 (필수)</span>
+</div>
+<div class="row">
+  <span class="swatch on">S</span><span class="swatch">M</span><span class="swatch">L</span><span class="swatch" style="opacity:.4;text-decoration:line-through">XL</span>
+</div>
+</body></html>

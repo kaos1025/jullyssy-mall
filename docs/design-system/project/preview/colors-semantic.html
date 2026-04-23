@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Semantic + Warm accents</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:20px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900);letter-spacing:-.01em}
+ .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+ .sw{border-radius:8px;padding:10px;min-height:68px;display:flex;flex-direction:column;justify-content:space-between}
+ .r{font-size:10px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+ .v{font-size:11px;font-weight:700;margin-top:2px}
+ .x{font-size:10px;font-family:ui-monospace,Menlo,monospace;opacity:.85}
+ h4{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-500);margin:0 0 8px;font-weight:600}
+ .note{font-size:11px;color:#6B7280;margin-top:14px;line-height:1.6;border-left:2px solid #E8E8E8;padding:2px 0 2px 10px}
+ .note b{color:#171717}
+ .note .no{color:#B91C1C;font-weight:600}
+</style></head><body>
+
+<h4>Semantic</h4>
+<div class="grid">
+  <div class="sw" style="background:#16A34A;color:#fff"><div class="r">success</div><div><div class="v">결제 · 배송 완료</div><div class="x">#16A34A</div></div></div>
+  <div class="sw" style="background:#F59E0B;color:#fff"><div class="r">warning</div><div><div class="v">품절 임박 · 마감</div><div class="x">#F59E0B</div></div></div>
+  <div class="sw" style="background:#D94B4B;color:#fff"><div class="r">error</div><div><div class="v">폼 에러 · 실패</div><div class="x">#D94B4B</div></div></div>
+  <div class="sw" style="background:#2563EB;color:#fff"><div class="r">info</div><div><div class="v">공지 · 배송 정보</div><div class="x">#2563EB</div></div></div>
+</div>
+
+<h4>Warm accents (surfaces only)</h4>
+<div class="grid">
+  <div class="sw" style="background:#FAFAF8;border:1px solid #EEE"><div class="r" style="color:#6B7280">subtle</div><div><div class="v">섹션 분리</div><div class="x" style="color:#6B7280">#FAFAF8</div></div></div>
+  <div class="sw" style="background:#FFF8F1;border:1px solid #EEE"><div class="r" style="color:#6B7280">warm-cream</div><div><div class="v">배너 ambient</div><div class="x" style="color:#6B7280">#FFF8F1</div></div></div>
+  <div class="sw" style="background:#FBE7D7"><div class="r" style="color:#7A3E0D">warm-peach</div><div><div class="v">hero tint</div><div class="x" style="color:#7A3E0D">#FBE7D7</div></div></div>
+  <div class="sw" style="background:#F5F0EB"><div class="r" style="color:#6B4E2B">warm</div><div><div class="v">푸터 배경</div><div class="x" style="color:#6B4E2B">#F5F0EB</div></div></div>
+</div>
+
+<p class="note">
+  <b>Error (#D94B4B) is for error states only</b> — form validation, failed requests, destructive confirmations.<br/>
+  <span class="no">✗ 할인율 뱃지에 사용 금지</span> — 할인 뱃지·가격 강조는 Primary Orange (<code>#F97316</code>)로 통일.
+</p>
+
+</body></html>

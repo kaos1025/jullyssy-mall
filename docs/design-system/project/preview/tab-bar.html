@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Tab Bar</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+ html,body{margin:0;padding:24px;background:#F4F4F5;font-family:'Pretendard Variable',system-ui;color:#171717;letter-spacing:-.01em}
+ .phone{width:320px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #E8E8E8}
+ .preview{height:40px;background:#FAFAFA;border-bottom:1px solid #F4F4F5}
+ .tabbar{display:flex;height:60px;border-top:1px solid #F4F4F5;background:#fff}
+ .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#9CA3AF;cursor:pointer}
+ .tab.active{color:#F97316}
+ .tab .lbl{font-size:10px;font-weight:500;line-height:1}
+ .tab svg{width:22px;height:22px}
+ .badge{position:absolute;top:-4px;right:-8px;background:#F97316;color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;padding:0 4px;display:flex;align-items:center;justify-content:center}
+ .wrap{position:relative;display:inline-flex}
+ .spec{font-size:11px;color:#6B7280;text-align:center;margin-top:10px;font-family:ui-monospace,Menlo,monospace}
+</style></head><body>
+<div class="phone">
+  <div class="preview"></div>
+  <nav class="tabbar">
+    <div class="tab active"><i data-lucide="home"></i><div class="lbl">홈</div></div>
+    <div class="tab"><i data-lucide="grid-2x2"></i><div class="lbl">카테고리</div></div>
+    <div class="tab"><i data-lucide="heart"></i><div class="lbl">찜</div></div>
+    <div class="tab"><i data-lucide="user"></i><div class="lbl">마이</div></div>
+    <div class="tab"><div class="wrap"><i data-lucide="shopping-bag"></i><span class="badge">3</span></div><div class="lbl">장바구니</div></div>
+  </nav>
+</div>
+<p class="spec">height 60 + env(safe-area-inset-bottom) · lucide 22 · strokeWidth 1.5</p>
+<script>lucide.createIcons({attrs:{'stroke-width':1.5}});</script>
+</body></html>

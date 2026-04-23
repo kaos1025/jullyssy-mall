@@ -1,0 +1,21 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Spacing</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:20px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900)}
+ .row{display:flex;align-items:center;gap:12px;padding:5px 0}
+ .tag{width:60px;font-size:11px;color:var(--gray-500);font-family:ui-monospace,Menlo,monospace}
+ .bar{height:14px;background:var(--primary-100);border-radius:2px}
+ .val{font-size:11px;color:var(--gray-700);min-width:70px}
+ .note{font-size:11px;color:var(--gray-500);margin-top:12px}
+</style></head><body>
+<div class="row"><div class="tag">gap-1</div><div class="bar" style="width:4px"></div><div class="val">4px · 인라인 tight</div></div>
+<div class="row"><div class="tag">gap-2</div><div class="bar" style="width:8px"></div><div class="val">8px · 아이콘+라벨</div></div>
+<div class="row"><div class="tag">gap-3</div><div class="bar" style="width:12px"></div><div class="val">12px · 카드 내부</div></div>
+<div class="row"><div class="tag">gap-4</div><div class="bar" style="width:16px"></div><div class="val">16px · 컴포넌트 기본</div></div>
+<div class="row"><div class="tag">gap-6</div><div class="bar" style="width:24px"></div><div class="val">24px · 섹션 내부</div></div>
+<div class="row"><div class="tag">py-12</div><div class="bar" style="width:48px"></div><div class="val">48px · 섹션 간</div></div>
+<div class="row"><div class="tag">py-16</div><div class="bar" style="width:64px"></div><div class="val">64px · 페이지 블록</div></div>
+<div class="row"><div class="tag">py-20</div><div class="bar" style="width:80px"></div><div class="val">80px · 대형 브레이크</div></div>
+<p class="note">섹션 구분은 <b>여백 + 배경 변화</b>로 — 보더 사용 최소화.</p>
+</body></html>

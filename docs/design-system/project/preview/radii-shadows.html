@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>Radii & Shadows</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+ html,body{margin:0;padding:20px 24px;background:#fff;font-family:var(--font-sans);color:var(--gray-900)}
+ h4{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-500);margin:0 0 8px;font-weight:600}
+ .row{display:flex;gap:16px;align-items:flex-end;margin-bottom:18px}
+ .tile{background:#fff;border:1px solid #E8E8E8;min-width:70px;height:70px;display:flex;align-items:center;justify-content:center;flex-direction:column}
+ .meta{font-size:10px;color:var(--gray-500);margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+ .val{font-size:11px;font-weight:600}
+ .sh{background:#fff;min-width:110px;height:56px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-700)}
+</style></head><body>
+<h4>Corner radii</h4>
+<div class="row">
+  <div><div class="tile" style="border-radius:4px"><div class="val">4</div></div><div class="meta">sm · badge</div></div>
+  <div><div class="tile" style="border-radius:6px"><div class="val">6</div></div><div class="meta">md</div></div>
+  <div><div class="tile" style="border-radius:8px;outline:2px solid var(--primary);outline-offset:2px"><div class="val">8 · default</div></div><div class="meta">lg · cards/btns</div></div>
+  <div><div class="tile" style="border-radius:12px"><div class="val">12</div></div><div class="meta">xl · rare</div></div>
+  <div><div class="tile" style="border-radius:9999px;width:70px"><div class="val">∞</div></div><div class="meta">full · pill/icon</div></div>
+</div>
+<h4>Shadow scale (kept minimal)</h4>
+<div class="row">
+  <div class="sh" style="border:1px solid #E8E8E8">none · default</div>
+  <div class="sh" style="box-shadow:0 1px 2px 0 rgba(0,0,0,.04)">shadow-sm · header</div>
+  <div class="sh" style="box-shadow:0 4px 12px -2px rgba(0,0,0,.08)">shadow-sheet · dropdown</div>
+</div>
+</body></html>
