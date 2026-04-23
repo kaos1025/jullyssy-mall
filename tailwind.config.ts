@@ -18,6 +18,8 @@ const config = {
   	},
   	extend: {
   		fontFamily: {
+  			sans: ['var(--font-sans)'],
+  			display: ['var(--font-display)'],
   			pretendard: [
   				'Pretendard Variable',
   				'Pretendard',
@@ -34,11 +36,28 @@ const config = {
   				'Segoe UI Emoji',
   				'Segoe UI Symbol',
   				'sans-serif'
-  			],
-  			display: ['Cormorant Garamond', 'serif']
+  			]
+  		},
+  		letterSpacing: {
+  			kr: 'var(--ls-body)',
+  			'wide-en': 'var(--ls-wide)',
+  			eyebrow: 'var(--ls-xwide)'
   		},
   		spacing: {
   			section: '80px'
+  		},
+  		maxWidth: {
+  			container: 'var(--container-max)'
+  		},
+  		height: {
+  			header: 'var(--header-h)',
+  			tabbar: 'var(--tabbar-h)',
+  			'hero-m': 'var(--hero-h-mobile)',
+  			'hero-d': 'var(--hero-h-desktop)'
+  		},
+  		boxShadow: {
+  			card: 'var(--shadow-card)',
+  			sheet: 'var(--shadow-sheet)'
   		},
   		colors: {
   			border: 'hsl(var(--border))',
@@ -48,7 +67,15 @@ const config = {
   			foreground: 'hsl(var(--foreground))',
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
+  				foreground: 'hsl(var(--primary-foreground))',
+  				50: 'var(--primary-50)',
+  				100: 'var(--primary-100)',
+  				200: 'var(--primary-200)',
+  				300: 'var(--primary-300)',
+  				400: 'var(--primary-400)',
+  				500: 'var(--primary-500)',
+  				600: 'var(--primary-600)',
+  				700: 'var(--primary-700)'
   			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
@@ -74,11 +101,20 @@ const config = {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			},
-  			subtle: '#FAFAF8',
-  			warm: '#F5F0EB',
+  			warm: {
+  				DEFAULT: 'var(--warm)',
+  				peach: 'var(--warm-peach)',
+  				cream: 'var(--warm-cream)',
+  				subtle: 'var(--subtle)'
+  			},
+  			subtle: 'var(--subtle)',
+  			success: 'var(--success)',
+  			warning: 'var(--warning)',
+  			error: 'var(--error)',
+  			info: 'var(--info)',
   			badge: {
   				best: '#1A1A1A',
-  				sale: '#D94B4B',
+  				sale: 'var(--error)',
   				new: '#C4956A'
   			}
   		},
