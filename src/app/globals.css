@@ -77,3 +77,28 @@
     scrollbar-width: none;
   }
 }
+
+/* 네이버 임포트 HTML의 인라인 빨강 스타일 중립화 */
+.product-description span[style*="color: rgb(231"],
+.product-description span[style*="color:#e74c3c"],
+.product-description span[style*="color: rgb(255, 0, 0)"],
+.product-description span[style*="color:red"],
+.product-description span[style*="color: red"],
+.product-description font[color*="red"],
+.product-description *[style*="color: rgb(231, 76, 60)"],
+.product-description *[style*="color: rgb(192, 57, 43)"] {
+  color: inherit !important;
+}
+
+.product-description strong[style*="color: rgb(231"],
+.product-description b[style*="color: rgb(231"],
+.product-description strong[style*="color:#e74c3c"],
+.product-description b[style*="color:#e74c3c"] {
+  color: hsl(var(--foreground)) !important;
+  font-weight: 700;
+}
+
+.product-description *[style*="background-color: rgb(231"],
+.product-description *[style*="background-color:#e74c3c"] {
+  background-color: transparent !important;
+}

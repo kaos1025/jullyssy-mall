@@ -28,7 +28,7 @@ const ProductDescription = ({ html }: { html: string }) => {
     <div className="relative">
       <div
         ref={contentRef}
-        className="prose prose-sm max-w-none overflow-hidden transition-[max-height] duration-500"
+        className="product-description prose prose-sm max-w-none overflow-hidden transition-[max-height] duration-500"
         style={{ maxHeight: expanded || !needsToggle ? "none" : `${MAX_HEIGHT}px` }}
         dangerouslySetInnerHTML={{ __html: html }}
       />

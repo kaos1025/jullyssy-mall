@@ -182,7 +182,7 @@ const Header = ({ categories }: HeaderProps) => {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🌷 봄 신상 BEST 아이템"
+              placeholder="상품을 검색하세요"
               className="pl-10 pr-4 h-9 rounded-full bg-muted border-0 text-sm placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-primary/30"
             />
           </div>
@@ -241,18 +241,6 @@ const Header = ({ categories }: HeaderProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {/* PC: 찜 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden md:flex h-10 w-10"
-            asChild
-          >
-            <Link href="/mypage">
-              <Heart className="h-6 w-6" strokeWidth={1.5} />
-              <span className="sr-only">찜</span>
-            </Link>
-          </Button>
           {/* 장바구니 */}
           <Button variant="ghost" size="icon" className="relative md:h-10 md:w-10" asChild>
             <Link href="/cart">
