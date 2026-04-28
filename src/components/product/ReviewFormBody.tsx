@@ -21,7 +21,8 @@ interface ReviewFormBodyProps {
   productId: string
   orderItemId: string
   productName: string
-  onSuccess?: () => void
+  onSuccess?: (data: { review_id: string; point_reward: number }) => void
+  showProductName?: boolean
 }
 
 const ReviewFormBody = ({
@@ -29,6 +30,7 @@ const ReviewFormBody = ({
   orderItemId,
   productName,
   onSuccess,
+  showProductName = true,
 }: ReviewFormBodyProps) => {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -75,7 +77,7 @@ const ReviewFormBody = ({
       setContent("")
       setImages([])
       setTags(EMPTY_TAGS)
-      onSuccess?.()
+      onSuccess?.(data)
     } else {
       const err = await res.json()
       toast({ variant: "destructive", title: "리뷰 작성 실패", description: err.error })
@@ -86,9 +88,11 @@ const ReviewFormBody = ({
 
   return (
     <>
-      <p className="text-sm text-muted-foreground line-clamp-1">
-        {productName}
-      </p>
+      {showProductName && (
+        <p className="text-sm text-muted-foreground line-clamp-1">
+          {productName}
+        </p>
+      )}
 
       <div className="space-y-4">
         {/* 별점 */}
