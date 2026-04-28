@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
+import { Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -126,27 +128,46 @@ const OrderDetailPage = () => {
       <div className="border rounded-lg p-4 space-y-3">
         <h3 className="font-medium text-sm">주문 상품</h3>
         {order.items.map((item) => (
-          <div key={item.id} className="flex gap-3 py-2 border-t first:border-0">
-            <div className="relative h-16 w-14 flex-shrink-0 overflow-hidden rounded bg-muted">
-              {item.product_image && (
-                <Image
-                  src={item.product_image}
-                  alt={item.product_name}
-                  fill
-                  className="object-cover"
-                  sizes="56px"
-                />
-              )}
+          <div key={item.id} className="py-2 border-t first:border-0">
+            <div className="flex gap-3">
+              <div className="relative h-16 w-14 flex-shrink-0 overflow-hidden rounded bg-muted">
+                {item.product_image && (
+                  <Image
+                    src={item.product_image}
+                    alt={item.product_name}
+                    fill
+                    className="object-cover"
+                    sizes="56px"
+                  />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm">{item.product_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {item.color}/{item.size} · {item.quantity}개
+                </p>
+                <p className="text-sm font-medium">
+                  {(item.price * item.quantity).toLocaleString()}원
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-sm">{item.product_name}</p>
-              <p className="text-xs text-muted-foreground">
-                {item.color}/{item.size} · {item.quantity}개
-              </p>
-              <p className="text-sm font-medium">
-                {(item.price * item.quantity).toLocaleString()}원
-              </p>
-            </div>
+            {order.status === "CONFIRMED" && (
+              <div className="mt-2 flex justify-end">
+                {item.is_reviewed ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                    <Check size={14} strokeWidth={2} />
+                    리뷰 작성 완료
+                  </span>
+                ) : (
+                  <Link
+                    href={`/mypage/reviews/write/${item.id}`}
+                    className="inline-flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition"
+                  >
+                    리뷰 작성
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
