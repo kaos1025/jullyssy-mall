@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Star, Upload } from "lucide-react"
+import { useState, useEffect, useRef, type ChangeEvent } from "react"
+import Image from "next/image"
+import { Star, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +16,16 @@ const EMPTY_TAGS: ReviewTagSelection = {
   tag_color: null,
   tag_thickness: null,
   tag_stretch: null,
+}
+
+const MAX_IMAGES = 3
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const ALLOWED_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+
+interface AttachedImage {
+  file: File
+  previewUrl: string
+  id: string
 }
 
 interface ReviewFormBodyProps {
@@ -46,8 +57,76 @@ const ReviewFormBody = ({
   const [height, setHeight] = useState("")
   const [weight, setWeight] = useState("")
   const [purchasedSize, setPurchasedSize] = useState("")
-  const [images, setImages] = useState<File[]>([])
+  const [images, setImages] = useState<AttachedImage[]>([])
   const [tags, setTags] = useState<ReviewTagSelection>(EMPTY_TAGS)
+
+  // unmount 시 남아있는 blob URL 정리 — ref 로 최신 images 추적 (stale closure 회피)
+  const imagesRef = useRef<AttachedImage[]>([])
+  useEffect(() => {
+    imagesRef.current = images
+  }, [images])
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((img) => URL.revokeObjectURL(img.previewUrl))
+    }
+  }, [])
+
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = "" // 같은 파일 재선택 가능
+
+    const remainingSlots = MAX_IMAGES - images.length
+    if (remainingSlots <= 0) {
+      toast({
+        title: `최대 ${MAX_IMAGES}장까지 첨부할 수 있어요`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const accepted: AttachedImage[] = []
+    const rejected: string[] = []
+
+    for (const file of files.slice(0, remainingSlots)) {
+      if (!ALLOWED_MIMES.includes(file.type)) {
+        rejected.push(`${file.name}: JPG, PNG, WebP만 가능`)
+        continue
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        rejected.push(`${file.name}: 5MB 초과`)
+        continue
+      }
+      accepted.push({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      })
+    }
+
+    if (rejected.length > 0) {
+      toast({
+        title: "일부 사진을 첨부할 수 없어요",
+        description: rejected.join("\n"),
+        variant: "destructive",
+      })
+    }
+
+    setImages((prev) => [...prev, ...accepted])
+
+    if (files.length > remainingSlots) {
+      toast({
+        title: `${MAX_IMAGES}장 초과로 ${files.length - remainingSlots}장은 추가되지 않았어요`,
+      })
+    }
+  }
+
+  const handleRemoveImage = (id: string) => {
+    setImages((prev) => {
+      const target = prev.find((img) => img.id === id)
+      if (target) URL.revokeObjectURL(target.previewUrl)
+      return prev.filter((img) => img.id !== id)
+    })
+  }
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -68,7 +147,7 @@ const ReviewFormBody = ({
     if (tags.tag_color) formData.append("tag_color", tags.tag_color)
     if (tags.tag_thickness) formData.append("tag_thickness", tags.tag_thickness)
     if (tags.tag_stretch) formData.append("tag_stretch", tags.tag_stretch)
-    images.forEach((file) => formData.append("images", file))
+    images.forEach((img) => formData.append("images", img.file))
 
     const res = await fetch("/api/reviews", {
       method: "POST",
@@ -83,6 +162,8 @@ const ReviewFormBody = ({
           description: `${data.point_reward}P 적립되었습니다.`,
         })
       }
+      // 성공 시 blob URL 즉시 해제 (unmount 전 미리)
+      images.forEach((img) => URL.revokeObjectURL(img.previewUrl))
       setContent("")
       setImages([])
       setTags(EMPTY_TAGS)
@@ -94,6 +175,8 @@ const ReviewFormBody = ({
 
     setLoading(false)
   }
+
+  const isLimitReached = images.length >= MAX_IMAGES
 
   return (
     <>
@@ -141,33 +224,59 @@ const ReviewFormBody = ({
           />
         </div>
 
-        {/* 이미지 */}
+        {/* 이미지 첨부 */}
         <div>
-          <Label
-            htmlFor="review-images"
-            className="flex items-center gap-2 border border-dashed rounded-lg p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+          <label
+            className={cn(
+              "border border-dashed border-gray-300 rounded-lg p-4 flex items-center gap-2 transition",
+              isLimitReached
+                ? "opacity-50 cursor-not-allowed"
+                : "cursor-pointer hover:border-gray-400"
+            )}
           >
-            <Upload className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              사진 첨부 (최대 3장) — 포토리뷰 500P, 일반리뷰 100P
+            <Upload size={16} strokeWidth={1.5} />
+            <span className="text-sm">
+              사진 첨부 ({images.length} / {MAX_IMAGES}) — 포토리뷰 500P, 일반리뷰 100P
             </span>
-          </Label>
-          <input
-            id="review-images"
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files) {
-                setImages(Array.from(e.target.files).slice(0, 3))
-              }
-            }}
-          />
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              disabled={isLimitReached}
+            />
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            JPG, PNG, WebP · 5MB 이하
+          </p>
+
           {images.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {images.length}장 선택됨
-            </p>
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {images.map((img, idx) => (
+                <div
+                  key={img.id}
+                  className="relative aspect-square rounded-lg overflow-hidden bg-gray-100"
+                >
+                  <Image
+                    src={img.previewUrl}
+                    alt={`첨부 이미지 ${idx + 1}`}
+                    fill
+                    sizes="(max-width: 640px) 33vw, 25vw"
+                    className="object-cover"
+                    unoptimized
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(img.id)}
+                    aria-label="이미지 제거"
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition"
+                  >
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
