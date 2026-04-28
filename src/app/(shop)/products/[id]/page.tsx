@@ -15,10 +15,17 @@ import ProductReviews from "@/components/product/ProductReviews"
 import ProductDescription from "@/components/product/ProductDescription"
 import ProductCard from "@/components/product/ProductCard"
 import ShareButton from "@/components/product/ShareButton"
+import ReviewTagSummary from "@/components/review/ReviewTagSummary"
+import MiniReviewCarousel from "@/components/review/MiniReviewCarousel"
 import { SHOPPING_GUIDE } from "@/constants/shopping-guide"
 import { BUSINESS_INFO } from "@/constants/business"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
+import type { ReviewTagSummaryRow } from "@/types/review"
+
+const REVIEW_TAG_SUMMARY_THRESHOLD = 10
+const MINI_REVIEW_CAROUSEL_THRESHOLD = 3
+const MINI_REVIEW_LIMIT = 8
 
 interface ProductDetailPageProps {
   params: { id: string }
@@ -100,18 +107,25 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     parentCategory = data
   }
 
-  // 리뷰 조회
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select(
-      `
+  // 리뷰 + 태그 집계 조회 (PDP SSR 시 함께 prefetch)
+  const [{ data: reviews }, { data: tagSummaryData }] = await Promise.all([
+    supabase
+      .from("reviews")
+      .select(
+        `
       *,
       images:review_images(*),
       user:profiles(name, height, weight)
     `
-    )
-    .eq("product_id", product.id)
-    .order("created_at", { ascending: false })
+      )
+      .eq("product_id", product.id)
+      .order("created_at", { ascending: false }),
+    supabase.rpc("get_product_review_tag_summary", {
+      p_product_id: product.id,
+    }),
+  ])
+  const tagSummaryRows =
+    ((tagSummaryData as unknown) as ReviewTagSummaryRow[] | null) ?? []
 
   // 관련상품 조회 (같은 카테고리, 현재 상품 제외)
   let relatedProducts: typeof product[] = []
@@ -132,6 +146,20 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       ? typedReviews.reduce((sum, r) => sum + r.rating, 0) /
         typedReviews.length
       : 0
+
+  // 미니 캐러셀: 사진 있는 리뷰 우선, 그 다음 최신순
+  const miniReviews = [...typedReviews]
+    .sort((a, b) => {
+      const ai = a.images?.length ? 1 : 0
+      const bi = b.images?.length ? 1 : 0
+      if (bi !== ai) return bi - ai
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+    .slice(0, MINI_REVIEW_LIMIT)
+
+  const showTagSummary = typedReviews.length >= REVIEW_TAG_SUMMARY_THRESHOLD
+  const showMiniCarousel =
+    typedReviews.length >= MINI_REVIEW_CAROUSEL_THRESHOLD
 
   const images = product.product_images?.sort(
     (a: { sort_order: number }, b: { sort_order: number }) =>
@@ -304,6 +332,19 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
           </div>
         </div>
       </div>
+
+      {/* 리뷰 4축 평가 요약 (10개 이상일 때만) */}
+      {showTagSummary && (
+        <ReviewTagSummary
+          rows={tagSummaryRows}
+          reviewCount={typedReviews.length}
+        />
+      )}
+
+      {/* 미니 리뷰 캐러셀 (3개 이상일 때만) */}
+      {showMiniCarousel && (
+        <MiniReviewCarousel reviews={miniReviews} reviewsTabHref="#reviews" />
+      )}
 
       {/* 탭: 4탭 */}
       <div className="mt-12" id="reviews">

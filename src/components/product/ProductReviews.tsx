@@ -1,8 +1,8 @@
 "use client"
 
 import { Star } from "lucide-react"
-import Image from "next/image"
 import { cn } from "@/lib/utils"
+import ReviewCard from "@/components/review/ReviewCard"
 import type { ReviewWithImages } from "@/types"
 
 interface ProductReviewsProps {
@@ -71,54 +71,7 @@ const ProductReviews = ({ reviews, averageRating }: ProductReviewsProps) => {
       {reviews.length > 0 ? (
         <div className="divide-y">
           {reviews.map((review) => (
-            <div key={review.id} className="py-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <StarRating rating={review.rating} />
-                  <span className="text-sm font-medium">
-                    {review.user?.name || "익명"}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(review.created_at).toLocaleDateString("ko-KR")}
-                </span>
-              </div>
-
-              {/* 키/몸무게/사이즈 */}
-              {(review.height || review.weight || review.purchased_size) && (
-                <div className="flex gap-3 text-xs text-muted-foreground">
-                  {review.height && <span>키 {review.height}cm</span>}
-                  {review.weight && <span>몸무게 {review.weight}kg</span>}
-                  {review.purchased_size && (
-                    <span>구매사이즈 {review.purchased_size}</span>
-                  )}
-                </div>
-              )}
-
-              {review.content && (
-                <p className="text-sm leading-relaxed">{review.content}</p>
-              )}
-
-              {/* 리뷰 이미지 */}
-              {review.images.length > 0 && (
-                <div className="flex gap-2">
-                  {review.images.map((img) => (
-                    <div
-                      key={img.id}
-                      className="relative h-20 w-20 overflow-hidden rounded-md"
-                    >
-                      <Image
-                        src={img.url}
-                        alt={`${review.user?.name || "고객"}님의 리뷰 이미지`}
-                        fill
-                        className="object-cover"
-                        sizes="80px"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ReviewCard key={review.id} review={review} />
           ))}
         </div>
       ) : (

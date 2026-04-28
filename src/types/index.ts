@@ -205,6 +205,11 @@ export interface PointHistory {
   created_at: string
 }
 
+export type ReviewTagSize = "약간 작아요" | "딱 맞아요" | "약간 커요"
+export type ReviewTagColor = "화면보다 어두워요" | "화면과 똑같아요" | "화면보다 밝아요"
+export type ReviewTagThickness = "얇아요" | "적당해요" | "두꺼워요"
+export type ReviewTagStretch = "없어요" | "적당해요" | "많이 있어요"
+
 export interface Review {
   id: string
   user_id: string
@@ -215,6 +220,10 @@ export interface Review {
   height: number | null
   weight: number | null
   purchased_size: string | null
+  tag_size: ReviewTagSize | null
+  tag_color: ReviewTagColor | null
+  tag_thickness: ReviewTagThickness | null
+  tag_stretch: ReviewTagStretch | null
   helpful_count: number
   created_at: string
 }

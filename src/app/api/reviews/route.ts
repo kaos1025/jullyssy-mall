@@ -1,9 +1,26 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  REVIEW_TAG_OPTIONS,
+  type ReviewTagAxis,
+  type ReviewTagOption,
+} from "@/types/review"
 
 const PHOTO_REVIEW_POINT = 500
 const TEXT_REVIEW_POINT = 100
+
+const pickTag = (
+  formData: FormData,
+  field: string,
+  axis: ReviewTagAxis
+): ReviewTagOption | null => {
+  const raw = formData.get(field)
+  if (typeof raw !== "string" || !raw) return null
+  return (REVIEW_TAG_OPTIONS[axis] as readonly string[]).includes(raw)
+    ? (raw as ReviewTagOption)
+    : null
+}
 
 export const POST = async (request: Request) => {
   const supabase = await createClient()
@@ -24,6 +41,10 @@ export const POST = async (request: Request) => {
   const height = formData.get("height") ? Number(formData.get("height")) : null
   const weight = formData.get("weight") ? Number(formData.get("weight")) : null
   const purchasedSize = formData.get("purchased_size") as string | null
+  const tagSize = pickTag(formData, "tag_size", "size")
+  const tagColor = pickTag(formData, "tag_color", "color")
+  const tagThickness = pickTag(formData, "tag_thickness", "thickness")
+  const tagStretch = pickTag(formData, "tag_stretch", "stretch")
 
   if (!productId || !rating) {
     return NextResponse.json({ error: "필수 항목이 누락되었습니다" }, { status: 400 })
@@ -61,6 +82,10 @@ export const POST = async (request: Request) => {
       height,
       weight,
       purchased_size: purchasedSize || null,
+      tag_size: tagSize,
+      tag_color: tagColor,
+      tag_thickness: tagThickness,
+      tag_stretch: tagStretch,
     })
     .select()
     .single()
