@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
-import { PackageOpen, MessageSquare, HelpCircle } from "lucide-react"
+import Link from "next/link"
+import { PackageOpen, MessageSquare, HelpCircle, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -78,6 +79,10 @@ export const generateMetadata = async ({
 
 const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
   const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   // 상품 + 이미지 + 옵션 조회
   const { data: product } = await supabase
@@ -421,6 +426,17 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
 
           {/* 구매후기 */}
           <TabsContent value="reviews" className="mt-6">
+            {user && (
+              <div className="flex justify-end mb-4">
+                <Link
+                  href="/mypage/reviews?tab=writable"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 underline-offset-2 hover:underline"
+                >
+                  <Pencil size={14} strokeWidth={1.5} />
+                  리뷰 작성
+                </Link>
+              </div>
+            )}
             {typedReviews.length > 0 ? (
               <ProductReviews
                 reviews={typedReviews}
