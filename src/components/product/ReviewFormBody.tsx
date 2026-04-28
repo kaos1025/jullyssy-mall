@@ -21,8 +21,14 @@ interface ReviewFormBodyProps {
   productId: string
   orderItemId: string
   productName: string
-  onSuccess?: (data: { review_id: string; point_reward: number }) => void
+  onSuccess?: (data: {
+    review_id: string
+    point_reward: number
+    uploaded_count?: number
+    upload_errors?: string[]
+  }) => void
   showProductName?: boolean
+  showToast?: boolean
 }
 
 const ReviewFormBody = ({
@@ -31,6 +37,7 @@ const ReviewFormBody = ({
   productName,
   onSuccess,
   showProductName = true,
+  showToast = true,
 }: ReviewFormBodyProps) => {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -70,10 +77,12 @@ const ReviewFormBody = ({
 
     if (res.ok) {
       const data = await res.json()
-      toast({
-        title: "리뷰가 등록되었습니다",
-        description: `${data.point_reward}P 적립되었습니다.`,
-      })
+      if (showToast) {
+        toast({
+          title: "리뷰가 등록되었습니다",
+          description: `${data.point_reward}P 적립되었습니다.`,
+        })
+      }
       setContent("")
       setImages([])
       setTags(EMPTY_TAGS)

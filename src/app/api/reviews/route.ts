@@ -102,13 +102,14 @@ export const POST = async (request: Request) => {
       .eq("id", orderItemId)
   }
 
-  // 이미지 업로드 (최대 3장)
+  // 이미지 업로드 (최대 3장) — 실패는 console.error 로 추적, 부분 실패 응답에 포함
   const images = formData.getAll("images") as File[]
-  const hasPhotos = images.length > 0 && images[0].size > 0
+  const uploadErrors: string[] = []
+  let uploadedCount = 0
 
   for (let i = 0; i < Math.min(images.length, 3); i++) {
     const file = images[i]
-    if (!file.size) continue
+    if (!file || file.size === 0) continue
 
     const ext = file.name.split(".").pop()
     const path = `reviews/${review.id}/${Date.now()}_${i}.${ext}`
@@ -118,20 +119,42 @@ export const POST = async (request: Request) => {
       .from("review-images")
       .upload(path, buffer, { contentType: file.type })
 
-    if (!uploadError) {
-      const {
-        data: { publicUrl },
-      } = admin.storage.from("review-images").getPublicUrl(path)
+    if (uploadError) {
+      console.error("[review-image-upload] failed:", {
+        reviewId: review.id,
+        fileName: file.name,
+        error: uploadError.message,
+      })
+      uploadErrors.push(`${file.name}: ${uploadError.message}`)
+      continue
+    }
 
-      await admin.from("review_images").insert({
+    const {
+      data: { publicUrl },
+    } = admin.storage.from("review-images").getPublicUrl(path)
+
+    const { error: insertError } = await admin
+      .from("review_images")
+      .insert({
         review_id: review.id,
         url: publicUrl,
         sort_order: i,
       })
+
+    if (insertError) {
+      console.error("[review-image-row] failed:", {
+        reviewId: review.id,
+        error: insertError.message,
+      })
+      uploadErrors.push(`${file.name}: DB insert failed`)
+      continue
     }
+
+    uploadedCount += 1
   }
 
-  // 포인트 적립
+  // 포인트 적립 — 실제 업로드 성공 카운트 기반 (첨부 의도가 아니라)
+  const hasPhotos = uploadedCount > 0
   const pointReward = hasPhotos ? PHOTO_REVIEW_POINT : TEXT_REVIEW_POINT
   const { data: profile } = await admin
     .from("profiles")
@@ -152,5 +175,11 @@ export const POST = async (request: Request) => {
     })
   }
 
-  return NextResponse.json({ success: true, review_id: review.id, point_reward: pointReward })
+  return NextResponse.json({
+    success: true,
+    review_id: review.id,
+    point_reward: pointReward,
+    uploaded_count: uploadedCount,
+    upload_errors: uploadErrors.length > 0 ? uploadErrors : undefined,
+  })
 }
