@@ -276,7 +276,7 @@ const Header = ({ categories }: HeaderProps) => {
                   {cat.name}
                 </Link>
                 {cat.children.length > 0 && (
-                  <div className="absolute top-full left-0 pt-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="absolute top-full left-0 pt-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[60]">
                     <div className="bg-white rounded-md shadow-lg border border-border/30 py-2 min-w-[140px]">
                       {cat.children.map((child) => (
                         <Link
