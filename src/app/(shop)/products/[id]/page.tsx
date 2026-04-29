@@ -101,6 +101,23 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
 
   if (!product) notFound()
 
+  // 작성 가능 order_item 사전 조회 (로그인 + 현재 상품 × CONFIRMED + 미작성)
+  // 보유 시에만 PDP 리뷰 탭에 "이 상품 리뷰 쓰기" 링크 노출
+  let writableOrderItem: { id: string } | null = null
+  if (user) {
+    const { data } = await supabase
+      .from("order_items")
+      .select("id, orders!inner(user_id, status, created_at)")
+      .eq("product_id", product.id)
+      .eq("orders.user_id", user.id)
+      .eq("orders.status", "CONFIRMED")
+      .eq("is_reviewed", false)
+      .order("created_at", { referencedTable: "orders", ascending: false })
+      .limit(1)
+      .maybeSingle()
+    writableOrderItem = data as { id: string } | null
+  }
+
   // 부모 카테고리 조회
   let parentCategory: { name: string; slug: string } | null = null
   if (product.category?.parent_id) {
@@ -426,14 +443,14 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
 
           {/* 구매후기 */}
           <TabsContent value="reviews" className="mt-6">
-            {user && (
+            {user && writableOrderItem && (
               <div className="flex justify-end mb-4">
                 <Link
-                  href="/mypage/reviews?tab=writable"
+                  href={`/mypage/reviews/write/${writableOrderItem.id}`}
                   className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 underline-offset-2 hover:underline"
                 >
                   <Pencil size={14} strokeWidth={1.5} />
-                  리뷰 작성
+                  이 상품 리뷰 쓰기
                 </Link>
               </div>
             )}
