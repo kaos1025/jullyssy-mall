@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import TopBannerCarousel from "@/components/banners/TopBannerCarousel"
 import type { TopBanner } from "@/lib/banners"
 
 interface Props {
@@ -123,22 +124,29 @@ const BannerForm = ({ banner }: Props) => {
     }
   }
 
+  // 실시간 미리보기용 가짜 banner 객체 (단일 배너 모드)
+  const previewBanner: TopBanner = {
+    id: "preview",
+    emoji: form.emoji.trim() || null,
+    message: form.message.trim() || "미리보기 메시지",
+    link_url: null,
+    variant: form.variant,
+    bg_color: form.bg_color.trim() || null,
+    text_color: form.text_color.trim() || null,
+    is_active: true,
+    starts_at: null,
+    ends_at: null,
+    sort_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
   return (
     <div className="space-y-6">
-      {/* === 미리보기 (Step 1.5에서 TopBanner 컴포넌트로 교체 예정) === */}
       <div>
         <Label className="mb-2 block">미리보기</Label>
-        <div
-          className="px-4 py-2 text-center text-sm rounded"
-          style={{
-            backgroundColor:
-              form.bg_color ||
-              (form.variant === "urgent" ? "#DC2626" : "#1F2937"),
-            color: form.text_color || "#FFFFFF",
-          }}
-        >
-          {form.emoji && <span className="mr-2">{form.emoji}</span>}
-          {form.message || "미리보기 메시지"}
+        <div className="rounded overflow-hidden border">
+          <TopBannerCarousel banners={[previewBanner]} />
         </div>
       </div>
 
