@@ -313,9 +313,9 @@ const Header = ({ categories, eventCategories }: HeaderProps) => {
                 )}
               </div>
             ))}
-            {/* 이벤트 카테고리 (어드민 등록) — 우측 끝 */}
+            {/* 이벤트 카테고리 (어드민 등록) — 카테고리 옆 */}
             {eventCategories.length > 0 && (
-              <div className="ml-auto pl-6 border-l border-border/50 flex items-center gap-2">
+              <div className="ml-2 pl-4 border-l border-border/50 flex items-center gap-2">
                 {eventCategories.map((ec) => (
                   <EventCategoryChip key={ec.id} category={ec} />
                 ))}
