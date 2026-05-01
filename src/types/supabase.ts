@@ -196,6 +196,48 @@ export type Database = {
         }
         Relationships: []
       }
+      event_categories: {
+        Row: {
+          color: string
+          created_at: string
+          display_order: number
+          emoji: string | null
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          link_url: string
+          name: string
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          display_order?: number
+          emoji?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          link_url: string
+          name: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          display_order?: number
+          emoji?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          link_url?: string
+          name?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       naver_category_mappings: {
         Row: {
           category_id: string | null
