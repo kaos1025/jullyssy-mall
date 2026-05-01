@@ -21,13 +21,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useCart } from "@/hooks/use-cart"
 import { useUser } from "@/hooks/use-user"
+import EventCategoryChip from "@/components/events/EventCategoryChip"
 import type { CategoryWithChildren } from "@/types"
+import type { EventCategory } from "@/lib/events-utils"
 
 interface HeaderProps {
   categories: CategoryWithChildren[]
+  eventCategories: EventCategory[]
 }
 
-const Header = ({ categories }: HeaderProps) => {
+const Header = ({ categories, eventCategories }: HeaderProps) => {
   const router = useRouter()
   const itemCount = useCart((s) => s.getItemCount())
   const { user, mounted: authMounted, signOut } = useUser()
@@ -104,6 +107,24 @@ const Header = ({ categories }: HeaderProps) => {
                     </button>
                   )}
                 </>
+              )}
+
+              {/* 이벤트 카테고리 (어드민 등록) */}
+              {eventCategories.length > 0 && (
+                <div className="px-3 py-3 border-b border-border/50 mb-1">
+                  <div className="text-xs text-muted-foreground mb-2 font-medium tracking-kr">
+                    이벤트
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {eventCategories.map((ec) => (
+                      <EventCategoryChip
+                        key={ec.id}
+                        category={ec}
+                        onClick={() => setSheetOpen(false)}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* 전체상품 */}
@@ -292,6 +313,14 @@ const Header = ({ categories }: HeaderProps) => {
                 )}
               </div>
             ))}
+            {/* 이벤트 카테고리 (어드민 등록) — 우측 끝 */}
+            {eventCategories.length > 0 && (
+              <div className="ml-auto pl-6 border-l border-border/50 flex items-center gap-2">
+                {eventCategories.map((ec) => (
+                  <EventCategoryChip key={ec.id} category={ec} />
+                ))}
+              </div>
+            )}
           </nav>
 
           {/* 모바일: 가로 스크롤 */}
@@ -310,6 +339,10 @@ const Header = ({ categories }: HeaderProps) => {
               >
                 {cat.name}
               </Link>
+            ))}
+            {/* 이벤트 카테고리 — 가로 스크롤 끝 */}
+            {eventCategories.map((ec) => (
+              <EventCategoryChip key={ec.id} category={ec} />
             ))}
           </nav>
         </div>

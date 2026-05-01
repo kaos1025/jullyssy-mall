@@ -4,9 +4,10 @@ import { isExternalUrl, type EventCategory } from "@/lib/events-utils"
 interface Props {
   category: Pick<EventCategory, "name" | "emoji" | "color" | "link_url">
   asLink?: boolean
+  onClick?: () => void
 }
 
-const EventCategoryChip = ({ category, asLink = true }: Props) => {
+const EventCategoryChip = ({ category, asLink = true, onClick }: Props) => {
   const { name, emoji, color, link_url } = category
 
   const content = (
@@ -27,6 +28,7 @@ const EventCategoryChip = ({ category, asLink = true }: Props) => {
       href={link_url}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
+      onClick={onClick}
     >
       {content}
     </Link>

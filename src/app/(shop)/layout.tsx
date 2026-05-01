@@ -4,6 +4,7 @@ import MobileNav from "@/components/layout/MobileNav"
 import TopBannerCarousel from "@/components/banners/TopBannerCarousel"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveTopBanners } from "@/lib/banners"
+import { getActiveEventCategories } from "@/lib/events"
 import type { Category } from "@/types"
 
 const ShopLayout = async ({
@@ -13,9 +14,10 @@ const ShopLayout = async ({
 }) => {
   const supabase = await createClient()
 
-  const [{ data: allCategories }, banners] = await Promise.all([
+  const [{ data: allCategories }, banners, eventCategories] = await Promise.all([
     supabase.from("categories").select("*").order("sort_order"),
     getActiveTopBanners(),
+    getActiveEventCategories(),
   ])
 
   // 1depth(부모) + 2depth(자식) 구조화
@@ -28,7 +30,10 @@ const ShopLayout = async ({
   return (
     <div className="min-h-screen flex flex-col">
       <TopBannerCarousel banners={banners} />
-      <Header categories={categoriesWithChildren} />
+      <Header
+        categories={categoriesWithChildren}
+        eventCategories={eventCategories}
+      />
       <main className="flex-1 pb-14 md:pb-0">{children}</main>
       <Footer />
       <MobileNav />
