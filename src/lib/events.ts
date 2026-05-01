@@ -1,34 +1,22 @@
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import type { Database } from "@/types/supabase"
+import type {
+  EventCategory,
+  EventCategoryInsert,
+  EventCategoryUpdate,
+} from "@/lib/events-utils"
 
-export type EventCategory = Database["public"]["Tables"]["event_categories"]["Row"]
-export type EventCategoryInsert =
-  Database["public"]["Tables"]["event_categories"]["Insert"]
-export type EventCategoryUpdate =
-  Database["public"]["Tables"]["event_categories"]["Update"]
-
-// =============================================
-// 검증 헬퍼 (API 라우트/UI에서 공용)
-// =============================================
-
-// #RRGGBB 형식만 허용. 단축형(#RGB)/투명도(#RRGGBBAA) 비허용.
-export const isValidHexColor = (color: string): boolean =>
-  /^#[0-9A-Fa-f]{6}$/.test(color)
-
-// http(s):// 절대 URL이고 호스트가 NEXT_PUBLIC_SITE_URL과 다르면 외부 링크.
-// 상대 경로(/products...)는 내부로 간주. SITE_URL 미설정 시 절대 URL은 보수적으로 외부 처리.
-export const isExternalUrl = (url: string): boolean => {
-  if (!url || !/^https?:\/\//i.test(url)) return false
-  try {
-    const target = new URL(url)
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    if (!siteUrl) return true
-    return target.host !== new URL(siteUrl).host
-  } catch {
-    return false
-  }
-}
+// 단일 import 표면 유지 — 서버 측 호출자는 lib/events에서 모두 가져갈 수 있다.
+// 클라이언트 컴포넌트는 lib/events-utils에서 직접 import (서버 의존성 회피).
+export {
+  isValidHexColor,
+  isExternalUrl,
+} from "@/lib/events-utils"
+export type {
+  EventCategory,
+  EventCategoryInsert,
+  EventCategoryUpdate,
+} from "@/lib/events-utils"
 
 // =============================================
 // 공개용 (anon / RSC)
