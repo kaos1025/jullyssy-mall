@@ -18,6 +18,11 @@ const verifyAdmin = async () => {
 }
 
 export const GET = async (request: NextRequest) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const admin = createAdminClient()
   const { searchParams } = request.nextUrl
   const status = searchParams.get("status") || "ALL"
