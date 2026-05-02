@@ -205,7 +205,7 @@ export type Database = {
           ends_at: string | null
           id: string
           is_active: boolean
-          link_url: string
+          link_url: string | null
           name: string
           starts_at: string | null
           updated_at: string
@@ -218,7 +218,7 @@ export type Database = {
           ends_at?: string | null
           id?: string
           is_active?: boolean
-          link_url: string
+          link_url?: string | null
           name: string
           starts_at?: string | null
           updated_at?: string
@@ -231,12 +231,48 @@ export type Database = {
           ends_at?: string | null
           id?: string
           is_active?: boolean
-          link_url?: string
+          link_url?: string | null
           name?: string
           starts_at?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      event_category_products: {
+        Row: {
+          created_at: string
+          display_order: number
+          event_category_id: string
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          event_category_id: string
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          event_category_id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_category_products_event_category_id_fkey"
+            columns: ["event_category_id"]
+            isOneToOne: false
+            referencedRelation: "event_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_category_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       naver_category_mappings: {
         Row: {

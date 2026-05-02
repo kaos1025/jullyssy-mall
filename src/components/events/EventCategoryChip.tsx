@@ -20,7 +20,7 @@ const EventCategoryChip = ({ category, asLink = true, onClick }: Props) => {
     </span>
   )
 
-  if (!asLink) return content
+  if (!asLink || !link_url) return content
 
   const external = isExternalUrl(link_url)
   return (

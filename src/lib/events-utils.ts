@@ -13,6 +13,57 @@ export type EventCategoryInsert =
 export type EventCategoryUpdate =
   Database["public"]["Tables"]["event_categories"]["Update"]
 
+// =============================================
+// 이벤트 페이지 상품 표시용 합성 타입
+// =============================================
+// event_category_products + products + product_images + product_options + reviews join 결과.
+// ProductCard props와 호환되도록 toProductCardProps()로 변환해 사용.
+export type EventProduct = {
+  display_order: number
+  id: string
+  name: string
+  price: number
+  sale_price: number | null
+  slug: string | null
+  status: string | null
+  created_at: string | null
+  free_shipping: boolean
+  product_images: { url: string; is_thumbnail: boolean | null; sort_order: number | null }[]
+  product_options: { color: string; stock: number | null }[]
+  review_count: number
+  review_avg: number | null
+}
+
+// EventProduct → ProductCard props 변환 (썸네일/이미지/색상/리뷰 추출).
+// ProductCard와 같은 추론 규칙 사용 (is_thumbnail 우선, 색상 unique, 리뷰 평균 1자리).
+export const toProductCardProps = (ep: EventProduct) => {
+  const sortedImages = [...ep.product_images].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  )
+  const thumbnail =
+    sortedImages.find((img) => img.is_thumbnail)?.url ??
+    sortedImages[0]?.url ??
+    null
+  const images = sortedImages.map((img) => img.url)
+  const colors = Array.from(new Set(ep.product_options.map((o) => o.color)))
+
+  return {
+    id: ep.id,
+    name: ep.name,
+    price: ep.price,
+    sale_price: ep.sale_price,
+    thumbnail,
+    images,
+    colors,
+    review_count: ep.review_count,
+    review_avg: ep.review_avg,
+    slug: ep.slug,
+    status: ep.status ?? undefined,
+    created_at: ep.created_at ?? undefined,
+    free_shipping: ep.free_shipping,
+  }
+}
+
 // #RRGGBB 형식만 허용. 단축형(#RGB)/투명도(#RRGGBBAA) 비허용.
 export const isValidHexColor = (color: string): boolean =>
   /^#[0-9A-Fa-f]{6}$/.test(color)
