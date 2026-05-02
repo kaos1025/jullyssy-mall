@@ -82,16 +82,3 @@ export const toProductCardProps = (ep: EventProduct) => {
 export const isValidHexColor = (color: string): boolean =>
   /^#[0-9A-Fa-f]{6}$/.test(color)
 
-// http(s):// 절대 URL이고 호스트가 NEXT_PUBLIC_SITE_URL과 다르면 외부 링크.
-// 상대 경로(/products...)는 내부로 간주. SITE_URL 미설정 시 절대 URL은 보수적으로 외부 처리.
-export const isExternalUrl = (url: string): boolean => {
-  if (!url || !/^https?:\/\//i.test(url)) return false
-  try {
-    const target = new URL(url)
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    if (!siteUrl) return true
-    return target.host !== new URL(siteUrl).host
-  } catch {
-    return false
-  }
-}

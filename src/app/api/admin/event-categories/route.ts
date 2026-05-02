@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
-  getAllEventCategoriesAdmin,
+  getAllEventCategoriesAdminWithCounts,
   createEventCategoryAdmin,
   isValidHexColor,
   type EventCategoryInsert,
@@ -28,7 +28,7 @@ export const GET = async () => {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
   }
 
-  const categories = await getAllEventCategoriesAdmin()
+  const categories = await getAllEventCategoriesAdminWithCounts()
   return NextResponse.json(categories)
 }
 
@@ -43,7 +43,6 @@ export const POST = async (request: NextRequest) => {
     name,
     emoji,
     color,
-    link_url,
     starts_at,
     ends_at,
     display_order,
@@ -73,29 +72,6 @@ export const POST = async (request: NextRequest) => {
   if (typeof color !== "string" || !isValidHexColor(color)) {
     return NextResponse.json(
       { error: "색상은 #RRGGBB 형식이어야 합니다" },
-      { status: 400 }
-    )
-  }
-
-  // link_url 필수
-  if (typeof link_url !== "string" || link_url.trim().length === 0) {
-    return NextResponse.json(
-      { error: "링크 URL을 입력하세요" },
-      { status: 400 }
-    )
-  }
-  if (link_url.length > 500) {
-    return NextResponse.json(
-      { error: "링크 URL은 500자 이내여야 합니다" },
-      { status: 400 }
-    )
-  }
-  // 절대 URL이면 http(s):// 시작, 아니면 / 시작 권장
-  const trimmedUrl = link_url.trim()
-  const isAbsolute = /^https?:\/\//i.test(trimmedUrl)
-  if (!isAbsolute && !trimmedUrl.startsWith("/")) {
-    return NextResponse.json(
-      { error: "링크 URL은 http(s):// 또는 / 로 시작해야 합니다" },
       { status: 400 }
     )
   }
@@ -131,7 +107,7 @@ export const POST = async (request: NextRequest) => {
     name: name.trim(),
     emoji: emoji ?? null,
     color,
-    link_url: trimmedUrl,
+    link_url: null,
     starts_at: starts_at ?? null,
     ends_at: ends_at ?? null,
     display_order: displayOrderValue,

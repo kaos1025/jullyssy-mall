@@ -13,7 +13,6 @@ import type {
 // 클라이언트 컴포넌트는 lib/events-utils에서 직접 import (서버 의존성 회피).
 export {
   isValidHexColor,
-  isExternalUrl,
   toProductCardProps,
 } from "@/lib/events-utils"
 export type {
@@ -65,6 +64,35 @@ export const getAllEventCategoriesAdmin = async (): Promise<EventCategory[]> => 
 
   if (error) throw error
   return data ?? []
+}
+
+// 어드민 리스트용 — 매칭 상품 수 포함.
+// PostgREST nested count 신택스 사용 (event_category_products(count))
+export const getAllEventCategoriesAdminWithCounts = async (): Promise<
+  (EventCategory & { product_count: number })[]
+> => {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("event_categories")
+    .select("*, event_category_products(count)")
+    .order("display_order", { ascending: true })
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+
+  return (data ?? []).map((row) => {
+    // event_category_products: [{ count: N }] 또는 빈 배열
+    const counts = (row as { event_category_products?: { count: number }[] })
+      .event_category_products
+    const product_count = counts?.[0]?.count ?? 0
+    // nested 필드는 응답에서 제거 (타입 호환)
+    const {
+      event_category_products: _ignored,
+      ...rest
+    } = row as EventCategory & { event_category_products?: unknown }
+    void _ignored
+    return { ...rest, product_count }
+  })
 }
 
 export const getEventCategoryByIdAdmin = async (

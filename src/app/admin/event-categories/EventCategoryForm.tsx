@@ -20,7 +20,6 @@ interface FormState {
   name: string
   emoji: string
   color: string
-  link_url: string
   is_active: boolean
   starts_at: string
   ends_at: string
@@ -43,7 +42,6 @@ const EventCategoryForm = ({ category }: Props) => {
     name: category?.name ?? "",
     emoji: category?.emoji ?? "",
     color: category?.color ?? DEFAULT_COLOR,
-    link_url: category?.link_url ?? "",
     is_active: category?.is_active ?? true,
     starts_at: toLocalInput(category?.starts_at),
     ends_at: toLocalInput(category?.ends_at),
@@ -70,18 +68,6 @@ const EventCategoryForm = ({ category }: Props) => {
       })
       return
     }
-    const trimmedUrl = form.link_url.trim()
-    if (!trimmedUrl) {
-      toast({ variant: "destructive", title: "링크 URL을 입력하세요" })
-      return
-    }
-    if (!/^https?:\/\//i.test(trimmedUrl) && !trimmedUrl.startsWith("/")) {
-      toast({
-        variant: "destructive",
-        title: "링크 URL은 http(s):// 또는 / 로 시작해야 합니다",
-      })
-      return
-    }
     if (
       form.starts_at &&
       form.ends_at &&
@@ -98,7 +84,6 @@ const EventCategoryForm = ({ category }: Props) => {
       name: form.name.trim(),
       emoji: form.emoji.trim() || null,
       color: form.color,
-      link_url: trimmedUrl,
       is_active: form.is_active,
       starts_at: toIsoOrNull(form.starts_at),
       ends_at: toIsoOrNull(form.ends_at),
@@ -134,12 +119,11 @@ const EventCategoryForm = ({ category }: Props) => {
     }
   }
 
-  // 실시간 미리보기용 가짜 객체
+  // 실시간 미리보기용 가짜 객체 (asLink={false}이므로 id 불필요)
   const previewCategory = {
     name: form.name.trim() || "이벤트 이름",
     emoji: form.emoji.trim() || null,
     color: isValidHexColor(form.color) ? form.color : DEFAULT_COLOR,
-    link_url: form.link_url || "/",
   }
 
   return (
@@ -207,27 +191,6 @@ const EventCategoryForm = ({ category }: Props) => {
         <p className="text-xs text-muted-foreground mt-1">
           #RRGGBB 형식 (단축형 #FFF 비허용)
         </p>
-      </div>
-
-      {/* 링크 URL (필수) */}
-      <div>
-        <Label htmlFor="link_url">링크 URL *</Label>
-        <Input
-          id="link_url"
-          maxLength={500}
-          placeholder="/products?search=봄코디"
-          value={form.link_url}
-          onChange={(e) => updateForm("link_url", e.target.value)}
-        />
-        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-          <p>
-            내부 페이지: <code>/products?search=봄코디</code> (상품 검색) 또는{" "}
-            <code>/events/봄코디</code>
-          </p>
-          <p>
-            외부 링크: <code>https://example.com</code> (자동으로 새 탭에서 열림)
-          </p>
-        </div>
       </div>
 
       {/* 활성화 */}

@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast"
 import EventCategoryChip from "@/components/events/EventCategoryChip"
 import type { EventCategory } from "@/lib/events-utils"
 
+type EventCategoryWithCount = EventCategory & { product_count: number }
+
 const formatPeriod = (cat: EventCategory): string => {
   const { starts_at, ends_at } = cat
   if (!starts_at && !ends_at) return "상시"
@@ -36,7 +38,7 @@ const formatPeriod = (cat: EventCategory): string => {
 const AdminEventCategoriesPage = () => {
   const router = useRouter()
   const { toast } = useToast()
-  const [categories, setCategories] = useState<EventCategory[]>([])
+  const [categories, setCategories] = useState<EventCategoryWithCount[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchCategories = useCallback(async () => {
@@ -53,7 +55,7 @@ const AdminEventCategoriesPage = () => {
       setLoading(false)
       return
     }
-    const data = (await res.json()) as EventCategory[]
+    const data = (await res.json()) as EventCategoryWithCount[]
     setCategories(data)
     setLoading(false)
   }, [toast])
@@ -62,7 +64,7 @@ const AdminEventCategoriesPage = () => {
     fetchCategories()
   }, [fetchCategories])
 
-  const handleToggleActive = async (cat: EventCategory, next: boolean) => {
+  const handleToggleActive = async (cat: EventCategoryWithCount, next: boolean) => {
     setCategories((prev) =>
       prev.map((c) => (c.id === cat.id ? { ...c, is_active: next } : c))
     )
@@ -88,7 +90,7 @@ const AdminEventCategoriesPage = () => {
     toast({ title: next ? "활성화됨" : "비활성화됨" })
   }
 
-  const handleDelete = async (cat: EventCategory) => {
+  const handleDelete = async (cat: EventCategoryWithCount) => {
     if (!confirm(`"${cat.name}" 이벤트 카테고리를 삭제하시겠습니까?`)) return
 
     const res = await fetch(`/api/admin/event-categories/${cat.id}`, {
@@ -127,7 +129,7 @@ const AdminEventCategoriesPage = () => {
               <th className="p-3 text-center w-20">활성</th>
               <th className="p-3 text-left w-48">미리보기</th>
               <th className="p-3 text-left">이름</th>
-              <th className="p-3 text-left hidden md:table-cell">링크</th>
+              <th className="p-3 text-center w-24 hidden md:table-cell">매칭</th>
               <th className="p-3 text-left hidden lg:table-cell">노출 기간</th>
               <th className="p-3 text-center w-32">액션</th>
             </tr>
@@ -174,9 +176,15 @@ const AdminEventCategoriesPage = () => {
                     <EventCategoryChip category={cat} asLink={false} />
                   </td>
                   <td className="p-3">{cat.name}</td>
-                  <td className="p-3 hidden md:table-cell max-w-[200px]">
-                    <span className="truncate text-muted-foreground text-xs block">
-                      {cat.link_url}
+                  <td className="p-3 text-center hidden md:table-cell">
+                    <span
+                      className={`text-xs ${
+                        cat.product_count === 0
+                          ? "text-muted-foreground/60"
+                          : "font-medium"
+                      }`}
+                    >
+                      {cat.product_count}건
                     </span>
                   </td>
                   <td className="p-3 hidden lg:table-cell text-xs text-muted-foreground">

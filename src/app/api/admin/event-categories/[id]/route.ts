@@ -93,30 +93,7 @@ export const PATCH = async (
     updateData.color = body.color
   }
 
-  // link_url (NOT NULL)
-  if (body.link_url !== undefined) {
-    if (typeof body.link_url !== "string" || body.link_url.trim().length === 0) {
-      return NextResponse.json(
-        { error: "링크 URL을 입력하세요" },
-        { status: 400 }
-      )
-    }
-    if (body.link_url.length > 500) {
-      return NextResponse.json(
-        { error: "링크 URL은 500자 이내여야 합니다" },
-        { status: 400 }
-      )
-    }
-    const trimmedUrl = body.link_url.trim()
-    const isAbsolute = /^https?:\/\//i.test(trimmedUrl)
-    if (!isAbsolute && !trimmedUrl.startsWith("/")) {
-      return NextResponse.json(
-        { error: "링크 URL은 http(s):// 또는 / 로 시작해야 합니다" },
-        { status: 400 }
-      )
-    }
-    updateData.link_url = trimmedUrl
-  }
+  // link_url은 PROMO-3에서 사용하지 않음 — body에 들어와도 무시 (NULLABLE 컬럼은 P2 재활용 대비 유지)
 
   // is_active
   if (body.is_active !== undefined) {
