@@ -5,6 +5,7 @@ import type {
   EventCategoryInsert,
   EventCategoryUpdate,
   EventProduct,
+  AdminEventProductRow,
 } from "@/lib/events-utils"
 
 // 단일 import 표면 유지 — 서버 측 호출자는 lib/events에서 모두 가져갈 수 있다.
@@ -19,6 +20,7 @@ export type {
   EventCategoryInsert,
   EventCategoryUpdate,
   EventProduct,
+  AdminEventProductRow,
 } from "@/lib/events-utils"
 
 // =============================================
@@ -248,16 +250,6 @@ export const getEventCategoryWithProducts = async (
 // =============================================
 // 어드민 매칭 (service role, RLS 우회)
 // =============================================
-
-export type AdminEventProductRow = {
-  product_id: string
-  display_order: number
-  name: string
-  thumbnail_url: string | null
-  price: number
-  sale_price: number | null
-  status: string | null
-}
 
 // 어드민 매칭 페이지용 — 비활성/품절 상품도 노출 (운영자 확인 필요).
 export const getEventCategoryProductsAdmin = async (

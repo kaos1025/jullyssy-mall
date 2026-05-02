@@ -34,6 +34,17 @@ export type EventProduct = {
   review_avg: number | null
 }
 
+// 어드민 매칭 페이지용 row (비활성/품절 포함) — 서버 헬퍼와 클라이언트 모두 공용.
+export type AdminEventProductRow = {
+  product_id: string
+  display_order: number
+  name: string
+  thumbnail_url: string | null
+  price: number
+  sale_price: number | null
+  status: string | null
+}
+
 // EventProduct → ProductCard props 변환 (썸네일/이미지/색상/리뷰 추출).
 // ProductCard와 같은 추론 규칙 사용 (is_thumbnail 우선, 색상 unique, 리뷰 평균 1자리).
 export const toProductCardProps = (ep: EventProduct) => {
