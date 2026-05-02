@@ -34,6 +34,9 @@ export type EventProduct = {
   review_avg: number | null
 }
 
+// 이벤트 페이지 정렬 옵션
+export type EventProductSort = "admin" | "newest" | "price_asc"
+
 // 어드민 매칭 페이지용 row (비활성/품절 포함) — 서버 헬퍼와 클라이언트 모두 공용.
 export type AdminEventProductRow = {
   product_id: string

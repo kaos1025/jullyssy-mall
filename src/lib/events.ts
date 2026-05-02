@@ -6,6 +6,7 @@ import type {
   EventCategoryUpdate,
   EventProduct,
   AdminEventProductRow,
+  EventProductSort,
 } from "@/lib/events-utils"
 
 // 단일 import 표면 유지 — 서버 측 호출자는 lib/events에서 모두 가져갈 수 있다.
@@ -21,6 +22,7 @@ export type {
   EventCategoryUpdate,
   EventProduct,
   AdminEventProductRow,
+  EventProductSort,
 } from "@/lib/events-utils"
 
 // =============================================
@@ -122,8 +124,6 @@ export const deleteEventCategoryAdmin = async (id: string): Promise<void> => {
 // =============================================
 // 이벤트 페이지 (anon, RLS 자동 필터)
 // =============================================
-
-export type EventProductSort = "admin" | "newest" | "price_asc"
 
 // 이벤트 카테고리 + 매칭 상품 SSR 조회.
 // 카테고리 비활성/기간 외 → null (404 트리거). 매칭 0건은 빈 products 배열.
