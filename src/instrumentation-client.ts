@@ -12,7 +12,7 @@ Sentry.init({
   tracesSampleRate: 0.1,
   enableLogs: false,
   sendDefaultPii: false,
-  debug: true,
+  debug: false,
   beforeSend: sanitizeEvent,
   ignoreErrors: [
     "ResizeObserver loop limit exceeded",
