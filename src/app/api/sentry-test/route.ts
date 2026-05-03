@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 
 /**
  * Sentry 통합 검증용 일회성 테스트 라우트.
@@ -7,6 +8,12 @@ import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 export async function GET() {
+  Sentry.captureMessage("Sentry test message - explicit capture", "error")
+  Sentry.captureException(
+    new Error("Sentry test exception - explicit capture")
+  )
+  await Sentry.flush(2000)
+
   throw new Error("Sentry integration test - safe to ignore")
   return NextResponse.json({ ok: true })
 }
