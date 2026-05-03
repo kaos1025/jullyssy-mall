@@ -29,7 +29,32 @@
       "Read(//c/Program Files \\(x86\\)/GitHub CLI/**)",
       "Read(//c/Users/**)",
       "Bash(/c/Program Files/GitHub CLI/gh.exe auth:*)",
-      "Bash('/c/Program Files/GitHub CLI/gh.exe' pr create --title 'feat\\(order\\): 주문 취소 기능 및 UX 개선' --body ':*)"
+      "Bash('/c/Program Files/GitHub CLI/gh.exe' pr create --title 'feat\\(order\\): 주문 취소 기능 및 UX 개선' --body ':*)",
+      "Bash(echo \"TSC_EXIT:$?\")",
+      "Bash(curl -i -s -o - --max-time 60 \"http://localhost:3001/mypage/reviews?tab=written\")",
+      "Bash(npx supabase *)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__generate_typescript_types",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"tsc=$?\")",
+      "Bash(curl -i -s http://localhost:3000/api/admin/banners)",
+      "Bash(TZ=Asia/Seoul node *)",
+      "Bash(curl -i -s -o /dev/null -w \"GET /admin/banners → %{http_code} → location: %{redirect_url}\\\\n\" http://localhost:3000/admin/banners)",
+      "Bash(curl -i -s -o /dev/null -w \"GET /admin/banners → HTTP %{http_code} \\(loc: %{redirect_url}\\)\\\\n\" http://localhost:3002/admin/banners)",
+      "Bash(curl -i -s http://localhost:3002/api/admin/banners)",
+      "Bash(curl *)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(echo \"LINT_EXIT=$?\")",
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "Bash(netstat -ano)",
+      "Bash(echo \"TSC=$?\")",
+      "Bash(echo \"LINT=$?\")",
+      "Bash(echo \"BUILD=$?\")"
     ]
   }
 }
