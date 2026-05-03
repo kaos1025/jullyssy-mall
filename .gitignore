@@ -42,3 +42,6 @@ e2e/.auth/
 
 # oh-my-claudecode session state
 .omc/
+
+# Sentry Config File
+.env.sentry-build-plugin
