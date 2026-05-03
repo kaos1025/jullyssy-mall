@@ -107,6 +107,12 @@ ADMIN_EMAILS=your@email.com
 # 네이버 커머스 API (선택)
 NAVER_COMMERCE_CLIENT_ID=your_client_id
 NAVER_COMMERCE_CLIENT_SECRET=your_client_secret\$your_secret
+
+# Sentry (에러 모니터링, production 활성)
+NEXT_PUBLIC_SENTRY_DSN=https://[key]@o[org-id].ingest.us.sentry.io/[project-id]
+SENTRY_AUTH_TOKEN=sntrys_xxxxxxx
+SENTRY_ORG=jullyssy
+SENTRY_PROJECT=javascript-nextjs
 ```
 
 > ⚠️ `$` 포함된 시크릿은 `.env.local`에서 `\$`로 이스케이프 필요
