@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
+import { adminEmails } from "@/lib/env"
 
 const protectedPaths = ["/mypage", "/checkout"]
 const authPaths = ["/login", "/signup"]
@@ -17,10 +18,6 @@ export const middleware = async (request: NextRequest) => {
       url.searchParams.set("redirect", pathname)
       return NextResponse.redirect(url)
     }
-
-    const adminEmails = (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
 
     if (!adminEmails.includes(user.email?.toLowerCase() || "")) {
       const url = request.nextUrl.clone()

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server"
 import { timingSafeEqual } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { paymentsLimiter } from "@/lib/rate-limit/limiters"
 
 const maskKey = (key: string): string => {
   if (key.length <= 8) return "***"
   return `${key.slice(0, 4)}***${key.slice(-4)}`
 }
 
-export const POST = async (request: Request) => {
+const postHandler = async (request: Request) => {
   const body = await request.json()
   const { eventType, data } = body ?? {}
 
@@ -83,3 +85,5 @@ export const POST = async (request: Request) => {
 
   return NextResponse.json({ success: true })
 }
+
+export const POST = withRateLimit(paymentsLimiter, postHandler)
