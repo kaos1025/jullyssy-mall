@@ -65,3 +65,11 @@ export function validateEnv() {
 export const kvRestApiUrl = process.env.KV_REST_API_URL || ""
 export const kvRestApiToken = process.env.KV_REST_API_TOKEN || ""
 export const isRateLimitEnabled = Boolean(kvRestApiUrl && kvRestApiToken)
+
+// 어드민 이메일 화이트리스트 — 단일 진입점 (외부에서 process.env.ADMIN_EMAILS 직접 참조 금지)
+// 모듈 로드 시점 1회 파싱 (env 변경 시 서버 재시작 필요)
+// 누락 시 빈 배열 → 모든 어드민 접근 거부 (closed by default)
+// production throw 분기는 일부러 두지 않음 (production /admin curl 검증 미확정 — 안전 우선)
+export const adminEmails: string[] = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
