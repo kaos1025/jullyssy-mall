@@ -5,7 +5,7 @@ import { redis } from "./redis"
  * 라우트 그룹별 rate limit 인스턴스.
  *
  * 한도 결정 근거:
- * - payments: Toss 콜백 재시도 충돌 방지를 위한 여유 (10/min)
+ * - payments: Toss 콜백 재시도 충돌 방지를 위한 여유 (30/min)
  * - auth: OAuth callback redirect chain 흡수 (20/min)
  * - admin: 와이프 운영자 단일 IP 대량 작업 허용 (60/min)
  * - reviews: 작성 스팸 방지 (5/min)
@@ -35,7 +35,7 @@ const createLimiter = (
   })
 }
 
-export const paymentsLimiter = createLimiter("payments", 10, 60)
+export const paymentsLimiter = createLimiter("payments", 30, 60)
 export const authLimiter = createLimiter("auth", 20, 60)
 export const adminLimiter = createLimiter("admin", 60, 60)
 export const reviewsLimiter = createLimiter("reviews", 5, 60)
