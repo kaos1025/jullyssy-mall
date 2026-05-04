@@ -500,6 +500,7 @@ export type Database = {
           order_id: string
           payment_key: string | null
           raw_response: Json | null
+          secret: string | null
           status: string | null
         }
         Insert: {
@@ -511,6 +512,7 @@ export type Database = {
           order_id: string
           payment_key?: string | null
           raw_response?: Json | null
+          secret?: string | null
           status?: string | null
         }
         Update: {
@@ -522,6 +524,7 @@ export type Database = {
           order_id?: string
           payment_key?: string | null
           raw_response?: Json | null
+          secret?: string | null
           status?: string | null
         }
         Relationships: [
