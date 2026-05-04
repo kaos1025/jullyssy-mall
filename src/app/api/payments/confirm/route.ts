@@ -51,6 +51,7 @@ export const GET = async (request: Request) => {
       status: "DONE",
       raw_response: tossData,
       approved_at: tossData.approvedAt,
+      secret: (tossData.secret as string | undefined) ?? null,
     })
 
     await admin
