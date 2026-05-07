@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const POST = async (
+const postHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -40,3 +42,5 @@ export const POST = async (
 
   return NextResponse.json({ success: true })
 }
+
+export const POST = withRateLimit(adminLimiter, postHandler)

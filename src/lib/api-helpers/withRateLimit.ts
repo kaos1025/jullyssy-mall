@@ -2,7 +2,12 @@ import type { Ratelimit } from "@upstash/ratelimit"
 import { getClientIp } from "./getClientIp"
 import { rateLimitErrorResponse } from "./handleRateLimitError"
 
-type RouteHandler = (request: Request, ...args: unknown[]) => Promise<Response>
+// Request 타입과 dynamic route params 인자를 모두 통과시키기 위해 generic 사용.
+// NextRequest 핸들러 + { params } 시그니처를 그대로 받아 wrapper 결과도 동일 시그니처로 노출.
+type RouteHandler<
+  TReq extends Request = Request,
+  TArgs extends unknown[] = unknown[],
+> = (request: TReq, ...args: TArgs) => Promise<Response>
 
 /**
  * 식별자 마스킹 (로그 노출 최소화).
@@ -32,13 +37,16 @@ const maskIdentifier = (id: string): string => {
  * Sentry 통합은 main 베이스라 console.warn 임시 사용.
  * TODO(rate-limit-rebase): Sentry.captureMessage로 교체.
  */
-export const withRateLimit = (
+export const withRateLimit = <
+  TReq extends Request,
+  TArgs extends unknown[],
+>(
   limiter: Ratelimit | null,
-  handler: RouteHandler,
+  handler: RouteHandler<TReq, TArgs>,
   options?: {
-    identifier?: (request: Request) => Promise<string> | string
+    identifier?: (request: TReq) => Promise<string> | string
   }
-): RouteHandler => {
+): RouteHandler<TReq, TArgs> => {
   return async (request, ...args) => {
     if (!limiter) {
       return handler(request, ...args)

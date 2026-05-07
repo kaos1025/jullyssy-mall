@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const GET = async (request: NextRequest) => {
+const getHandler = async (request: NextRequest) => {
   const user = await verifyAdmin()
   if (!user) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -44,3 +46,5 @@ export const GET = async (request: NextRequest) => {
 
   return NextResponse.json(data || [])
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)

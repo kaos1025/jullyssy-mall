@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import {
   getAllTopBannersAdmin,
   createTopBannerAdmin,
@@ -9,7 +11,7 @@ import {
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/
 const ALLOWED_VARIANTS = ["normal", "urgent"] as const
 
-export const GET = async () => {
+const getHandler = async () => {
   const adminUser = await verifyAdmin()
   if (!adminUser) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -19,7 +21,7 @@ export const GET = async () => {
   return NextResponse.json(banners)
 }
 
-export const POST = async (request: NextRequest) => {
+const postHandler = async (request: NextRequest) => {
   const adminUser = await verifyAdmin()
   if (!adminUser) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -146,3 +148,6 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)
+export const POST = withRateLimit(adminLimiter, postHandler)

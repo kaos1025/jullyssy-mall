@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const PATCH = async (
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -41,3 +43,5 @@ export const PATCH = async (
 
   return NextResponse.json(data)
 }
+
+export const PATCH = withRateLimit(adminLimiter, patchHandler)

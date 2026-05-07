@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { updateEventCategoryProductOrderAdmin } from "@/lib/events"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export const PATCH = async (
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -75,3 +77,5 @@ export const PATCH = async (
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const PATCH = withRateLimit(adminLimiter, patchHandler)
