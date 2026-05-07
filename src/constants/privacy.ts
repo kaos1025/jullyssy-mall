@@ -53,6 +53,7 @@ export const PRIVACY_POLICY: TermsArticle[] = [
     items: [
       "토스페이먼츠: 결제 처리 및 결제 도용 방지",
       "CJ대한통운: 상품 배송",
+      "Upstash, Inc.: API 요청 빈도 제한(rate limiting) — 처리 항목: IP 주소·User-Agent / 보유 기간: 60초(rate limit 윈도우 만료 시 자동 삭제) / 이전 국가: 미국",
       "몰은 위탁계약 시 개인정보가 안전하게 관리될 수 있도록 필요한 사항을 규정하고 있으며, 위탁업무의 내용이나 수탁자가 변경될 경우 지체 없이 본 개인정보처리방침을 통하여 공개하겠습니다.",
     ],
   },
