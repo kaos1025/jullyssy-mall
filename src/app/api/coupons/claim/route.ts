@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { couponsLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const POST = async (request: NextRequest) => {
+const postHandler = async (request: NextRequest) => {
   const supabase = await createClient()
   const {
     data: { user },
@@ -81,3 +83,5 @@ export const POST = async (request: NextRequest) => {
     user_coupon_id: inserted.id,
   })
 }
+
+export const POST = withRateLimit(couponsLimiter, postHandler)
