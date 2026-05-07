@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { ordersLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { cancelOrder } from "@/lib/order/cancel-order"
 
-export const POST = async (
+const postHandler = async (
   _request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -43,3 +45,5 @@ export const POST = async (
 
   return NextResponse.json({ success: true })
 }
+
+export const POST = withRateLimit(ordersLimiter, postHandler)

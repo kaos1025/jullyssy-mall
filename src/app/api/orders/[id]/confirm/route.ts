@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { ordersLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const POINT_RATE = 0.01 // 1%
 
-export const POST = async (
+const postHandler = async (
   _request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -72,3 +74,5 @@ export const POST = async (
 
   return NextResponse.json({ success: true, point_reward: pointReward })
 }
+
+export const POST = withRateLimit(ordersLimiter, postHandler)
