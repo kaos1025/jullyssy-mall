@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const GET = async () => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const admin = createAdminClient()
 
   // 매핑 목록 + 연결된 쥴리씨 카테고리 정보
@@ -24,6 +30,11 @@ export const GET = async () => {
 }
 
 export const POST = async (request: NextRequest) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const admin = createAdminClient()
   const { mappings } = await request.json() as {
     mappings: { id: string; category_id: string | null }[]

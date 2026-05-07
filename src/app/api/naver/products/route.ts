@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
 
@@ -15,6 +16,11 @@ interface NaverSearchItem {
 }
 
 export const GET = async (request: NextRequest) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const { searchParams } = request.nextUrl
   const page = parseInt(searchParams.get("page") || "1", 10)
   const size = parseInt(searchParams.get("size") || "100", 10)
