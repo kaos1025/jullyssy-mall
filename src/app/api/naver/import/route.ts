@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
 
@@ -219,6 +220,11 @@ const importSingleProduct = async (
 }
 
 export const POST = async (request: NextRequest) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const admin = createAdminClient()
   const body = await request.json()
 

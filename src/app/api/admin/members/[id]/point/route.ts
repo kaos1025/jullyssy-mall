@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const POST = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const admin = createAdminClient()
   const { amount, reason, currentPoint } = await request.json()
   const userId = params.id
