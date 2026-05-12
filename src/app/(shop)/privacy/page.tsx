@@ -12,7 +12,7 @@ const PrivacyPage = () => {
     <div className="max-w-3xl mx-auto px-4 py-12">
       <h1 className="text-2xl font-bold mb-2">개인정보처리방침</h1>
       <p className="text-sm text-muted-foreground mb-8">
-        시행일: 2026년 4월 1일
+        시행일: 2026년 5월 20일 (갱신일: 2026년 5월 13일)
       </p>
 
       {PRIVACY_POLICY.map((article) => (
