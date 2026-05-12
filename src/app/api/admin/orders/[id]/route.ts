@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { cancelOrder } from "@/lib/order/cancel-order"
 
-export const PATCH = async (
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
+  const user = await verifyAdmin()
+  if (!user) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
+  }
+
   const admin = createAdminClient()
   const body = await request.json()
   const orderId = params.id
@@ -42,3 +50,5 @@ export const PATCH = async (
 
   return NextResponse.json({ success: true })
 }
+
+export const PATCH = withRateLimit(adminLimiter, patchHandler)

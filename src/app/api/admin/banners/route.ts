@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import {
   getAllTopBannersAdmin,
   createTopBannerAdmin,
@@ -9,22 +11,7 @@ import {
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/
 const ALLOWED_VARIANTS = ["normal", "urgent"] as const
 
-const verifyAdmin = async () => {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const adminEmails = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-
-  if (!adminEmails.includes(user.email?.toLowerCase() || "")) return null
-  return user
-}
-
-export const GET = async () => {
+const getHandler = async () => {
   const adminUser = await verifyAdmin()
   if (!adminUser) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -34,7 +21,7 @@ export const GET = async () => {
   return NextResponse.json(banners)
 }
 
-export const POST = async (request: NextRequest) => {
+const postHandler = async (request: NextRequest) => {
   const adminUser = await verifyAdmin()
   if (!adminUser) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -161,3 +148,6 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)
+export const POST = withRateLimit(adminLimiter, postHandler)

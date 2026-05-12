@@ -1,23 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-const verifyAdmin = async () => {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const adminEmails = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-
-  if (!adminEmails.includes(user.email?.toLowerCase() || "")) return null
-  return user
-}
-
-export const POST = async (
+const postHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -98,3 +85,5 @@ export const POST = async (
     skipped: alreadyIssued.size,
   })
 }
+
+export const POST = withRateLimit(adminLimiter, postHandler)

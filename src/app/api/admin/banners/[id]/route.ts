@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import {
   getTopBannerByIdAdmin,
   updateTopBannerAdmin,
@@ -10,22 +12,7 @@ import {
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/
 const ALLOWED_VARIANTS = ["normal", "urgent"] as const
 
-const verifyAdmin = async () => {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const adminEmails = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-
-  if (!adminEmails.includes(user.email?.toLowerCase() || "")) return null
-  return user
-}
-
-export const GET = async (
+const getHandler = async (
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -44,7 +31,7 @@ export const GET = async (
   return NextResponse.json(banner)
 }
 
-export const PATCH = async (
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -200,7 +187,7 @@ export const PATCH = async (
   }
 }
 
-export const DELETE = async (
+const deleteHandler = async (
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -217,3 +204,7 @@ export const DELETE = async (
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)
+export const PATCH = withRateLimit(adminLimiter, patchHandler)
+export const DELETE = withRateLimit(adminLimiter, deleteHandler)

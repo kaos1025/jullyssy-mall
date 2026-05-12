@@ -46,4 +46,35 @@ export function validateEnv() {
       )
     }
   }
+
+  // Upstash Redis (rate limiting) — Vercel Marketplace 자동 주입
+  // VERCEL_ENV === "production"만 강제 검증. preview/dev는 fail-open.
+  if (process.env.VERCEL_ENV === "production") {
+    if (!process.env.KV_REST_API_URL) {
+      throw new Error(
+        "❌ 프로덕션에서 KV_REST_API_URL이 누락되었습니다. (Vercel Marketplace Upstash for Redis 통합 필요)"
+      )
+    }
+    if (!process.env.KV_REST_API_TOKEN) {
+      throw new Error(
+        "❌ 프로덕션에서 KV_REST_API_TOKEN이 누락되었습니다. (Vercel Marketplace Upstash for Redis 통합 필요)"
+      )
+    }
+  }
 }
+
+// KV 환경변수 export — 단일 진입점 원칙 (외부에서 process.env.KV_* 직접 참조 금지)
+// VERCEL_ENV !== "production" 이거나 누락 시: 빈 문자열 → isRateLimitEnabled=false → 호출부 fail-open
+// VERCEL_ENV === "production" 누락 시: validateEnv()가 instrumentation에서 throw
+//   (try/catch로 감싸 있어 SDK init 자체는 보호됨, Day 13 학습)
+export const kvRestApiUrl = process.env.KV_REST_API_URL || ""
+export const kvRestApiToken = process.env.KV_REST_API_TOKEN || ""
+export const isRateLimitEnabled = Boolean(kvRestApiUrl && kvRestApiToken)
+
+// 어드민 이메일 화이트리스트 — 단일 진입점 (외부에서 process.env.ADMIN_EMAILS 직접 참조 금지)
+// 모듈 로드 시점 1회 파싱 (env 변경 시 서버 재시작 필요)
+// 누락 시 빈 배열 → 모든 어드민 접근 거부 (closed by default)
+// production throw 분기는 일부러 두지 않음 (production /admin curl 검증 미확정 — 안전 우선)
+export const adminEmails: string[] = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())

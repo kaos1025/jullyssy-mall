@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { paymentsLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const GET = async (request: Request) => {
+const getHandler = async (request: Request) => {
   const { searchParams, origin } = new URL(request.url)
   const paymentKey = searchParams.get("paymentKey")
   const orderId = searchParams.get("orderId")
@@ -51,6 +53,7 @@ export const GET = async (request: Request) => {
       status: "DONE",
       raw_response: tossData,
       approved_at: tossData.approvedAt,
+      secret: (tossData.secret as string | undefined) ?? null,
     })
 
     await admin
@@ -181,3 +184,5 @@ const handlePaymentFailure = async (
     raw_response: failureData || null,
   })
 }
+
+export const GET = withRateLimit(paymentsLimiter, getHandler)

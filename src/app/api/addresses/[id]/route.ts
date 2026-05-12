@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { ordersLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 
 const getUser = async () => {
@@ -9,7 +11,7 @@ const getUser = async () => {
   return { supabase, user }
 }
 
-export const PUT = async (
+const putHandler = async (
   request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -61,7 +63,7 @@ export const PUT = async (
   return NextResponse.json(data)
 }
 
-export const DELETE = async (
+const deleteHandler = async (
   _request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -116,7 +118,7 @@ export const DELETE = async (
   return NextResponse.json({ success: true })
 }
 
-export const PATCH = async (
+const patchHandler = async (
   _request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -147,3 +149,7 @@ export const PATCH = async (
 
   return NextResponse.json(data)
 }
+
+export const PUT = withRateLimit(ordersLimiter, putHandler)
+export const DELETE = withRateLimit(ordersLimiter, deleteHandler)
+export const PATCH = withRateLimit(ordersLimiter, patchHandler)
