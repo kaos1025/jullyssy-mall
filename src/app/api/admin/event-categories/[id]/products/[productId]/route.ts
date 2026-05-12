@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { removeEventCategoryProductAdmin } from "@/lib/events"
 
-export const DELETE = async (
+const deleteHandler = async (
   _request: NextRequest,
   { params }: { params: { id: string; productId: string } }
 ) => {
@@ -19,3 +21,5 @@ export const DELETE = async (
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const DELETE = withRateLimit(adminLimiter, deleteHandler)

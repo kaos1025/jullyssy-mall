@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import {
   getAllEventCategoriesAdminWithCounts,
   createEventCategoryAdmin,
@@ -7,7 +9,7 @@ import {
   type EventCategoryInsert,
 } from "@/lib/events"
 
-export const GET = async () => {
+const getHandler = async () => {
   const adminUser = await verifyAdmin()
   if (!adminUser) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -17,7 +19,7 @@ export const GET = async () => {
   return NextResponse.json(categories)
 }
 
-export const POST = async (request: NextRequest) => {
+const postHandler = async (request: NextRequest) => {
   const adminUser = await verifyAdmin()
   if (!adminUser) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -107,3 +109,6 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)
+export const POST = withRateLimit(adminLimiter, postHandler)

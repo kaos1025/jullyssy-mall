@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const GET = async (request: NextRequest) => {
+const getHandler = async (request: NextRequest) => {
   const user = await verifyAdmin()
   if (!user) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -85,7 +87,7 @@ export const GET = async (request: NextRequest) => {
   return NextResponse.json({ products, categories: allCategories || [], totalCount })
 }
 
-export const POST = async (request: Request) => {
+const postHandler = async (request: Request) => {
   const user = await verifyAdmin()
   if (!user) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -195,3 +197,6 @@ export const POST = async (request: Request) => {
     return NextResponse.json({ error: "상품 등록 실패" }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)
+export const POST = withRateLimit(adminLimiter, postHandler)

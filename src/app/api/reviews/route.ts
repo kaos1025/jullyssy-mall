@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { reviewsLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
@@ -22,7 +24,7 @@ const pickTag = (
     : null
 }
 
-export const POST = async (request: Request) => {
+const postHandler = async (request: Request) => {
   const supabase = await createClient()
   const admin = createAdminClient()
 
@@ -183,3 +185,5 @@ export const POST = async (request: Request) => {
     upload_errors: uploadErrors.length > 0 ? uploadErrors : undefined,
   })
 }
+
+export const POST = withRateLimit(reviewsLimiter, postHandler)

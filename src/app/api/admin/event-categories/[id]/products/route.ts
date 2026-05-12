@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import {
   getEventCategoryProductsAdmin,
   addEventCategoryProductsAdmin,
@@ -7,7 +9,7 @@ import {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export const GET = async (
+const getHandler = async (
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -25,7 +27,7 @@ export const GET = async (
   }
 }
 
-export const POST = async (
+const postHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
@@ -69,3 +71,6 @@ export const POST = async (
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(adminLimiter, getHandler)
+export const POST = withRateLimit(adminLimiter, postHandler)

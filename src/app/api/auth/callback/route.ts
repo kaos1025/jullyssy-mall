@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { authLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 
-export const GET = async (request: Request) => {
+const getHandler = async (request: Request) => {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
   const redirect = searchParams.get("redirect") || "/"
@@ -17,3 +19,5 @@ export const GET = async (request: Request) => {
 
   return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 }
+
+export const GET = withRateLimit(authLimiter, getHandler)

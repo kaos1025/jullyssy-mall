@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
+import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
+import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const PUT = async (
+const putHandler = async (
   request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -142,7 +144,7 @@ export const PUT = async (
   }
 }
 
-export const PATCH = async (
+const patchHandler = async (
   request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -184,7 +186,7 @@ export const PATCH = async (
   }
 }
 
-export const DELETE = async (
+const deleteHandler = async (
   _request: Request,
   { params }: { params: { id: string } }
 ) => {
@@ -206,3 +208,7 @@ export const DELETE = async (
 
   return NextResponse.json({ success: true })
 }
+
+export const PUT = withRateLimit(adminLimiter, putHandler)
+export const PATCH = withRateLimit(adminLimiter, patchHandler)
+export const DELETE = withRateLimit(adminLimiter, deleteHandler)
