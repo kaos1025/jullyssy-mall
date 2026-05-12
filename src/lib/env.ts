@@ -15,8 +15,13 @@ export function validateEnv() {
     )
   }
 
-  // 프로덕션에서 테스트 키 사용 방지
-  if (process.env.NODE_ENV === "production") {
+  // 진짜 프로덕션(Vercel production)에서만 테스트 키 사용 방지
+  // - Vercel preview는 NODE_ENV=production이지만 VERCEL_ENV=preview (test 키 정상)
+  // - VERCEL_ENV 미정의 + NODE_ENV=production = 비-Vercel 빌드(자체 서버 등)
+  const isRealProduction =
+    process.env.VERCEL_ENV === "production" ||
+    (!process.env.VERCEL_ENV && process.env.NODE_ENV === "production")
+  if (isRealProduction) {
     const tossClientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || ""
     const tossSecretKey = process.env.TOSS_SECRET_KEY || ""
 

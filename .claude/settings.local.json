@@ -54,7 +54,9 @@
       "Bash(netstat -ano)",
       "Bash(echo \"TSC=$?\")",
       "Bash(echo \"LINT=$?\")",
-      "Bash(echo \"BUILD=$?\")"
+      "Bash(echo \"BUILD=$?\")",
+      "Bash(npm ls *)",
+      "Bash(awk '{print $NF}')"
     ]
   }
 }
