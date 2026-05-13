@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -180,6 +181,9 @@ const patchHandler = async (
 
   try {
     const banner = await updateTopBannerAdmin(params.id, updateData)
+    revalidatePath("/admin/banners")
+    revalidatePath("/admin/banners/[id]", "page")
+    revalidatePath("/", "layout")
     return NextResponse.json(banner)
   } catch (e) {
     const msg = e instanceof Error ? e.message : "배너 수정 실패"
@@ -198,6 +202,9 @@ const deleteHandler = async (
 
   try {
     await deleteTopBannerAdmin(params.id)
+    revalidatePath("/admin/banners")
+    revalidatePath("/admin/banners/[id]", "page")
+    revalidatePath("/", "layout")
     return NextResponse.json({ ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "배너 삭제 실패"

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -135,6 +136,10 @@ const putHandler = async (
       })
     }
 
+    revalidatePath("/admin/products")
+    revalidatePath("/admin/products/[id]", "page")
+    revalidatePath("/products/[id]", "page")
+
     return NextResponse.json({
       id: productId,
       ...(uploadErrors.length > 0 && { image_errors: uploadErrors }),
@@ -180,6 +185,10 @@ const patchHandler = async (
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    revalidatePath("/admin/products")
+    revalidatePath("/admin/products/[id]", "page")
+    revalidatePath("/products/[id]", "page")
+
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "상품 수정 실패" }, { status: 500 })
@@ -205,6 +214,10 @@ const deleteHandler = async (
   if (error) {
     return NextResponse.json({ error: "삭제 실패" }, { status: 500 })
   }
+
+  revalidatePath("/admin/products")
+  revalidatePath("/admin/products/[id]", "page")
+  revalidatePath("/products/[id]", "page")
 
   return NextResponse.json({ success: true })
 }

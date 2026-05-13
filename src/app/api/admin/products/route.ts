@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -188,6 +189,9 @@ const postHandler = async (request: Request) => {
         sort_order: existingCount + i,
       })
     }
+
+    revalidatePath("/admin/products")
+    revalidatePath("/products/[id]", "page")
 
     return NextResponse.json({
       id: product.id,

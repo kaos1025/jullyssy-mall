@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -103,6 +104,8 @@ const postHandler = async (request: NextRequest) => {
 
   try {
     const category = await createEventCategoryAdmin(input)
+    revalidatePath("/admin/event-categories")
+    revalidatePath("/", "layout")
     return NextResponse.json(category, { status: 201 })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "이벤트 카테고리 생성 실패"
