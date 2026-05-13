@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { paymentsLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -15,6 +16,40 @@ const getHandler = async (request: Request) => {
   }
 
   const admin = createAdminClient()
+
+  // 토스 confirm 호출 직전 서버측 검증.
+  // 토스는 confirm 시점에 amount를 자체 검증하지 않으므로 (가맹점 책임 — Toss v2 SDK 문서 명시),
+  // successUrl의 amount 쿼리가 조작되면 그대로 승인된다. 우리 DB의 paid_amount와 비교해 차단.
+  const { data: order } = await admin
+    .from("orders")
+    .select("paid_amount, status, user_id")
+    .eq("id", orderUuid)
+    .single()
+
+  if (!order) {
+    return NextResponse.redirect(`${origin}/checkout?error=order_not_found`)
+  }
+
+  // 중복 confirm 방지: 이미 PAID/CANCELLED 등으로 상태 전이된 주문은 재승인 차단.
+  if (order.status !== "PENDING") {
+    return NextResponse.redirect(`${origin}/checkout?error=order_state_invalid`)
+  }
+
+  if (order.paid_amount !== Number(amount)) {
+    Sentry.captureMessage("Payment amount mismatch detected", {
+      level: "error",
+      tags: { security: "amount_mismatch" },
+      extra: {
+        order_id: orderUuid,
+        intended_amount: order.paid_amount,
+        client_amount: Number(amount),
+        user_id: order.user_id,
+        ip: request.headers.get("x-forwarded-for") || "unknown",
+        user_agent: request.headers.get("user-agent") || "unknown",
+      },
+    })
+    return NextResponse.redirect(`${origin}/checkout?error=amount_mismatch`)
+  }
 
   try {
     const secretKey = process.env.TOSS_SECRET_KEY || ""

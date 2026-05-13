@@ -56,6 +56,34 @@ const CheckoutPage = () => {
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const errorCode = params.get("error")
+    if (!errorCode) return
+
+    const errorMessages: Record<string, string> = {
+      amount_mismatch:
+        "결제 금액에 문제가 발생했습니다. 처음부터 다시 시도해주세요.",
+      order_state_invalid:
+        "이미 처리된 주문입니다. 마이페이지에서 확인해주세요.",
+      order_not_found: "주문을 찾을 수 없습니다.",
+      invalid_params: "결제 요청 정보가 올바르지 않습니다.",
+      payment_failed: "결제에 실패했습니다. 다시 시도해주세요.",
+      server_error: "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    }
+
+    toast({
+      variant: "destructive",
+      title: "결제 처리 실패",
+      description: errorMessages[errorCode] || "결제 처리 중 오류가 발생했습니다.",
+    })
+
+    // 메시지 노출 후 URL 정리 (새로고침/뒤로가기 시 재노출 방지)
+    const cleanUrl = window.location.pathname
+    window.history.replaceState({}, "", cleanUrl)
+  }, [toast])
+
   const subtotal = mounted ? getTotal() : 0
   const hasFreeShippingItem = mounted && items.some((item) => item.free_shipping)
   const shippingFee = calculateShippingFee(subtotal, { hasFreeShippingItem })
