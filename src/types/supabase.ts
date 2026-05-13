@@ -985,9 +985,10 @@ export type Database = {
         Args: {
           p_address: Json
           p_coupon_id?: string
+          p_free_shipping_threshold: number
           p_items: Json
           p_point_used?: number
-          p_shipping_fee?: number
+          p_standard_shipping_fee: number
           p_user_id: string
         }
         Returns: Json
