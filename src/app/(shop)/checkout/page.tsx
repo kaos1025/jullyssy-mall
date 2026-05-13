@@ -136,14 +136,26 @@ const CheckoutPage = () => {
       )
       const payment = toss.payment({ customerKey: order_id })
 
-      // 토스 v2 SDK: 간편결제는 method="EASY_PAY" + easyPay.provider 한글값 필수.
-      type RequestPaymentMethod =
-        | { method: "CARD" }
-        | { method: "EASY_PAY"; easyPay: { provider: "카카오페이" | "네이버페이" } }
+      // 토스 v2 SDK: 모든 결제는 method:"CARD" 단일 진입, card.flowMode로 결제창 분기.
+      // - DEFAULT: 일반 결제창 (사용자가 수단 선택)
+      // - DIRECT + card.easyPay: 간편결제 provider 바로 진입
+      type RequestPaymentMethod = {
+        method: "CARD"
+        card: {
+          flowMode: "DEFAULT" | "DIRECT"
+          easyPay?: "KAKAOPAY" | "NAVERPAY"
+        }
+      }
       const methodMap: Record<PaymentMethodType, RequestPaymentMethod> = {
-        CARD: { method: "CARD" },
-        KAKAOPAY: { method: "EASY_PAY", easyPay: { provider: "카카오페이" } },
-        NAVERPAY: { method: "EASY_PAY", easyPay: { provider: "네이버페이" } },
+        CARD: { method: "CARD", card: { flowMode: "DEFAULT" } },
+        KAKAOPAY: {
+          method: "CARD",
+          card: { flowMode: "DIRECT", easyPay: "KAKAOPAY" },
+        },
+        NAVERPAY: {
+          method: "CARD",
+          card: { flowMode: "DIRECT", easyPay: "NAVERPAY" },
+        },
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
