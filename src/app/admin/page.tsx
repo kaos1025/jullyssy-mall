@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -5,6 +7,9 @@ import { ORDER_STATUS_LABEL } from "@/constants"
 import dayjs from "dayjs"
 
 const AdminDashboardPage = async () => {
+  const user = await verifyAdmin()
+  if (!user) notFound()
+
   const admin = createAdminClient()
   const today = dayjs().startOf("day").toISOString()
 
