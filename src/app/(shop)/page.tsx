@@ -233,7 +233,7 @@ const HomePage = async () => {
               <div className="absolute inset-0 flex flex-col justify-center px-8">
                 <p className="text-xs tracking-[0.2em] text-muted-foreground mb-2">SHIPPING</p>
                 <h3 className="text-lg md:text-xl font-bold mb-1">무료배송</h3>
-                <p className="text-sm text-muted-foreground">5만원 이상 구매 시 무료배송</p>
+                <p className="text-sm text-muted-foreground">4만원 이상 구매 시 무료배송</p>
               </div>
               <div className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground/30 group-hover:text-muted-foreground/50 transition-colors">
                 <ArrowRight className="h-6 w-6" />
