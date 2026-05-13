@@ -31,6 +31,7 @@ interface ProductOptionsProps {
   productImage: string | null
   price: number
   salePrice: number | null
+  freeShipping: boolean
   options: ProductOption[]
 }
 
@@ -40,6 +41,7 @@ const ProductOptions = ({
   productImage,
   price,
   salePrice,
+  freeShipping,
   options,
 }: ProductOptionsProps) => {
   const router = useRouter()
@@ -138,6 +140,7 @@ const ProductOptions = ({
         extra_price: option.extra_price,
         quantity: item.quantity,
         stock: item.stock,
+        free_shipping: freeShipping,
       })
       if (!success) {
         toast({
