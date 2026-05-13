@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import {
   getEventCategoryByIdAdmin,
   getEventCategoryProductsAdmin,
@@ -12,6 +13,9 @@ interface EditEventCategoryPageProps {
 }
 
 const EditEventCategoryPage = async ({ params }: EditEventCategoryPageProps) => {
+  const user = await verifyAdmin()
+  if (!user) notFound()
+
   const category = await getEventCategoryByIdAdmin(params.id)
   if (!category) notFound()
 

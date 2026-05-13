@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { createAdminClient } from "@/lib/supabase/admin"
 import ProductForm from "../ProductForm"
 
@@ -7,6 +8,9 @@ interface EditProductPageProps {
 }
 
 const EditProductPage = async ({ params }: EditProductPageProps) => {
+  const user = await verifyAdmin()
+  if (!user) notFound()
+
   const admin = createAdminClient()
   const { data: product } = await admin
     .from("products")

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { getTopBannerByIdAdmin } from "@/lib/banners"
 import BannerForm from "../BannerForm"
 
@@ -7,6 +8,9 @@ interface EditBannerPageProps {
 }
 
 const EditBannerPage = async ({ params }: EditBannerPageProps) => {
+  const user = await verifyAdmin()
+  if (!user) notFound()
+
   const banner = await getTopBannerByIdAdmin(params.id)
   if (!banner) notFound()
 
