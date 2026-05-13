@@ -15,11 +15,12 @@ import AddressSelector from "@/components/checkout/AddressSelector"
 import CouponSelector from "@/components/checkout/CouponSelector"
 import PointInput from "@/components/checkout/PointInput"
 
-type PaymentMethodType = "CARD" | "TRANSFER" | "KAKAOPAY" | "NAVERPAY"
+type PaymentMethodType = "CARD" | "KAKAOPAY" | "NAVERPAY"
 
+// 계좌이체(TRANSFER)는 데스크탑 iframe 스크롤 차단 이슈로 일시 비활성화.
+// TODO(PAYMENT-TRANSFER-IFRAME-1): 디버깅 후 재노출.
 const paymentMethods: { value: PaymentMethodType; label: string }[] = [
   { value: "CARD", label: "신용카드" },
-  { value: "TRANSFER", label: "계좌이체" },
   { value: "KAKAOPAY", label: "카카오페이" },
   { value: "NAVERPAY", label: "네이버페이" },
 ]
@@ -135,16 +136,19 @@ const CheckoutPage = () => {
       )
       const payment = toss.payment({ customerKey: order_id })
 
-      const methodMap: Record<PaymentMethodType, string> = {
-        CARD: "CARD",
-        TRANSFER: "TRANSFER",
-        KAKAOPAY: "EASYPAY",
-        NAVERPAY: "EASYPAY",
+      // 토스 v2 SDK: 간편결제는 method="EASY_PAY" + easyPay.provider 한글값 필수.
+      type RequestPaymentMethod =
+        | { method: "CARD" }
+        | { method: "EASY_PAY"; easyPay: { provider: "카카오페이" | "네이버페이" } }
+      const methodMap: Record<PaymentMethodType, RequestPaymentMethod> = {
+        CARD: { method: "CARD" },
+        KAKAOPAY: { method: "EASY_PAY", easyPay: { provider: "카카오페이" } },
+        NAVERPAY: { method: "EASY_PAY", easyPay: { provider: "네이버페이" } },
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (payment as any).requestPayment({
-        method: methodMap[paymentMethod],
+        ...methodMap[paymentMethod],
         amount: { currency: "KRW", value: paid_amount },
         orderId: order_no,
         orderName:
