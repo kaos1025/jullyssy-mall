@@ -208,12 +208,14 @@ const CartPage = () => {
                     : `${shippingFee.toLocaleString()}원`}
                 </span>
               </div>
-              {subtotal > 0 && subtotal < SHIPPING_CONFIG.freeShippingThreshold && (
-                <p className="text-xs text-primary">
-                  {(SHIPPING_CONFIG.freeShippingThreshold - subtotal).toLocaleString()}원 더 담으면
-                  무료배송!
-                </p>
-              )}
+              {!hasFreeShippingItem &&
+                subtotal > 0 &&
+                subtotal < SHIPPING_CONFIG.freeShippingThreshold && (
+                  <p className="text-xs text-primary">
+                    {(SHIPPING_CONFIG.freeShippingThreshold - subtotal).toLocaleString()}원 더 담으면
+                    무료배송!
+                  </p>
+                )}
             </div>
             <Separator />
             <div className="flex justify-between font-bold text-lg">

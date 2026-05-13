@@ -349,6 +349,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
               productImage={thumbnail}
               price={product.price}
               salePrice={product.sale_price}
+              freeShipping={product.free_shipping === true}
               options={product.product_options || []}
             />
           </div>
