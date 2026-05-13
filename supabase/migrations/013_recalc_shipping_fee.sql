@@ -1,13 +1,16 @@
 -- =============================================
--- 주문 생성 RPC: 배송비 서버측 재계산
--- - p_shipping_fee 파라미터 제거 (클라 신뢰 제거)
--- - p_free_shipping_threshold, p_standard_shipping_fee 파라미터 추가
--- - 내부적으로 products.free_shipping과 무료배송 임계값을 기준으로 v_shipping_fee 계산
---
--- 시그니처 변경이라 CREATE OR REPLACE만으로는 갱신 불가 → DROP + CREATE.
+-- 주문 생성 RPC: 배송비 서버측 재계산 (overload 추가)
+-- - 신 시그니처 추가: p_free_shipping_threshold + p_standard_shipping_fee
+-- - 구 시그니처(p_shipping_fee 받는 형태)는 본 마이그레이션에서 DROP하지 않음 →
+--   배포 윈도우 0초 (구 코드와 신 코드가 잠시 공존해도 각자 자기 시그니처로 dispatch)
+-- - Postgres 함수 overload 메커니즘:
+--   * 구: (UUID, JSONB, JSONB, UUID, INT, INT) — 이름에 p_shipping_fee 포함
+--   * 신: (UUID, JSONB, JSONB, INT, INT, UUID, INT) — 이름에 p_free_shipping_threshold/p_standard_shipping_fee 포함
+--   서로 다른 arity + 서로 다른 positional types → 별개 overload로 공존
+--   named-arg 호출 시 unique한 파라미터 이름 기준으로 dispatch 됨
+-- - 신 코드(api/orders/route.ts)는 신 시그니처 호출 → 클라 shipping_fee 신뢰 제거 달성
+-- - 구 시그니처는 1주일 후 별도 마이그레이션(014)으로 DROP 예정 (배포 안정화 확인 후)
 -- =============================================
-
-DROP FUNCTION IF EXISTS create_order_with_items(UUID, JSONB, JSONB, UUID, INT, INT);
 
 CREATE OR REPLACE FUNCTION create_order_with_items(
   p_user_id UUID,
