@@ -3,6 +3,7 @@ import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { ordersLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { SHIPPING_CONFIG } from "@/constants/shipping"
 
 const postHandler = async (request: Request) => {
   const supabase = await createClient()
@@ -16,7 +17,9 @@ const postHandler = async (request: Request) => {
   }
 
   const body = await request.json()
-  const { items, address, coupon_id, point_used, shipping_fee } = body
+  // shipping_fee는 더 이상 클라에서 받지 않음 — RPC가 SHIPPING_CONFIG와
+  // products.free_shipping 기준으로 서버측 재계산 (Track 2 보안 fix).
+  const { items, address, coupon_id, point_used } = body
 
   if (!items || items.length === 0) {
     return NextResponse.json({ error: "주문 상품이 없습니다" }, { status: 400 })
@@ -28,7 +31,8 @@ const postHandler = async (request: Request) => {
     p_address: address,
     p_coupon_id: coupon_id || null,
     p_point_used: point_used || 0,
-    p_shipping_fee: shipping_fee || 0,
+    p_free_shipping_threshold: SHIPPING_CONFIG.freeShippingThreshold,
+    p_standard_shipping_fee: SHIPPING_CONFIG.baseFee,
   })
 
   if (error) {
