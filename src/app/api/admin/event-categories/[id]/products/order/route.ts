@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -71,6 +72,8 @@ const patchHandler = async (
         display_order: o.display_order,
       }))
     )
+    revalidatePath("/admin/event-categories/[id]", "page")
+    revalidatePath("/events/[id]", "page")
     return NextResponse.json({ ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "순서 변경 실패"

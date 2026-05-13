@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -65,6 +66,8 @@ const postHandler = async (
 
   try {
     const result = await addEventCategoryProductsAdmin(params.id, uniqueIds)
+    revalidatePath("/admin/event-categories/[id]", "page")
+    revalidatePath("/events/[id]", "page")
     return NextResponse.json(result, { status: 201 })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "매칭 추가 실패"
