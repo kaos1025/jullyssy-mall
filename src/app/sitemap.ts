@@ -34,14 +34,16 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
       .select("id, slug, updated_at")
       .eq("status", "ACTIVE")
 
-    const productPages: MetadataRoute.Sitemap = (products ?? []).map(
-      (product) => ({
-        url: `${SITE_URL}/products/${product.slug || product.id}`,
+    // 024 마이그레이션 적용 후 slug는 NOT NULL이지만, apply 전 빌드 안전망으로 필터링
+    // (filter 술어로 slug: string 타입 narrowing → non-null assertion 불필요)
+    const productPages: MetadataRoute.Sitemap = (products ?? [])
+      .filter((p): p is typeof p & { slug: string } => Boolean(p.slug))
+      .map((product) => ({
+        url: `${SITE_URL}/products/${product.slug}`,
         changeFrequency: "weekly" as const,
         priority: 0.8,
         lastModified: product.updated_at,
-      })
-    )
+      }))
 
     // 활성 이벤트 카테고리 (starts_at/ends_at 윈도우 내)
     const now = new Date().toISOString()
