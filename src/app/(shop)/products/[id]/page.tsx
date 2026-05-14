@@ -107,8 +107,14 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
 
   console.error("[PDP-DEBUG]", {
     params_id: params.id,
+    decoded_id: decodeURIComponent(params.id),
     isUuid,
     product_exists: !!product,
+    product_id: product?.id,
+    product_slug: product?.slug,
+    product_slug_type: typeof product?.slug,
+    product_slug_length: product?.slug?.length,
+    product_status: product?.status,
     product_error: productError,
     error_code: productError?.code,
     error_message: productError?.message,
