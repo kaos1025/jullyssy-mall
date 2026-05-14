@@ -91,7 +91,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
   // params.id가 UUID 형태면 id 컬럼, 아니면 slug 컬럼으로 분기 조회
   // (기존 .or() 보간 대비 PostgREST 필터 주입 위험 제거)
   const isUuid = UUID_RE.test(params.id)
-  const { data: product } = await supabase
+  const { data: product, error: productError } = await supabase
     .from("products")
     .select(
       `
@@ -104,6 +104,16 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     .eq(isUuid ? "id" : "slug", params.id)
     .eq("status", "ACTIVE")
     .single()
+
+  console.error("[PDP-DEBUG]", {
+    params_id: params.id,
+    isUuid,
+    product_exists: !!product,
+    product_error: productError,
+    error_code: productError?.code,
+    error_message: productError?.message,
+    error_details: productError?.details,
+  })
 
   if (!product) notFound()
 
