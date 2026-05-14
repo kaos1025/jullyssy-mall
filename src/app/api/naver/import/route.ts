@@ -4,6 +4,7 @@ import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
+import { toSlug, dedupeSlug } from "@/lib/slug"
 
 interface ImportItem {
   productNo: string
@@ -72,7 +73,8 @@ const importSingleProduct = async (
   admin: ReturnType<typeof createAdminClient>,
   originProductNo: string,
   detail: ChannelProductDetail,
-  token: string
+  token: string,
+  existingSlugs: Set<string>
 ) => {
   const op = detail.originProduct
   if (!op) throw new Error("originProduct 없음")
@@ -148,11 +150,17 @@ const importSingleProduct = async (
     }
   }
 
+  // slug 생성 (NOT NULL + UNIQUE 제약 사전 충돌 방지)
+  // toSlug는 빈 결과 시 throw → 상위 try/catch에서 errors[]로 기록됨
+  const baseSlug = toSlug(name)
+  const slug = dedupeSlug(baseSlug, existingSlugs)
+
   // 상품 등록
   const { data: product, error: prodError } = await admin
     .from("products")
     .insert({
       name,
+      slug,
       description: detailContent,
       price: originalPrice,
       sale_price: salePrice,
@@ -168,6 +176,9 @@ const importSingleProduct = async (
   if (prodError || !product) {
     throw new Error("상품 등록 실패")
   }
+
+  // INSERT 성공한 경우에만 dedupe 풀에 반영 (실패 시 동일 slug 재사용 허용)
+  existingSlugs.add(slug)
 
   // 대표 이미지 등록
   if (representImage?.url) {
@@ -248,6 +259,15 @@ const postHandler = async (request: NextRequest) => {
   try {
     const token = await getNaverAccessToken()
 
+    // 기존 slug 1회 로드 후 dedupe 풀로 활용 (admin 1명 운영 가정, race 무시)
+    const { data: slugRows } = await admin
+      .from("products")
+      .select("slug")
+      .not("slug", "is", null)
+    const existingSlugs = new Set<string>(
+      slugRows?.map((r) => r.slug as string) ?? []
+    )
+
     for (const item of items) {
       try {
         const channelNo = item.channelProductNo
@@ -300,7 +320,7 @@ const postHandler = async (request: NextRequest) => {
         }
 
         const detail: ChannelProductDetail = await detailRes.json()
-        const result = await importSingleProduct(admin, item.productNo, detail, token)
+        const result = await importSingleProduct(admin, item.productNo, detail, token, existingSlugs)
         successCount++
         if (result.skipped) {
           // 이미 존재하는 상품도 성공으로 카운트
