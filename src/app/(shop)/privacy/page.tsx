@@ -3,8 +3,10 @@ import { PRIVACY_POLICY } from "@/constants/privacy"
 
 export const generateMetadata = (): Metadata => ({
   title: "개인정보처리방침",
-  description: "쥴리씨 개인정보처리방침",
-  robots: { index: false },
+  description:
+    "쥴리씨 개인정보처리방침 (2026.05.20 시행) — PIPA 28조의2에 따른 처리위탁 공시 포함",
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/privacy" },
 })
 
 const PrivacyPage = () => {

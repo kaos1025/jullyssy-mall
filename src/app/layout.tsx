@@ -34,8 +34,13 @@ export const metadata: Metadata = {
     follow: true,
   },
   verification: {
-    // 네이버 서치어드바이저 등록 후 추가
-    // other: { "naver-site-verification": "인증코드" },
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    other: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION
+      ? {
+          "naver-site-verification":
+            process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION,
+        }
+      : undefined,
   },
 }
 

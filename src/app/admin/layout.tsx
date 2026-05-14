@@ -1,4 +1,10 @@
+import type { Metadata } from "next"
 import AdminSidebar from "@/components/layout/AdminSidebar"
+
+export const metadata: Metadata = {
+  title: "쥴리씨 관리자",
+  robots: { index: false, follow: false },
+}
 
 const AdminLayout = ({
   children,

@@ -43,7 +43,23 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
       })
     )
 
-    return [...staticPages, ...categoryPages, ...productPages]
+    // 활성 이벤트 카테고리 (starts_at/ends_at 윈도우 내)
+    const now = new Date().toISOString()
+    const { data: events } = await supabase
+      .from("event_categories")
+      .select("id, updated_at")
+      .eq("is_active", true)
+      .or(`starts_at.is.null,starts_at.lte.${now}`)
+      .or(`ends_at.is.null,ends_at.gte.${now}`)
+
+    const eventPages: MetadataRoute.Sitemap = (events ?? []).map((event) => ({
+      url: `${SITE_URL}/events/${event.id}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+      lastModified: event.updated_at,
+    }))
+
+    return [...staticPages, ...categoryPages, ...productPages, ...eventPages]
   } catch {
     // Supabase 조회 실패 시 고정 페이지만 반환
     return staticPages
