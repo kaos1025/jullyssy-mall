@@ -38,13 +38,14 @@ export const generateMetadata = async ({
 }: ProductDetailPageProps): Promise<Metadata> => {
   try {
     const supabase = await createClient()
-    // params.id가 UUID 형태면 id 컬럼, 아니면 slug 컬럼으로 분기 조회
-    // (기존 .or() 보간 대비 PostgREST 필터 주입 위험 제거)
-    const isUuid = UUID_RE.test(params.id)
+    // params.id는 Next.js App Router에서 percent-encoded 상태로 전달될 수 있음
+    // (한글 slug URL — decode 안 하면 DB 매치 0건)
+    const id = decodeURIComponent(params.id)
+    const isUuid = UUID_RE.test(id)
     const { data: product } = await supabase
       .from("products")
       .select("id, slug, name, description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
-      .eq(isUuid ? "id" : "slug", params.id)
+      .eq(isUuid ? "id" : "slug", id)
       .eq("status", "ACTIVE")
       .single()
 
@@ -88,10 +89,11 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // params.id가 UUID 형태면 id 컬럼, 아니면 slug 컬럼으로 분기 조회
-  // (기존 .or() 보간 대비 PostgREST 필터 주입 위험 제거)
-  const isUuid = UUID_RE.test(params.id)
-  const { data: product, error: productError } = await supabase
+  // params.id는 Next.js App Router에서 percent-encoded 상태로 전달될 수 있음
+  // (한글 slug URL — decode 안 하면 DB 매치 0건)
+  const id = decodeURIComponent(params.id)
+  const isUuid = UUID_RE.test(id)
+  const { data: product } = await supabase
     .from("products")
     .select(
       `
@@ -101,25 +103,9 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       product_options(*)
     `
     )
-    .eq(isUuid ? "id" : "slug", params.id)
+    .eq(isUuid ? "id" : "slug", id)
     .eq("status", "ACTIVE")
     .single()
-
-  console.error("[PDP-DEBUG]", {
-    params_id: params.id,
-    decoded_id: decodeURIComponent(params.id),
-    isUuid,
-    product_exists: !!product,
-    product_id: product?.id,
-    product_slug: product?.slug,
-    product_slug_type: typeof product?.slug,
-    product_slug_length: product?.slug?.length,
-    product_status: product?.status,
-    product_error: productError,
-    error_code: productError?.code,
-    error_message: productError?.message,
-    error_details: productError?.details,
-  })
 
   if (!product) notFound()
 
