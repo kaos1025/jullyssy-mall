@@ -113,6 +113,11 @@ NEXT_PUBLIC_SENTRY_DSN=https://[key]@o[org-id].ingest.us.sentry.io/[project-id]
 SENTRY_AUTH_TOKEN=sntrys_xxxxxxx
 SENTRY_ORG=jullyssy
 SENTRY_PROJECT=javascript-nextjs
+
+# SEO 사이트 인증 (선택, 발급 후 주입)
+# Naver: https://searchadvisor.naver.com/  Google: https://search.google.com/search-console/
+NEXT_PUBLIC_NAVER_SITE_VERIFICATION=
+NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=
 ```
 
 > ⚠️ `$` 포함된 시크릿은 `.env.local`에서 `\$`로 이스케이프 필요
