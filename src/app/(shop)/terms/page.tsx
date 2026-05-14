@@ -4,7 +4,8 @@ import { TERMS_OF_SERVICE } from "@/constants/terms"
 export const generateMetadata = (): Metadata => ({
   title: "이용약관",
   description: "쥴리씨 이용약관",
-  robots: { index: false },
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/terms" },
 })
 
 const TermsPage = () => {
