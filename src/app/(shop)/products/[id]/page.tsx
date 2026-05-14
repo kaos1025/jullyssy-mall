@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { PackageOpen, MessageSquare, HelpCircle, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
@@ -23,6 +23,7 @@ import { BUSINESS_INFO } from "@/constants/business"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
 import type { ReviewTagSummaryRow } from "@/types/review"
+import { UUID_RE } from "@/lib/slug"
 
 const REVIEW_TAG_SUMMARY_THRESHOLD = 10
 const MINI_REVIEW_CAROUSEL_THRESHOLD = 3
@@ -37,10 +38,13 @@ export const generateMetadata = async ({
 }: ProductDetailPageProps): Promise<Metadata> => {
   try {
     const supabase = await createClient()
+    // params.id가 UUID 형태면 id 컬럼, 아니면 slug 컬럼으로 분기 조회
+    // (기존 .or() 보간 대비 PostgREST 필터 주입 위험 제거)
+    const isUuid = UUID_RE.test(params.id)
     const { data: product } = await supabase
       .from("products")
       .select("id, slug, name, description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
-      .or(`slug.eq.${params.id},id.eq.${params.id}`)
+      .eq(isUuid ? "id" : "slug", params.id)
       .eq("status", "ACTIVE")
       .single()
 
@@ -84,7 +88,9 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // 상품 + 이미지 + 옵션 조회
+  // params.id가 UUID 형태면 id 컬럼, 아니면 slug 컬럼으로 분기 조회
+  // (기존 .or() 보간 대비 PostgREST 필터 주입 위험 제거)
+  const isUuid = UUID_RE.test(params.id)
   const { data: product } = await supabase
     .from("products")
     .select(
@@ -95,11 +101,18 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       product_options(*)
     `
     )
-    .or(`slug.eq.${params.id},id.eq.${params.id}`)
+    .eq(isUuid ? "id" : "slug", params.id)
     .eq("status", "ACTIVE")
     .single()
 
   if (!product) notFound()
+
+  // UUID 접근이면서 slug 보유 시 → slug URL로 308 영구 리다이렉트
+  // (어드민 즐겨찾기 / 외부 공유 링크 / 검색엔진 색인 자동 갱신)
+  // permanentRedirect는 throw 기반이라 이후 코드는 실행되지 않음
+  if (isUuid && product.slug) {
+    permanentRedirect(`/products/${product.slug}`)
+  }
 
   // 작성 가능 order_item 사전 조회 (로그인 + 현재 상품 × CONFIRMED + 미작성)
   // 보유 시에만 PDP 리뷰 탭에 "이 상품 리뷰 쓰기" 링크 노출
