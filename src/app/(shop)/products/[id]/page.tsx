@@ -107,12 +107,24 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     .eq("status", "ACTIVE")
     .single()
 
-  if (!product) notFound()
+  console.log("[PDP-DIAG]", {
+    paramId: params.id,
+    isUuid,
+    productFound: !!product,
+    productSlug: product?.slug ?? null,
+    productId: product?.id ?? null,
+  })
+
+  if (!product) {
+    console.log("[PDP-DIAG] notFound called for", params.id)
+    notFound()
+  }
 
   // UUID 접근이면서 slug 보유 시 → slug URL로 308 영구 리다이렉트
   // (어드민 즐겨찾기 / 외부 공유 링크 / 검색엔진 색인 자동 갱신)
   // permanentRedirect는 throw 기반이라 이후 코드는 실행되지 않음
   if (isUuid && product.slug) {
+    console.log("[PDP-DIAG] redirect called", `/products/${product.slug}`)
     permanentRedirect(`/products/${product.slug}`)
   }
 
