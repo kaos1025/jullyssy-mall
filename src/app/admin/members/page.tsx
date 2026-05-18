@@ -64,7 +64,6 @@ const AdminMembersPage = () => {
       body: JSON.stringify({
         amount,
         reason: pointReason,
-        currentPoint: pointTarget.point,
       }),
     })
 

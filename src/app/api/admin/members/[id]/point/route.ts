@@ -14,33 +14,41 @@ const postHandler = async (
   }
 
   const admin = createAdminClient()
-  const { amount, reason, currentPoint } = await request.json()
+  const body = await request.json()
+  const amount = Number(body.amount)
+  const reason: unknown = body.reason
   const userId = params.id
 
-  if (!amount || !reason) {
-    return NextResponse.json({ error: "amount와 reason이 필요합니다" }, { status: 400 })
+  if (!Number.isInteger(amount) || amount === 0) {
+    return NextResponse.json(
+      { error: "amount는 0이 아닌 정수여야 합니다" },
+      { status: 400 }
+    )
+  }
+  if (typeof reason !== "string" || reason.trim().length === 0) {
+    return NextResponse.json({ error: "reason이 필요합니다" }, { status: 400 })
   }
 
-  // 포인트 업데이트
-  const { error: updateError } = await admin
-    .from("profiles")
-    .update({ point: currentPoint + amount })
-    .eq("id", userId)
+  // 클라가 보낸 currentPoint를 신뢰하던 패턴 제거.
+  // RPC가 `point = point + amount` 원자적 갱신 + 음수 잔액 차단 + history 기록까지 단일 트랜잭션으로 처리.
+  const { data, error } = await admin.rpc("add_member_point", {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reason: reason,
+  })
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  if (error) {
+    const isClientError =
+      error.message.includes("잔여 포인트가 부족합니다") ||
+      error.message.includes("회원을 찾을 수 없습니다") ||
+      error.message.includes("amount는 0일 수 없습니다")
+    return NextResponse.json(
+      { error: error.message },
+      { status: isClientError ? 400 : 500 }
+    )
   }
 
-  // 히스토리 기록
-  const { error: historyError } = await admin
-    .from("point_histories")
-    .insert({ user_id: userId, amount, reason })
-
-  if (historyError) {
-    return NextResponse.json({ error: historyError.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, ...((data as object) ?? {}) })
 }
 
 export const POST = withRateLimit(adminLimiter, postHandler)
