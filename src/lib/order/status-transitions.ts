@@ -1,3 +1,5 @@
+import type { OrderStatus } from "@/types"
+
 // 어드민이 PATCH 라우트에서 직접 설정 가능한 orders.status 화이트리스트 — 배송 운영 흐름만.
 //
 // 제외 이유:
@@ -11,13 +13,25 @@ export const ADMIN_ORDER_STATUS_ALLOWED = [
   "PREPARING",
   "SHIPPING",
   "DELIVERED",
-] as const
+] as const satisfies readonly OrderStatus[]
 
 // bulk 변경은 운영 실수의 영향이 N배라 더 좁게 — 배송 운영 흐름만 허용.
 export const ADMIN_ORDER_STATUS_BULK_ALLOWED = [
   "PREPARING",
   "SHIPPING",
-] as const
+] as const satisfies readonly OrderStatus[]
+
+// 어드민 단건 주문 상태 변경 dropdown에 노출할 옵션.
+// ADMIN_ORDER_STATUS_ALLOWED(PATCH 화이트리스트) + CANCELLED(cancelOrder 전용 분기)와 정합.
+// 라벨은 ORDER_STATUS_LABEL에서 lookup(SSOT 단일화). 화이트리스트 외 옵션을 UI에 노출하면
+// 운영자가 선택 후 백엔드 400을 받는 운영 차단 회귀가 발생하므로 한 곳에서 관리.
+// CONFIRMED/RETURN_*/EXCHANGE_*는 본 hotfix 시점에 의도적으로 제외 — 정식 반품/교환 플로우는 후속 P1.
+export const ADMIN_ORDER_STATUS_OPTIONS = [
+  "PREPARING",
+  "SHIPPING",
+  "DELIVERED",
+  "CANCELLED",
+] as const satisfies readonly OrderStatus[]
 
 export type AdminOrderStatus = (typeof ADMIN_ORDER_STATUS_ALLOWED)[number]
 export type AdminOrderBulkStatus = (typeof ADMIN_ORDER_STATUS_BULK_ALLOWED)[number]

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
+import { ADMIN_ORDER_STATUS_OPTIONS } from "@/lib/order/status-transitions"
 import { COURIERS } from "@/constants/courier"
 import dayjs from "dayjs"
 
@@ -259,9 +260,9 @@ const AdminOrdersPage = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(ORDER_STATUS_LABEL).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>
-                            {v}
+                        {ADMIN_ORDER_STATUS_OPTIONS.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {ORDER_STATUS_LABEL[status]}
                           </SelectItem>
                         ))}
                       </SelectContent>
