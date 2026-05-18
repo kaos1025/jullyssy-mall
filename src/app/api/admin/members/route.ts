@@ -3,6 +3,7 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { escapePostgrestLikeValue } from "@/lib/supabase/search"
 
 const getHandler = async (request: NextRequest) => {
   const user = await verifyAdmin()
@@ -19,8 +20,9 @@ const getHandler = async (request: NextRequest) => {
     .order("created_at", { ascending: false })
 
   if (search) {
+    const safe = escapePostgrestLikeValue(search)
     query = query.or(
-      `name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+      `name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`
     )
   }
 
