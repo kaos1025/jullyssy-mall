@@ -15,12 +15,14 @@ import AddressSelector from "@/components/checkout/AddressSelector"
 import CouponSelector from "@/components/checkout/CouponSelector"
 import PointInput from "@/components/checkout/PointInput"
 
-type PaymentMethodType = "CARD" | "KAKAOPAY" | "NAVERPAY"
+type PaymentMethodType = "CARD" | "TRANSFER" | "KAKAOPAY" | "NAVERPAY"
 
 // 계좌이체(TRANSFER)는 데스크탑 iframe 스크롤 차단 이슈로 일시 비활성화.
 // TODO(PAYMENT-TRANSFER-IFRAME-1): 디버깅 후 재노출.
+// [DIAG-TEMP] P1-1 fix 검증용 임시 UI 노출 — 검증 후 revert (PR 머지 전).
 const paymentMethods: { value: PaymentMethodType; label: string }[] = [
   { value: "CARD", label: "신용카드" },
+  { value: "TRANSFER", label: "계좌이체" },
   { value: "KAKAOPAY", label: "카카오페이" },
   { value: "NAVERPAY", label: "네이버페이" },
 ]
