@@ -107,24 +107,14 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     .eq("status", "ACTIVE")
     .single()
 
-  console.log("[PDP-DIAG]", {
-    paramId: params.id,
-    isUuid,
-    productFound: !!product,
-    productSlug: product?.slug ?? null,
-    productId: product?.id ?? null,
-  })
-
-  if (!product) {
-    console.log("[PDP-DIAG] notFound called for", params.id)
-    notFound()
-  }
+  if (!product) notFound()
 
   // UUID 접근이면서 slug 보유 시 → slug URL로 308 영구 리다이렉트
   // (어드민 즐겨찾기 / 외부 공유 링크 / 검색엔진 색인 자동 갱신)
   // permanentRedirect는 throw 기반이라 이후 코드는 실행되지 않음
+  // NOTE: Next.js 14.2 RSC streaming context에서는 308 status 대신 meta refresh 폴백으로
+  // 응답될 수 있음 (Sentry 영향 아닌 known design — P1-13, Phase 1~5 격리 진단 완료).
   if (isUuid && product.slug) {
-    console.log("[PDP-DIAG] redirect called", `/products/${product.slug}`)
     permanentRedirect(`/products/${product.slug}`)
   }
 
