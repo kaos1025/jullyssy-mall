@@ -164,18 +164,25 @@ const CheckoutPage = () => {
       )
       const payment = toss.payment({ customerKey: order_id })
 
-      // 토스 v2 SDK: 모든 결제는 method:"CARD" 단일 진입, card.flowMode로 결제창 분기.
-      // - DEFAULT: 일반 결제창 (사용자가 수단 선택)
-      // - DIRECT + card.easyPay: 간편결제 provider 바로 진입
-      type RequestPaymentMethod = {
-        method: "CARD"
-        card: {
-          flowMode: "DEFAULT" | "DIRECT"
-          easyPay?: "KAKAOPAY" | "NAVERPAY"
-        }
-      }
-      const methodMap: Record<PaymentMethodType, RequestPaymentMethod> = {
+      // 토스 v2 SDK 결제수단 분기.
+      // - CARD + flowMode:DEFAULT: 카드/간편결제 통합결제창 (사용자가 수단 선택)
+      // - CARD + flowMode:DIRECT + easyPay: 간편결제 provider 바로 진입
+      // - TRANSFER: 퀵계좌이체 결제창 (별도 method — CARD 매핑 시 통합결제창엔 계좌이체 없음)
+      type RequestPaymentMethod =
+        | {
+            method: "CARD"
+            card: {
+              flowMode: "DEFAULT" | "DIRECT"
+              easyPay?: "KAKAOPAY" | "NAVERPAY"
+            }
+          }
+        | { method: "TRANSFER" }
+      const methodMap: Record<
+        PaymentMethodType | "TRANSFER",
+        RequestPaymentMethod
+      > = {
         CARD: { method: "CARD", card: { flowMode: "DEFAULT" } },
+        TRANSFER: { method: "TRANSFER" },
         KAKAOPAY: {
           method: "CARD",
           card: { flowMode: "DIRECT", easyPay: "KAKAOPAY" },
