@@ -48,5 +48,9 @@ export default withSentryConfig(nextConfig, {
       // Automatically tree-shake Sentry logger statements to reduce bundle size
       removeDebugLogging: true,
     },
+
+    // PHASE-5-DIAG: (Z) 격리 테스트 (NEXT-REDIRECT-SWALLOW-1)
+    autoInstrumentServerFunctions: false,
+    autoInstrumentAppDirectory: false,
   },
 });
