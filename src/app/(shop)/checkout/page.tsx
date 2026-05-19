@@ -163,39 +163,13 @@ const CheckoutPage = () => {
       )
       const payment = toss.payment({ customerKey: order_id })
 
-      // 토스 v2 SDK 결제수단 분기.
-      // - CARD + flowMode:DEFAULT: 카드/간편결제 통합결제창 (사용자가 수단 선택)
+      // 토스 v2 SDK 결제수단 분기 — RequestPayment intersection 함수에
+      // discriminated union으로 매칭되도록 method별 직접 호출.
+      // - CARD + flowMode:DEFAULT: 카드/간편결제 통합결제창
       // - CARD + flowMode:DIRECT + easyPay: 간편결제 provider 바로 진입
       // - TRANSFER: 퀵계좌이체 결제창 (별도 method — CARD 매핑 시 통합결제창엔 계좌이체 없음)
-      type RequestPaymentMethod =
-        | {
-            method: "CARD"
-            card: {
-              flowMode: "DEFAULT" | "DIRECT"
-              easyPay?: "KAKAOPAY" | "NAVERPAY"
-            }
-          }
-        | { method: "TRANSFER" }
-      const methodMap: Record<
-        PaymentMethodType | "TRANSFER",
-        RequestPaymentMethod
-      > = {
-        CARD: { method: "CARD", card: { flowMode: "DEFAULT" } },
-        TRANSFER: { method: "TRANSFER" },
-        KAKAOPAY: {
-          method: "CARD",
-          card: { flowMode: "DIRECT", easyPay: "KAKAOPAY" },
-        },
-        NAVERPAY: {
-          method: "CARD",
-          card: { flowMode: "DIRECT", easyPay: "NAVERPAY" },
-        },
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (payment as any).requestPayment({
-        ...methodMap[paymentMethod],
-        amount: { currency: "KRW", value: paid_amount },
+      const baseRequest = {
+        amount: { currency: "KRW" as const, value: paid_amount },
         orderId: order_no,
         orderName:
           items.length === 1
@@ -203,7 +177,37 @@ const CheckoutPage = () => {
             : `${items[0].product_name} 외 ${items.length - 1}건`,
         successUrl: `${window.location.origin}/api/payments/confirm?order_id=${order_id}`,
         failUrl: `${window.location.origin}/checkout?error=payment_failed`,
-      })
+      }
+
+      switch (paymentMethod) {
+        case "CARD":
+          await payment.requestPayment({
+            method: "CARD",
+            card: { flowMode: "DEFAULT" },
+            ...baseRequest,
+          })
+          break
+        case "TRANSFER":
+          await payment.requestPayment({
+            method: "TRANSFER",
+            ...baseRequest,
+          })
+          break
+        case "KAKAOPAY":
+          await payment.requestPayment({
+            method: "CARD",
+            card: { flowMode: "DIRECT", easyPay: "KAKAOPAY" },
+            ...baseRequest,
+          })
+          break
+        case "NAVERPAY":
+          await payment.requestPayment({
+            method: "CARD",
+            card: { flowMode: "DIRECT", easyPay: "NAVERPAY" },
+            ...baseRequest,
+          })
+          break
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "결제 처리 중 오류가 발생했습니다"
