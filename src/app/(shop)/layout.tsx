@@ -2,7 +2,7 @@ import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
 import MobileNav from "@/components/layout/MobileNav"
 import TopBannerCarousel from "@/components/banners/TopBannerCarousel"
-import { createClient } from "@/lib/supabase/server"
+import { getCategoriesAll } from "@/lib/categories"
 import { getActiveTopBanners } from "@/lib/banners"
 import { getActiveEventCategories } from "@/lib/events"
 import type { Category } from "@/types"
@@ -12,19 +12,17 @@ const ShopLayout = async ({
 }: {
   children: React.ReactNode
 }) => {
-  const supabase = await createClient()
-
-  const [{ data: allCategories }, banners, eventCategories] = await Promise.all([
-    supabase.from("categories").select("*").order("sort_order"),
+  const [allCategories, banners, eventCategories] = await Promise.all([
+    getCategoriesAll(),
     getActiveTopBanners(),
     getActiveEventCategories(),
   ])
 
   // 1depth(부모) + 2depth(자식) 구조화
-  const parentCategories = (allCategories ?? []).filter((c: Category) => !c.parent_id)
+  const parentCategories = allCategories.filter((c: Category) => !c.parent_id)
   const categoriesWithChildren = parentCategories.map((parent: Category) => ({
     ...parent,
-    children: (allCategories ?? []).filter((c: Category) => c.parent_id === parent.id),
+    children: allCategories.filter((c: Category) => c.parent_id === parent.id),
   }))
 
   return (

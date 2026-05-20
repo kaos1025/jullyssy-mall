@@ -2,6 +2,7 @@ import { notFound, permanentRedirect } from "next/navigation"
 import Link from "next/link"
 import { PackageOpen, MessageSquare, HelpCircle, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import { getCategoryById } from "@/lib/categories"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Accordion,
@@ -138,12 +139,10 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
   // 부모 카테고리 조회
   let parentCategory: { name: string; slug: string } | null = null
   if (product.category?.parent_id) {
-    const { data } = await supabase
-      .from("categories")
-      .select("name, slug")
-      .eq("id", product.category.parent_id)
-      .single()
-    parentCategory = data
+    const parent = await getCategoryById(product.category.parent_id)
+    parentCategory = parent
+      ? { name: parent.name, slug: parent.slug }
+      : null
   }
 
   // 리뷰 + 태그 집계 조회 (PDP SSR 시 함께 prefetch)

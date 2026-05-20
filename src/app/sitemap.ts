@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getCategoriesAll } from "@/lib/categories"
 
 export const revalidate = 3600
 
@@ -17,18 +18,13 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
     const supabase = createAdminClient()
 
     // 카테고리 페이지
-    const { data: categories } = await supabase
-      .from("categories")
-      .select("slug")
-      .order("sort_order")
+    const categories = await getCategoriesAll()
 
-    const categoryPages: MetadataRoute.Sitemap = (categories ?? []).map(
-      (cat) => ({
-        url: `${SITE_URL}/products?category=${cat.slug}`,
-        changeFrequency: "weekly" as const,
-        priority: 0.7,
-      })
-    )
+    const categoryPages: MetadataRoute.Sitemap = categories.map((cat) => ({
+      url: `${SITE_URL}/products?category=${cat.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }))
 
     // 상품 상세 페이지
     const { data: products } = await supabase
