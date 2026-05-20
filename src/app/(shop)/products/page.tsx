@@ -1,6 +1,11 @@
 import Link from "next/link"
 import { PackageOpen, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import {
+  getCategoryBySlug,
+  getChildrenOf,
+  getRootCategories,
+} from "@/lib/categories"
 import ProductCard from "@/components/product/ProductCard"
 import ProductListFilter from "@/components/product/ProductListFilter"
 import { Button } from "@/components/ui/button"
@@ -21,13 +26,7 @@ export const generateMetadata = async ({
 
   if (category) {
     try {
-      const supabase = await createClient()
-      const { data: cat } = await supabase
-        .from("categories")
-        .select("name")
-        .eq("slug", category)
-        .single()
-
+      const cat = await getCategoryBySlug(category)
       if (cat) {
         return {
           title: `${cat.name} - 여성의류`,
@@ -57,18 +56,14 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
   const offset = (page - 1) * pageSize
 
   // 1depth 카테고리 목록 조회
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("*")
-    .is("parent_id", null)
-    .order("sort_order")
+  const categories = await getRootCategories()
 
   // 서브카테고리 조회: 선택된 카테고리의 children
   let subCategories: typeof categories = []
   let selectedParentId: string | null = null
   let categoryName: string | null = null
 
-  if (searchParams.category && categories) {
+  if (searchParams.category) {
     // 선택된 slug가 1depth인지 확인
     const parentCat = categories.find((c) => c.slug === searchParams.category)
     if (parentCat) {
@@ -76,11 +71,7 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
       categoryName = parentCat.name
     } else {
       // 2depth slug일 수 있음 → 부모를 찾기
-      const { data: subCat } = await supabase
-        .from("categories")
-        .select("name, parent_id")
-        .eq("slug", searchParams.category)
-        .single()
+      const subCat = await getCategoryBySlug(searchParams.category)
       if (subCat?.parent_id) {
         selectedParentId = subCat.parent_id
         categoryName = subCat.name
@@ -88,12 +79,7 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
     }
 
     if (selectedParentId) {
-      const { data: subs } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("parent_id", selectedParentId)
-        .order("sort_order")
-      subCategories = subs || []
+      subCategories = await getChildrenOf(selectedParentId)
     }
   }
 
@@ -113,19 +99,10 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
 
   // 카테고리 필터
   if (searchParams.category) {
-    const { data: cat } = await supabase
-      .from("categories")
-      .select("id")
-      .eq("slug", searchParams.category)
-      .single()
-
+    const cat = await getCategoryBySlug(searchParams.category)
     if (cat) {
-      const { data: childCats } = await supabase
-        .from("categories")
-        .select("id")
-        .eq("parent_id", cat.id)
-
-      const categoryIds = [cat.id, ...(childCats?.map((c) => c.id) || [])]
+      const childCats = await getChildrenOf(cat.id)
+      const categoryIds = [cat.id, ...childCats.map((c) => c.id)]
       query = query.in("category_id", categoryIds)
     }
   }
