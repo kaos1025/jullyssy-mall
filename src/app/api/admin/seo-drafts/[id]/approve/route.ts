@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
+import * as Sentry from "@sentry/nextjs"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -40,6 +41,10 @@ interface PatternAlt {
 }
 
 const postHandler = async (request: NextRequest, context: RouteContext) => {
+  // Sentry tag: request-scoped isolation (@sentry/nextjs 10.x).
+  Sentry.setTag("seo_draft_action", "approve")
+  Sentry.setTag("seo_draft_id", context.params.id)
+
   const admin = await verifyAdmin()
   if (!admin) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -60,12 +65,16 @@ const postHandler = async (request: NextRequest, context: RouteContext) => {
     .eq("id", context.params.id)
     .maybeSingle()
   if (draftErr) {
+    Sentry.captureException(draftErr, {
+      tags: { seo_event: "approve_draft_fetch_failed" },
+    })
     return NextResponse.json({ error: draftErr.message }, { status: 500 })
   }
   if (!draftRow) {
     return NextResponse.json({ error: "draft 없음" }, { status: 404 })
   }
   const draft = draftRow as DraftRow
+  Sentry.setTag("product_id", draft.product_id)
   if (draft.status !== "pending_review") {
     return NextResponse.json(
       {
@@ -82,6 +91,9 @@ const postHandler = async (request: NextRequest, context: RouteContext) => {
     .eq("id", draft.product_id)
     .maybeSingle()
   if (productErr) {
+    Sentry.captureException(productErr, {
+      tags: { seo_event: "approve_product_fetch_failed" },
+    })
     return NextResponse.json({ error: productErr.message }, { status: 500 })
   }
   if (!productRow) {
@@ -97,6 +109,9 @@ const postHandler = async (request: NextRequest, context: RouteContext) => {
     .order("sort_order", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: true })
   if (imagesErr) {
+    Sentry.captureException(imagesErr, {
+      tags: { seo_event: "approve_images_fetch_failed" },
+    })
     return NextResponse.json({ error: imagesErr.message }, { status: 500 })
   }
   const images = (imagesData ?? []) as ImageRow[]
@@ -122,6 +137,10 @@ const postHandler = async (request: NextRequest, context: RouteContext) => {
     p_review_note: note,
   })
   if (rpcErr) {
+    Sentry.captureException(rpcErr, {
+      tags: { seo_event: "approve_rpc_failed" },
+      extra: { pattern_alts_count: patternAlts.length },
+    })
     return NextResponse.json(
       { error: rpcErr.message, code: "RPC_FAILED" },
       { status: 500 },

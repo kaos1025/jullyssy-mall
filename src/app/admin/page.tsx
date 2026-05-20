@@ -4,7 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ORDER_STATUS_LABEL } from "@/constants"
+import { getSeoDashboardStats } from "@/lib/seo/dashboard"
+import SeoBackfillTrigger from "./_components/seo-backfill-trigger"
 import dayjs from "dayjs"
+
+export const dynamic = "force-dynamic"
 
 const AdminDashboardPage = async () => {
   const user = await verifyAdmin()
@@ -14,7 +18,7 @@ const AdminDashboardPage = async () => {
   const today = dayjs().startOf("day").toISOString()
 
   // 병렬 조회
-  const [ordersToday, salesToday, pendingOrders, newMembers, recentOrders, lowStock] =
+  const [ordersToday, salesToday, pendingOrders, newMembers, recentOrders, lowStock, seoStats] =
     await Promise.all([
       // 오늘 주문수
       admin
@@ -51,7 +55,20 @@ const AdminDashboardPage = async () => {
         .lte("stock", 10)
         .order("stock", { ascending: true })
         .limit(10),
+      // SEO 운영 통계
+      getSeoDashboardStats(),
     ])
+
+  const seoUsagePct = seoStats.cap_set
+    ? Math.min(100, Math.round(seoStats.usage_ratio * 100))
+    : 0
+  const seoAlertLevel: "ok" | "warn" | "danger" = !seoStats.cap_set
+    ? "ok"
+    : seoStats.usage_ratio >= 1
+      ? "danger"
+      : seoStats.usage_ratio >= 0.75
+        ? "warn"
+        : "ok"
 
   const todaySales =
     salesToday.data?.reduce(
@@ -110,6 +127,66 @@ const AdminDashboardPage = async () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* SEO 운영 카드 */}
+      <Card>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-3">
+          <CardTitle className="text-base">SEO 자동화 (#48-1)</CardTitle>
+          <Badge
+            variant={
+              seoAlertLevel === "danger"
+                ? "destructive"
+                : seoAlertLevel === "warn"
+                  ? "default"
+                  : "outline"
+            }
+          >
+            {!seoStats.cap_set
+              ? "CAP 미설정"
+              : `${seoUsagePct}% (${seoStats.month_cost_usd.toFixed(4)} / ${seoStats.cap_usd.toFixed(2)} USD)`}
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {seoStats.cap_set && (
+            <div className="h-2 w-full bg-muted rounded overflow-hidden">
+              <div
+                className={
+                  seoAlertLevel === "danger"
+                    ? "h-full bg-destructive"
+                    : seoAlertLevel === "warn"
+                      ? "h-full bg-amber-500"
+                      : "h-full bg-primary"
+                }
+                style={{ width: `${seoUsagePct}%` }}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground text-xs">pending_review</p>
+              <p className="font-semibold">{seoStats.draft_counts.pending_review}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">approved</p>
+              <p className="font-semibold">{seoStats.draft_counts.approved}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">rejected</p>
+              <p className="font-semibold">{seoStats.draft_counts.rejected}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">failed</p>
+              <p className="font-semibold">{seoStats.draft_counts.failed}</p>
+            </div>
+          </div>
+
+          <div className="border-t pt-3">
+            <p className="text-xs font-medium mb-2">Backfill 실행</p>
+            <SeoBackfillTrigger />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 최근 주문 */}

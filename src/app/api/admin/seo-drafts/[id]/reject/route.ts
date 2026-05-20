@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -13,6 +14,9 @@ interface RejectBody {
 }
 
 const postHandler = async (request: NextRequest, context: RouteContext) => {
+  Sentry.setTag("seo_draft_action", "reject")
+  Sentry.setTag("seo_draft_id", context.params.id)
+
   const admin = await verifyAdmin()
   if (!admin) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
@@ -28,14 +32,20 @@ const postHandler = async (request: NextRequest, context: RouteContext) => {
 
   const { data: draftRow, error: fetchErr } = await supabase
     .from("seo_metadata_drafts")
-    .select("status")
+    .select("status, product_id")
     .eq("id", context.params.id)
     .maybeSingle()
   if (fetchErr) {
+    Sentry.captureException(fetchErr, {
+      tags: { seo_event: "reject_draft_fetch_failed" },
+    })
     return NextResponse.json({ error: fetchErr.message }, { status: 500 })
   }
   if (!draftRow) {
     return NextResponse.json({ error: "draft 없음" }, { status: 404 })
+  }
+  if (draftRow.product_id) {
+    Sentry.setTag("product_id", draftRow.product_id)
   }
   if (draftRow.status !== "pending_review") {
     return NextResponse.json(
@@ -57,6 +67,9 @@ const postHandler = async (request: NextRequest, context: RouteContext) => {
     })
     .eq("id", context.params.id)
   if (updateErr) {
+    Sentry.captureException(updateErr, {
+      tags: { seo_event: "reject_update_failed" },
+    })
     return NextResponse.json({ error: updateErr.message }, { status: 500 })
   }
 
