@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -226,6 +227,28 @@ const importSingleProduct = async (
       size: "FREE",
       stock: stockQuantity,
       extra_price: 0,
+    })
+  }
+
+  // SEO 생성 큐 등록 (#48-1 Phase 1)
+  // 실패 시 임포트 자체는 성공으로 처리 (queue 실패는 비치명적).
+  try {
+    const { error: queueErr } = await admin.from("seo_generation_queue").insert({
+      product_id: product.id,
+      status: "pending",
+      trigger_source: "naver_import",
+    })
+    if (queueErr) {
+      Sentry.captureMessage(`seo_generation_queue insert failed: ${queueErr.message}`, {
+        level: "warning",
+        tags: { area: "seo_queue", trigger: "naver_import" },
+        extra: { product_id: product.id },
+      })
+    }
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { area: "seo_queue", trigger: "naver_import" },
+      extra: { product_id: product.id },
     })
   }
 
