@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -11,12 +12,16 @@ interface RouteContext {
 const ALLOWED_STATUSES = ["ACTIVE", "SOLDOUT", "HIDDEN"] as const
 
 const postHandler = async (_request: NextRequest, context: RouteContext) => {
+  const productId = context.params.id
+  Sentry.setTag("seo_draft_action", "regenerate")
+  Sentry.setTag("product_id", productId)
+  Sentry.setTag("trigger_source", "manual_regenerate")
+
   const admin = await verifyAdmin()
   if (!admin) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 })
   }
 
-  const productId = context.params.id
   const supabase = createAdminClient()
 
   // product 조회 + status 검증
@@ -26,6 +31,9 @@ const postHandler = async (_request: NextRequest, context: RouteContext) => {
     .eq("id", productId)
     .maybeSingle()
   if (productErr) {
+    Sentry.captureException(productErr, {
+      tags: { seo_event: "regenerate_product_fetch_failed" },
+    })
     return NextResponse.json({ error: productErr.message }, { status: 500 })
   }
   if (!product) {
@@ -46,6 +54,9 @@ const postHandler = async (_request: NextRequest, context: RouteContext) => {
     .eq("status", "pending")
     .maybeSingle()
   if (existingErr) {
+    Sentry.captureException(existingErr, {
+      tags: { seo_event: "regenerate_existing_check_failed" },
+    })
     return NextResponse.json({ error: existingErr.message }, { status: 500 })
   }
   if (existing) {
@@ -65,6 +76,9 @@ const postHandler = async (_request: NextRequest, context: RouteContext) => {
     .select("id")
     .maybeSingle()
   if (insertErr) {
+    Sentry.captureException(insertErr, {
+      tags: { seo_event: "regenerate_insert_failed" },
+    })
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }
 
