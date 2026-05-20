@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dayjs from "dayjs"
 import {
   ChevronLeft,
@@ -29,6 +29,7 @@ import type {
 interface Props {
   initialDrafts: SeoDraftListItem[]
   initialTotal: number
+  initialDetail: SeoDraftDetail | null
   perPage: number
 }
 
@@ -59,7 +60,12 @@ const buildAltMap = (
   return map
 }
 
-const SeoDraftsClient = ({ initialDrafts, initialTotal, perPage }: Props) => {
+const SeoDraftsClient = ({
+  initialDrafts,
+  initialTotal,
+  initialDetail,
+  perPage,
+}: Props) => {
   const { toast } = useToast()
   const [drafts, setDrafts] = useState<SeoDraftListItem[]>(initialDrafts)
   const [total, setTotal] = useState(initialTotal)
@@ -67,20 +73,27 @@ const SeoDraftsClient = ({ initialDrafts, initialTotal, perPage }: Props) => {
   const [listLoading, setListLoading] = useState(false)
 
   const [selectedId, setSelectedId] = useState<string | null>(
-    initialDrafts[0]?.id ?? null,
+    initialDetail?.id ?? initialDrafts[0]?.id ?? null,
   )
-  const [detail, setDetail] = useState<SeoDraftDetail | null>(null)
+  const [detail, setDetail] = useState<SeoDraftDetail | null>(initialDetail)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  // 편집 상태
-  const [metaTitle, setMetaTitle] = useState("")
-  const [metaDescription, setMetaDescription] = useState("")
-  const [searchTagsInput, setSearchTagsInput] = useState("")
-  const [altTexts, setAltTexts] = useState<Record<number, string>>({
-    0: "",
-    1: "",
-    2: "",
-  })
+  // DUPLICATE-FETCH-AUDIT-1 (P1): Server에서 initialDetail prefetch — 첫 mount
+  // 시 useEffect의 fetchDetail 호출을 1회 skip하여 waterfall 제거.
+  // (이후 다른 draft 클릭 / 페이지 이동 시는 client fetch 정상 동작.)
+  const skipInitialFetchRef = useRef<boolean>(initialDetail !== null)
+
+  // 편집 상태 (initialDetail 있으면 즉시 prefill)
+  const [metaTitle, setMetaTitle] = useState(initialDetail?.meta_title ?? "")
+  const [metaDescription, setMetaDescription] = useState(
+    initialDetail?.meta_description ?? "",
+  )
+  const [searchTagsInput, setSearchTagsInput] = useState(
+    tagsToInput(initialDetail?.search_tags ?? null),
+  )
+  const [altTexts, setAltTexts] = useState<Record<number, string>>(
+    buildAltMap(initialDetail?.image_alt_texts ?? null),
+  )
 
   const [submitting, setSubmitting] = useState<
     null | "save" | "approve" | "reject" | "regenerate"
@@ -151,6 +164,11 @@ const SeoDraftsClient = ({ initialDrafts, initialTotal, perPage }: Props) => {
   )
 
   useEffect(() => {
+    if (skipInitialFetchRef.current) {
+      // 첫 mount 시 Server-prefetched initialDetail 사용 — fetch skip.
+      skipInitialFetchRef.current = false
+      return
+    }
     if (selectedId) {
       fetchDetail(selectedId)
     } else {
