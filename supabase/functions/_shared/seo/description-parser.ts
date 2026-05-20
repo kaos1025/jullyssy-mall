@@ -1,7 +1,12 @@
 // SEO description 파서 — products.description HTML 내 <img> alt 일괄 삽입.
 //
-// Runtime: Deno (Edge Function) + Node (Next.js 승인 API). npm: specifier 사용.
+// Runtime: Deno (Edge Function) 전용. Vercel Node용 동일 모듈은
+//   `src/lib/seo/description-parser.ts` (node-html-parser npm import).
 // 라이브러리: node-html-parser@7.0.1.
+//
+// ⚠️ 시그니처 동기화 의무 ([[dual-runtime-signature]] feedback):
+// `src/lib/seo/description-parser.ts`와 동일 인자/반환/동작을 유지한다.
+// 한쪽 변경 시 다른 쪽 PR 동시 산출.
 //
 // Phase 0 실측: 네이버 SE 모든 <img>는 alt="" → 덮어쓰기 충돌 없음.
 // description 당 <img> 40~99개 → spec FR-2 B "최대 3개" alt 생성 합리적.
@@ -57,9 +62,14 @@ export function injectAltTexts(
       return;
     }
     const newAlt = altByIndex.get(idx);
-    if (newAlt) {
+    if (newAlt !== undefined) {
       img.setAttribute("alt", newAlt);
       injected += 1;
+      return;
+    }
+    // injection 없으면 빈 alt 일괄 삽입 (spec v0.5 §FR-2 B: decorative).
+    if (!hasExisting) {
+      img.setAttribute("alt", "");
     }
   });
 

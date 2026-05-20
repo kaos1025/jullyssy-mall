@@ -11,6 +11,7 @@ import {
   Megaphone,
   Sparkles,
   ArrowLeftRight,
+  FileText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -22,6 +23,7 @@ const menuItems = [
   { href: "/admin/coupons", label: "쿠폰관리", icon: Ticket },
   { href: "/admin/banners", label: "배너관리", icon: Megaphone },
   { href: "/admin/event-categories", label: "이벤트 카테고리", icon: Sparkles },
+  { href: "/admin/seo-drafts", label: "SEO Draft 검토", icon: FileText },
   { href: "/admin/settings/category-mapping", label: "카테고리 매핑", icon: ArrowLeftRight },
 ]
 
