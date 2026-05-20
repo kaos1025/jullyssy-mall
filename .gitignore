@@ -45,3 +45,6 @@ e2e/.auth/
 
 # sentry
 .env.sentry-build-plugin
+
+# scratch
+tmp/
