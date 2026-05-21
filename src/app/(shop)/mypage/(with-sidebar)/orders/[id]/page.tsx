@@ -21,12 +21,23 @@ import { ORDER_STATUS_LABEL } from "@/constants"
 import { COURIER_TRACKING_URLS } from "@/constants/courier"
 import type { CourierName } from "@/constants/courier"
 import type { OrderWithItems } from "@/types"
+import {
+  buildCancellationLabel,
+  type CancellationActor,
+  type CancellationReason,
+} from "@/lib/order/cancellation"
+
+type OrderWithCancellation = OrderWithItems & {
+  cancellation_actor: CancellationActor | null
+  cancellation_reason: CancellationReason | null
+  cancellation_note: string | null
+}
 
 const OrderDetailPage = () => {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const [order, setOrder] = useState<OrderWithItems | null>(null)
+  const [order, setOrder] = useState<OrderWithCancellation | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
@@ -45,7 +56,7 @@ const OrderDetailPage = () => {
           ...data,
           items: data.items || [],
           payment: data.payment?.[0] || null,
-        } as unknown as OrderWithItems)
+        } as unknown as OrderWithCancellation)
       }
       setLoading(false)
     }
@@ -81,7 +92,7 @@ const OrderDetailPage = () => {
           ...data,
           items: data.items || [],
           payment: data.payment?.[0] || null,
-        } as unknown as OrderWithItems)
+        } as unknown as OrderWithCancellation)
       }
     } else {
       const err = await res.json()
@@ -123,6 +134,24 @@ const OrderDetailPage = () => {
           {ORDER_STATUS_LABEL[order.status] || order.status}
         </Badge>
       </div>
+
+      {/* 취소 사유 — status='CANCELLED'이고 메타데이터가 있을 때만 노출 */}
+      {order.status === "CANCELLED" && order.cancellation_reason && (
+        <div className="border rounded-lg p-4 bg-muted/30 space-y-1">
+          <h3 className="font-medium text-sm">취소 사유</h3>
+          <p className="text-sm">
+            {buildCancellationLabel(
+              order.cancellation_actor,
+              order.cancellation_reason
+            )}
+          </p>
+          {order.cancellation_note && (
+            <p className="text-xs text-muted-foreground whitespace-pre-line">
+              {order.cancellation_note}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* 상품 목록 */}
       <div className="border rounded-lg p-4 space-y-3">

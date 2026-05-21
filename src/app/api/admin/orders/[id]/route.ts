@@ -3,9 +3,10 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { cancelOrder } from "@/lib/order/cancel-order"
 import { isAdminOrderStatusAllowed } from "@/lib/order/status-transitions"
 
+// 취소는 POST /api/admin/orders/[id]/cancel 전용 — 사유(reason) 입력 강제.
+// PATCH는 배송 운영 상태 전이 + 송장 입력만 처리한다.
 const patchHandler = async (
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -19,23 +20,9 @@ const patchHandler = async (
   const body = await request.json()
   const orderId = params.id
 
-  // CANCELLED 상태로 변경 시 전체 취소 플로우 실행
-  if (body.status === "CANCELLED") {
-    const result = await cancelOrder(orderId)
-
-    if ("error" in result) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status }
-      )
-    }
-
-    return NextResponse.json({ success: true })
-  }
-
-  // 그 외 상태 변경 (송장입력 포함).
   // body.status를 무검증 update하면 어드민 실수/내부자 위협으로 PAID→RETURNED 등
   // status만 전이되어 cancelOrder를 우회한 결제 환불 누락이 가능 → 화이트리스트 강제.
+  // CANCELLED는 화이트리스트에 없어 자동으로 거부 (전용 cancel 라우트로 유도).
   const updateData: Record<string, string> = {}
 
   if (body.status !== undefined) {

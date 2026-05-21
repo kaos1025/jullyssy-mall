@@ -34,7 +34,10 @@ const postHandler = async (
     )
   }
 
-  const result = await cancelOrder(params.id)
+  const result = await cancelOrder(params.id, {
+    actor: "USER",
+    reason: "CUSTOMER_REQUEST",
+  })
 
   if ("error" in result) {
     return NextResponse.json(

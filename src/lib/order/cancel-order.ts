@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import type { CancellationContext } from "@/lib/order/cancellation"
 
 interface CancelResult {
   success: true
@@ -9,8 +10,12 @@ interface CancelError {
   status: number
 }
 
+// PAID/PREPARING 주문 취소 — 토스 환불 + 재고/포인트/쿠폰 원복 + status='CANCELLED' 전이.
+// PENDING은 cleanupPendingOrder() 경로 사용.
+// ctx.actor/reason은 orders 테이블에 함께 저장하여 사용자 마이페이지 사유 노출과 운영 분석에 활용.
 export const cancelOrder = async (
-  orderId: string
+  orderId: string,
+  ctx: CancellationContext
 ): Promise<CancelResult | CancelError> => {
   const admin = createAdminClient()
 
@@ -119,10 +124,15 @@ export const cancelOrder = async (
     .eq("order_id", orderId)
     .eq("status", "DONE")
 
-  // 8. orders 상태 변경
+  // 8. orders 상태 변경 + 취소 메타데이터
   await admin
     .from("orders")
-    .update({ status: "CANCELLED" })
+    .update({
+      status: "CANCELLED",
+      cancellation_actor: ctx.actor,
+      cancellation_reason: ctx.reason,
+      cancellation_note: ctx.note ?? null,
+    })
     .eq("id", orderId)
 
   return { success: true }
