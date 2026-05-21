@@ -39,8 +39,11 @@ const OrdersPage = async ({ searchParams }: OrdersPageProps) => {
   const pageSize = 10
   const offset = (page - 1) * pageSize
 
+  // visible_user_orders view: payments row 없는 CANCELLED는 자동 제외.
+  // (security_invoker=on이라 RLS는 orders와 동일하게 본인 row만 적용된다.)
+  // PostgREST는 view에 underlying orders.id가 노출되면 order_items.order_id FK를 추론한다.
   const { data: orders, count } = await supabase
-    .from("orders")
+    .from("visible_user_orders")
     .select("*, order_items(*)", { count: "exact" })
     .in("status", VISIBLE_ORDER_STATUSES as unknown as string[])
     .order("created_at", { ascending: false })
