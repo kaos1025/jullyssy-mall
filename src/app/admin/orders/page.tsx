@@ -22,6 +22,13 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
 import { ADMIN_ORDER_STATUS_OPTIONS } from "@/lib/order/status-transitions"
+import {
+  ADMIN_CANCEL_REASONS,
+  CANCELLATION_REASON_LABEL,
+  type AdminCancelReason,
+  type CancellationActor,
+  type CancellationReason,
+} from "@/lib/order/cancellation"
 import { COURIERS } from "@/constants/courier"
 import dayjs from "dayjs"
 
@@ -44,6 +51,9 @@ interface OrderRow {
   recipient_phone: string
   courier: string | null
   tracking_no: string | null
+  cancellation_actor: CancellationActor | null
+  cancellation_reason: CancellationReason | null
+  cancellation_note: string | null
   order_items: { product_name: string; quantity: number }[]
 }
 
@@ -59,6 +69,14 @@ const AdminOrdersPage = () => {
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
   const [courier, setCourier] = useState<string>(COURIERS[0])
   const [trackingNo, setTrackingNo] = useState("")
+
+  // 어드민 취소 다이얼로그 — 사유 입력 강제 (Track C)
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState<AdminCancelReason>(
+    ADMIN_CANCEL_REASONS[0]
+  )
+  const [cancelNote, setCancelNote] = useState("")
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -77,6 +95,14 @@ const AdminOrdersPage = () => {
   }, [fetchOrders])
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
+    // CANCELLED는 사유 입력 강제 — 전용 모달로 분기
+    if (newStatus === "CANCELLED") {
+      setCancelOrderId(orderId)
+      setCancelReason(ADMIN_CANCEL_REASONS[0])
+      setCancelNote("")
+      return
+    }
+
     await fetch(`/api/admin/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -84,6 +110,33 @@ const AdminOrdersPage = () => {
     })
     fetchOrders()
     toast({ title: `주문 상태: ${ORDER_STATUS_LABEL[newStatus]}` })
+  }
+
+  const handleCancelSubmit = async () => {
+    if (!cancelOrderId) return
+    setCancelSubmitting(true)
+    const res = await fetch(`/api/admin/orders/${cancelOrderId}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: cancelReason, note: cancelNote || null }),
+    })
+    setCancelSubmitting(false)
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast({
+        variant: "destructive",
+        title: "취소 처리 실패",
+        description: err.error || "요청을 처리하지 못했습니다",
+      })
+      return
+    }
+
+    setCancelOrderId(null)
+    fetchOrders()
+    toast({
+      title: `주문 취소 완료 — ${CANCELLATION_REASON_LABEL[cancelReason]}`,
+    })
   }
 
   const handleBulkStatusChange = async (newStatus: string) => {
@@ -184,6 +237,56 @@ const AdminOrdersPage = () => {
         )}
       </div>
 
+      {/* 취소 사유 다이얼로그 */}
+      <Dialog
+        open={cancelOrderId !== null}
+        onOpenChange={(open) => !open && setCancelOrderId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>주문 취소 — 사유 선택</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">취소 사유</label>
+              <Select
+                value={cancelReason}
+                onValueChange={(v) => setCancelReason(v as AdminCancelReason)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADMIN_CANCEL_REASONS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {CANCELLATION_REASON_LABEL[r]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">메모 (선택)</label>
+              <textarea
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                rows={3}
+                placeholder="고객 안내용 추가 설명을 입력하세요"
+                className="w-full mt-1 px-3 py-2 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <Button
+              onClick={handleCancelSubmit}
+              disabled={cancelSubmitting}
+              className="w-full"
+              variant="destructive"
+            >
+              {cancelSubmitting ? "처리 중..." : "주문 취소 실행"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* 테이블 */}
       <div className="border rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
@@ -267,6 +370,13 @@ const AdminOrdersPage = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {order.status === "CANCELLED" && order.cancellation_reason && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {CANCELLATION_REASON_LABEL[order.cancellation_reason]}
+                        {order.cancellation_actor === "ADMIN" && " · 판매자"}
+                        {order.cancellation_actor === "SYSTEM" && " · 시스템"}
+                      </p>
+                    )}
                   </td>
                   <td className="p-3 text-muted-foreground hidden md:table-cell text-xs">
                     {dayjs(order.created_at).format("MM/DD HH:mm")}
