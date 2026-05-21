@@ -21,7 +21,10 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
-import { ADMIN_ORDER_STATUS_OPTIONS } from "@/lib/order/status-transitions"
+import {
+  ADMIN_ORDER_STATUS_OPTIONS,
+  isTerminalOrderStatus,
+} from "@/lib/order/status-transitions"
 import {
   ADMIN_CANCEL_REASONS,
   CANCELLATION_REASON_LABEL,
@@ -358,6 +361,7 @@ const AdminOrdersPage = () => {
                     <Select
                       value={order.status}
                       onValueChange={(v) => handleStatusChange(order.id, v)}
+                      disabled={isTerminalOrderStatus(order.status)}
                     >
                       <SelectTrigger className="h-7 text-xs w-[100px]">
                         <SelectValue />

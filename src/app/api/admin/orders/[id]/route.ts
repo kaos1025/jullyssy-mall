@@ -3,7 +3,10 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isAdminOrderStatusAllowed } from "@/lib/order/status-transitions"
+import {
+  isAdminOrderStatusAllowed,
+  isTerminalOrderStatus,
+} from "@/lib/order/status-transitions"
 
 // 취소는 POST /api/admin/orders/[id]/cancel 전용 — 사유(reason) 입력 강제.
 // PATCH는 배송 운영 상태 전이 + 송장 입력만 처리한다.
@@ -19,6 +22,33 @@ const patchHandler = async (
   const admin = createAdminClient()
   const body = await request.json()
   const orderId = params.id
+
+  // P1-22 terminal freeze — status 변경 시 현재 상태가 terminal(CANCELLED/DELIVERED)이면 거부.
+  // 송장/courier만 단독으로 보내는 경우는 통과 (배송 완료 후 송장 정정 등 운영 케이스 보존).
+  if (body.status !== undefined) {
+    const { data: currentOrder } = await admin
+      .from("orders")
+      .select("status")
+      .eq("id", orderId)
+      .single()
+
+    if (!currentOrder) {
+      return NextResponse.json(
+        { error: "주문을 찾을 수 없습니다" },
+        { status: 404 }
+      )
+    }
+
+    if (isTerminalOrderStatus(currentOrder.status)) {
+      return NextResponse.json(
+        {
+          code: "ORDER_TERMINAL_STATE",
+          message: "취소되었거나 배송 완료된 주문은 상태를 변경할 수 없습니다.",
+        },
+        { status: 409 }
+      )
+    }
+  }
 
   // body.status를 무검증 update하면 어드민 실수/내부자 위협으로 PAID→RETURNED 등
   // status만 전이되어 cancelOrder를 우회한 결제 환불 누락이 가능 → 화이트리스트 강제.
