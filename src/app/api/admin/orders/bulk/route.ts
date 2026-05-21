@@ -3,7 +3,10 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isAdminOrderStatusBulkAllowed } from "@/lib/order/status-transitions"
+import {
+  isAdminOrderStatusBulkAllowed,
+  TERMINAL_ORDER_STATUSES,
+} from "@/lib/order/status-transitions"
 
 const patchHandler = async (request: NextRequest) => {
   const user = await verifyAdmin()
@@ -24,6 +27,25 @@ const patchHandler = async (request: NextRequest) => {
     return NextResponse.json(
       { error: "일괄 변경에 허용되지 않은 상태값입니다" },
       { status: 400 }
+    )
+  }
+
+  // P1-22 terminal freeze — ids 중 하나라도 terminal 주문이면 전체 거부.
+  // silent partial update를 피하고 운영자에게 명시적 피드백 제공.
+  const { data: targets } = await admin
+    .from("orders")
+    .select("id, status")
+    .in("id", ids)
+    .in("status", TERMINAL_ORDER_STATUSES as unknown as string[])
+
+  if (targets && targets.length > 0) {
+    return NextResponse.json(
+      {
+        code: "ORDER_TERMINAL_STATE",
+        message: "취소되었거나 배송 완료된 주문은 상태를 변경할 수 없습니다.",
+        terminal_ids: targets.map((t) => t.id),
+      },
+      { status: 409 }
     )
   }
 

@@ -47,3 +47,18 @@ export const isAdminOrderStatusBulkAllowed = (
 ): status is AdminOrderBulkStatus =>
   typeof status === "string" &&
   (ADMIN_ORDER_STATUS_BULK_ALLOWED as readonly string[]).includes(status)
+
+// Terminal status — 도달 후 어떤 status로도 전이 금지.
+// CANCELLED: 환불/원복 동반된 종결, 재활성화 시 회계 불일치 + cancellation_actor 메타 inconsistency
+// DELIVERED: 배송 완료된 거래 종결, 재활성화 시 운영 흐름 역행
+// (반품/교환 플로우는 별도 RETURN_REQUESTED/EXCHANGE_REQUESTED status로 분기 — 본 freeze는 PATCH의
+// 자유 전이만 차단하며, 향후 정식 반품/교환 라우트는 별도 진입로로 구현)
+export const TERMINAL_ORDER_STATUSES = ["CANCELLED", "DELIVERED"] as const
+
+export type TerminalOrderStatus = (typeof TERMINAL_ORDER_STATUSES)[number]
+
+export const isTerminalOrderStatus = (
+  status: unknown
+): status is TerminalOrderStatus =>
+  typeof status === "string" &&
+  (TERMINAL_ORDER_STATUSES as readonly string[]).includes(status)
