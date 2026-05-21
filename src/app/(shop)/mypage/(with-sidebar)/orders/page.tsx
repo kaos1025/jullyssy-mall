@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Badge } from "@/components/ui/badge"
 import { ORDER_STATUS_LABEL } from "@/constants"
 import { OrderCancelButton } from "@/components/mypage/order-cancel-button"
+import { VISIBLE_ORDER_STATUSES } from "@/lib/order/visibility"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ const OrdersPage = async ({ searchParams }: OrdersPageProps) => {
   const { data: orders, count } = await supabase
     .from("orders")
     .select("*, order_items(*)", { count: "exact" })
+    .in("status", VISIBLE_ORDER_STATUSES as unknown as string[])
     .order("created_at", { ascending: false })
     .range(offset, offset + pageSize - 1)
 

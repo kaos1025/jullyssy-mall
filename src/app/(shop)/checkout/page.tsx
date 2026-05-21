@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ChevronDown, ChevronUp } from "lucide-react"
+import * as Sentry from "@sentry/nextjs"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -26,6 +28,7 @@ const paymentMethods: { value: PaymentMethodType; label: string }[] = [
 
 const CheckoutPage = () => {
   const { toast } = useToast()
+  const router = useRouter()
   const { items, getTotal } = useCart()
   const [mounted, setMounted] = useState(false)
 
@@ -118,6 +121,9 @@ const CheckoutPage = () => {
 
     setLoading(true)
 
+    // catch에서 PENDING cleanup 호출에 사용 — try 외부 closure
+    let createdOrderId: string | null = null
+
     try {
       // 0. 새 배송지 저장 (체크한 경우)
       const saveAddr = (window as unknown as Record<string, unknown>)
@@ -153,6 +159,7 @@ const CheckoutPage = () => {
       }
 
       const { order_id, order_no, paid_amount } = await res.json()
+      createdOrderId = order_id
 
       // 2. 토스페이먼츠 결제 요청
       const { loadTossPayments } = await import(
@@ -209,9 +216,35 @@ const CheckoutPage = () => {
           break
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "결제 처리 중 오류가 발생했습니다"
-      if (!message.includes("취소")) {
+      // 토스 SDK는 UserCancelError를 throw하지만 `.d.ts`에 런타임 code 값이 노출돼 있지 않다.
+      // 공식 문서 기준 USER_CANCEL / PAY_PROCESS_CANCELED 두 코드를 모두 받고, 마지막 안전책으로
+      // message에 "취소"가 포함되는지도 확인 (이전 동작 호환).
+      const err = error as { code?: string | null; message?: string } | null
+      const code = err?.code ?? ""
+      const message = err?.message ?? "결제 처리 중 오류가 발생했습니다"
+      const isUserCancel =
+        code === "USER_CANCEL" ||
+        code === "PAY_PROCESS_CANCELED" ||
+        message.includes("취소")
+
+      // PENDING 주문 cleanup — 사용자 취소든 일반 에러든 결제 confirm 미진입 PENDING은 정리되어야 한다.
+      // 실패 시 cron(033)이 30분 후 만료 처리하므로 best-effort 호출로 충분.
+      if (createdOrderId) {
+        fetch(`/api/orders/${createdOrderId}/cleanup-pending`, {
+          method: "POST",
+        }).catch(() => {})
+      }
+
+      if (isUserCancel) {
+        toast({ title: "결제가 취소되었습니다" })
+        router.push("/cart")
+      } else {
+        Sentry.captureException(error, {
+          tags: {
+            payment_error_code: code || "unknown",
+            payment_method: paymentMethod,
+          },
+        })
         toast({
           variant: "destructive",
           title: "결제 실패",
