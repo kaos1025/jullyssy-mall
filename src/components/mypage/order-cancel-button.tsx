@@ -22,7 +22,11 @@ export const OrderCancelButton = ({ orderId }: OrderCancelButtonProps) => {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const handleCancel = async () => {
+  // Dialog는 Portal로 DOM 분리되지만 React 합성 이벤트는 React 트리 따라 버블링한다.
+  // 본 컴포넌트가 카드 <Link> 내부에 렌더되므로 Dialog 내부 버튼 onClick이 stopPropagation
+  // 없이 호출되면 Link로 전파돼 navigation이 발동된다(닫기 클릭 시 상세 페이지 진입 회귀).
+  const handleCancel = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     setLoading(true)
 
     const res = await fetch(`/api/orders/${orderId}/cancel`, {
@@ -45,6 +49,11 @@ export const OrderCancelButton = ({ orderId }: OrderCancelButtonProps) => {
     }
 
     setLoading(false)
+  }
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setOpen(false)
   }
 
   return (
@@ -73,7 +82,7 @@ export const OrderCancelButton = ({ orderId }: OrderCancelButtonProps) => {
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               disabled={loading}
             >
               닫기
