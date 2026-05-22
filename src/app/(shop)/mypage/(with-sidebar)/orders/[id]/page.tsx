@@ -18,8 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { ORDER_STATUS_LABEL } from "@/constants"
-import { COURIER_TRACKING_URLS } from "@/constants/courier"
-import type { CourierName } from "@/constants/courier"
+import { buildTrackingUrl } from "@/lib/order/tracking-url"
 import type { OrderWithItems } from "@/types"
 import {
   buildCancellationLabel,
@@ -215,26 +214,37 @@ const OrderDetailPage = () => {
             메모: {order.delivery_memo}
           </p>
         )}
-        {order.courier && order.tracking_no && (
+        {/* 송장 정보 — courier 또는 tracking_no 중 하나라도 있을 때만 노출.
+            둘 다 NULL이면 hide (발송 준비 단계는 별도 안내 불필요 — status badge가 역할). */}
+        {(order.courier || order.tracking_no) && (
           <div className="pt-2">
             <Separator className="mb-2" />
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div className="text-sm">
-                <span className="text-muted-foreground">택배사:</span> {order.courier}
-                <br />
-                <span className="text-muted-foreground">송장번호:</span> {order.tracking_no}
+                {order.courier && (
+                  <>
+                    <span className="text-muted-foreground">택배사:</span>{" "}
+                    {order.courier}
+                    <br />
+                  </>
+                )}
+                {order.tracking_no && (
+                  <>
+                    <span className="text-muted-foreground">송장번호:</span>{" "}
+                    {order.tracking_no}
+                  </>
+                )}
               </div>
-              {COURIER_TRACKING_URLS[order.courier as CourierName] && (
-                <a
-                  href={COURIER_TRACKING_URLS[order.courier as CourierName](order.tracking_no)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" size="sm">
-                    배송 조회
-                  </Button>
-                </a>
-              )}
+              {(() => {
+                const url = buildTrackingUrl(order.courier, order.tracking_no)
+                return url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm">
+                      배송 조회
+                    </Button>
+                  </a>
+                ) : null
+              })()}
             </div>
           </div>
         )}

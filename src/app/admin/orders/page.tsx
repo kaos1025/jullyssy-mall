@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -32,7 +31,8 @@ import {
   type CancellationActor,
   type CancellationReason,
 } from "@/lib/order/cancellation"
-import { COURIERS } from "@/constants/courier"
+import { COURIER_SUGGESTIONS } from "@/lib/order/courier-suggestions"
+import { InlineTrackingCell } from "@/components/admin/inline-tracking-cell"
 import dayjs from "dayjs"
 
 const STATUS_TABS = [
@@ -67,11 +67,6 @@ const AdminOrdersPage = () => {
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-
-  // 송장 입력 다이얼로그
-  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
-  const [courier, setCourier] = useState<string>(COURIERS[0])
-  const [trackingNo, setTrackingNo] = useState("")
 
   // 어드민 취소 다이얼로그 — 사유 입력 강제 (Track C)
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null)
@@ -154,18 +149,15 @@ const AdminOrdersPage = () => {
     toast({ title: `${selectedIds.length}건 상태 변경: ${ORDER_STATUS_LABEL[newStatus]}` })
   }
 
-  const handleTrackingSubmit = async () => {
-    if (!trackingOrderId || !trackingNo) return
-    await fetch(`/api/admin/orders/${trackingOrderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ courier, tracking_no: trackingNo, status: "SHIPPING" }),
-    })
-
-    setTrackingOrderId(null)
-    setTrackingNo("")
-    fetchOrders()
-    toast({ title: "송장번호 등록 완료" })
+  // 송장 인라인 입력 후 부분 갱신 — fetchOrders 재호출 없이 row만 업데이트(P0 응답성).
+  const updateOrderField = (
+    id: string,
+    field: "courier" | "tracking_no",
+    value: string
+  ) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, [field]: value || null } : o))
+    )
   }
 
   const handleCsvExport = () => {
@@ -198,6 +190,13 @@ const AdminOrdersPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* 인라인 택배사 셀 공용 datalist (전 row 공유). */}
+      <datalist id="courier-suggestions">
+        {COURIER_SUGGESTIONS.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">주문 관리</h1>
         <Button variant="outline" onClick={handleCsvExport}>
@@ -315,19 +314,20 @@ const AdminOrdersPage = () => {
               <th className="p-3 text-right">금액</th>
               <th className="p-3 text-center">상태</th>
               <th className="p-3 text-left hidden md:table-cell">일자</th>
-              <th className="p-3 text-center">관리</th>
+              <th className="p-3 text-left w-[140px]">택배사</th>
+              <th className="p-3 text-left w-[180px]">송장번호</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="text-center py-10 text-muted-foreground">
+                <td colSpan={9} className="text-center py-10 text-muted-foreground">
                   로딩 중...
                 </td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-10 text-muted-foreground">
+                <td colSpan={9} className="text-center py-10 text-muted-foreground">
                   주문이 없습니다.
                 </td>
               </tr>
@@ -385,50 +385,26 @@ const AdminOrdersPage = () => {
                   <td className="p-3 text-muted-foreground hidden md:table-cell text-xs">
                     {dayjs(order.created_at).format("MM/DD HH:mm")}
                   </td>
-                  <td className="p-3 text-center">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant={order.tracking_no ? "ghost" : order.status === "PAID" || order.status === "PREPARING" ? "outline" : "ghost"}
-                          size="sm"
-                          className={`text-xs ${order.tracking_no ? "text-green-600" : order.status === "PAID" || order.status === "PREPARING" ? "text-orange-600 border-orange-300" : ""}`}
-                          onClick={() => {
-                            setTrackingOrderId(order.id)
-                            setCourier(order.courier || COURIERS[0])
-                            setTrackingNo(order.tracking_no || "")
-                          }}
-                        >
-                          {order.tracking_no ? "송장 ✓" : "송장"}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>송장번호 입력</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-3">
-                          <Select value={courier} onValueChange={setCourier}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {COURIERS.map((c) => (
-                                <SelectItem key={c} value={c}>
-                                  {c}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            placeholder="송장번호 입력"
-                            value={trackingNo}
-                            onChange={(e) => setTrackingNo(e.target.value)}
-                          />
-                          <Button onClick={handleTrackingSubmit} className="w-full">
-                            등록
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                  <td className="p-2">
+                    <InlineTrackingCell
+                      orderId={order.id}
+                      field="courier"
+                      initialValue={order.courier}
+                      disabled={isTerminalOrderStatus(order.status)}
+                      onSaved={(v) => updateOrderField(order.id, "courier", v)}
+                    />
+                  </td>
+                  <td className="p-2">
+                    <InlineTrackingCell
+                      orderId={order.id}
+                      field="tracking_no"
+                      initialValue={order.tracking_no}
+                      disabled={isTerminalOrderStatus(order.status)}
+                      onSaved={(v) =>
+                        updateOrderField(order.id, "tracking_no", v)
+                      }
+                      courierForUrl={order.courier}
+                    />
                   </td>
                 </tr>
               ))
