@@ -289,9 +289,11 @@ const AdminOrdersPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* 테이블 */}
+      {/* 테이블 — 신규 컬럼 2개(택배사 140 + 송장번호 180) 추가로 합산 폭 ↑.
+          모바일은 가로 스크롤 정책(데스크탑 주 사용). min-w로 셀 폭 보장 → 좁은 viewport에서도
+          input + spinner + ExternalLink가 압축되지 않음. */}
       <div className="border rounded-lg overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[1100px]">
           <thead className="bg-muted/50">
             <tr>
               <th className="p-3 w-10">
