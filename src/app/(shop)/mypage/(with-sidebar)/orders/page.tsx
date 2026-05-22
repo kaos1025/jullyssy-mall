@@ -73,14 +73,20 @@ const OrdersPage = async ({ searchParams }: OrdersPageProps) => {
             href={`/mypage/orders/${order.id}`}
             className="block border rounded-lg p-4 hover:border-primary/50 transition-colors"
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
+            {/* 모바일(<400px)에서 [주문번호+뱃지] + [취소버튼+날짜]가 한 줄에 못 들어가
+                Badge 글자가 세로로 stack되던 회귀 — flex-wrap으로 자연 줄바꿈 허용 + Badge에
+                whitespace-nowrap 보장 + 우측 영역은 flex-shrink-0으로 압축 방지. */}
+            <div className="flex items-center justify-between flex-wrap gap-y-2 mb-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <span className="text-sm font-medium">{order.order_no}</span>
-                <Badge variant={statusVariant(order.status)}>
+                <Badge
+                  variant={statusVariant(order.status)}
+                  className="whitespace-nowrap"
+                >
                   {ORDER_STATUS_LABEL[order.status] || order.status}
                 </Badge>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {["PAID", "PREPARING"].includes(order.status) && (
                   <OrderCancelButton orderId={order.id} />
                 )}
