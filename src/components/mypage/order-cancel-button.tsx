@@ -49,10 +49,11 @@ export const OrderCancelButton = ({ orderId }: OrderCancelButtonProps) => {
 
   return (
     <>
+      {/* P1-26: 카드 줄2 한 줄 유지 + "결제 직후 취소"는 자주 발생 X → ghost로 시각 약화. */}
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="text-xs"
+        className="text-xs h-6 px-2 text-muted-foreground hover:text-foreground"
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
