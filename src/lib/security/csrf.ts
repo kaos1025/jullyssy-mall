@@ -4,7 +4,10 @@ const STATE_CHANGING_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 
 // 토스 webhook은 외부 서버에서 Origin 없이 호출 → CSRF 면제
 // payment_secret 기반 HMAC 검증으로 별도 보호됨 (commit 0d5dd67)
-const CSRF_EXEMPT_PATHS = ["/api/payments/webhook"]
+//
+// /api/dev/* — preview 환경 자동화 검증 (이메일 발송 테스트 등). production에서는
+// VERCEL_ENV === "production" 차단으로 라우트 자체가 404, 별도 헤더 인증(x-resend-key 등)으로 보호.
+const CSRF_EXEMPT_PATHS = ["/api/payments/webhook", "/api/dev/"]
 
 const PRODUCTION_ORIGINS = [
   "https://jullyssy.shop",
