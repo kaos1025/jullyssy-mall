@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -7,6 +8,16 @@ import {
   isAdminOrderStatusAllowed,
   isTerminalOrderStatus,
 } from "@/lib/order/status-transitions"
+import { buildTrackingUrl } from "@/lib/order/tracking-url"
+import {
+  sendShippingDelivered,
+  sendShippingStarted,
+} from "@/lib/email/send"
+import {
+  formatKST,
+  getOrderDetailUrl,
+  resolveUserEmail,
+} from "@/lib/email/mappers"
 
 // 취소는 POST /api/admin/orders/[id]/cancel 전용 — 사유(reason) 입력 강제.
 // PATCH는 배송 운영 상태 전이 + 송장 입력만 처리한다.
@@ -67,6 +78,20 @@ const patchHandler = async (
   if (body.courier) updateData.courier = body.courier
   if (body.tracking_no) updateData.tracking_no = body.tracking_no
 
+  // SHIPPING 전환 시 courier + tracking_no 필수 — body로 함께 입력하는 운영 흐름 강제.
+  // 빈 송장으로 발송된 메일이 사용자에게 도달하는 회귀 차단 (Phase 3 가드).
+  if (body.status === "SHIPPING") {
+    if (!body.courier || !body.tracking_no) {
+      return NextResponse.json(
+        {
+          code: "TRACKING_REQUIRED",
+          error: "배송 시작 전환에는 택배사와 송장번호가 모두 필요합니다",
+        },
+        { status: 400 }
+      )
+    }
+  }
+
   const { error } = await admin
     .from("orders")
     .update(updateData)
@@ -74,6 +99,78 @@ const patchHandler = async (
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // 배송 시작/완료 메일 — UPDATE 성공 후, fire-and-forget
+  if (body.status === "SHIPPING" || body.status === "DELIVERED") {
+    const { data: orderFull } = await admin
+      .from("orders")
+      .select("*, order_items(*)")
+      .eq("id", orderId)
+      .single()
+
+    if (orderFull) {
+      const userEmail = await resolveUserEmail(orderFull.user_id)
+      if (!userEmail) {
+        Sentry.captureMessage("Email recipient missing", {
+          level: "info",
+          tags: {
+            type: "email",
+            event:
+              body.status === "SHIPPING"
+                ? "shipping_started_skip"
+                : "shipping_delivered_skip",
+          },
+          extra: { orderId: orderFull.id, userId: orderFull.user_id },
+        })
+      } else if (body.status === "SHIPPING") {
+        const trackingUrl = buildTrackingUrl(
+          orderFull.courier,
+          orderFull.tracking_no
+        )
+        if (trackingUrl && orderFull.courier && orderFull.tracking_no) {
+          sendShippingStarted({
+            to: userEmail,
+            customerName: orderFull.recipient,
+            orderNo: orderFull.order_no,
+            shippedDate: formatKST(orderFull.updated_at),
+            courierName: orderFull.courier,
+            trackingNumber: orderFull.tracking_no,
+            trackingUrl,
+            shipping: {
+              recipient: orderFull.recipient,
+              phone: orderFull.recipient_phone,
+              postalCode: orderFull.zipcode,
+              address: orderFull.address1,
+              addressDetail: orderFull.address2 || undefined,
+            },
+            orderDetailUrl: getOrderDetailUrl(orderFull.id),
+            context: { orderId: orderFull.id, userId: orderFull.user_id },
+          })
+        }
+      } else {
+        sendShippingDelivered({
+          to: userEmail,
+          customerName: orderFull.recipient,
+          orderNo: orderFull.order_no,
+          deliveredDate: formatKST(orderFull.updated_at),
+          items: (orderFull.order_items ?? []).map(
+            (i: {
+              product_name: string
+              color: string
+              size: string
+              quantity: number
+            }) => ({
+              productName: i.product_name,
+              optionName: `${i.color} / ${i.size}`,
+              quantity: i.quantity,
+            })
+          ),
+          orderDetailUrl: getOrderDetailUrl(orderFull.id),
+          context: { orderId: orderFull.id, userId: orderFull.user_id },
+        })
+      }
+    }
   }
 
   return NextResponse.json({ success: true })

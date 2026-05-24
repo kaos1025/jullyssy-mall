@@ -4,6 +4,13 @@ import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { paymentsLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { cleanupPendingOrder } from "@/lib/order/cleanup-pending-order"
+import { sendOrderConfirmation } from "@/lib/email/send"
+import {
+  formatKST,
+  getOrderDetailUrl,
+  getPaymentMethodLabel,
+  resolveUserEmail,
+} from "@/lib/email/mappers"
 
 const getHandler = async (request: Request) => {
   const { searchParams, origin } = new URL(request.url)
@@ -81,10 +88,12 @@ const getHandler = async (request: Request) => {
       )
     }
 
+    const paymentMethod = mapPaymentMethod(tossData)
+
     await admin.from("payments").insert({
       order_id: orderUuid,
       payment_key: paymentKey,
-      method: mapPaymentMethod(tossData),
+      method: paymentMethod,
       amount: Number(amount),
       status: "DONE",
       raw_response: tossData,
@@ -97,26 +106,72 @@ const getHandler = async (request: Request) => {
       .update({ status: "PAID" })
       .eq("id", orderUuid)
 
-    // 결제 승인 성공 후 장바구니에서 주문 상품 삭제
-    const { data: order } = await admin
+    // 결제 승인 성공 후 — orders 전체 + order_items 통합 조회 (cart 정리 + 메일 props 양쪽 활용)
+    const { data: orderFull } = await admin
       .from("orders")
-      .select("user_id")
+      .select("*, order_items(*)")
       .eq("id", orderUuid)
       .single()
 
-    if (order) {
-      const { data: orderItems } = await admin
-        .from("order_items")
-        .select("product_option_id")
-        .eq("order_id", orderUuid)
-
-      if (orderItems?.length) {
-        const optionIds = orderItems.map((i) => i.product_option_id)
+    if (orderFull?.order_items?.length) {
+      const optionIds = orderFull.order_items
+        .map((i: { product_option_id: string | null }) => i.product_option_id)
+        .filter((id: string | null): id is string => !!id)
+      if (optionIds.length) {
         await admin
           .from("cart_items")
           .delete()
-          .eq("user_id", order.user_id)
+          .eq("user_id", orderFull.user_id)
           .in("product_option_id", optionIds)
+      }
+    }
+
+    // 주문 확정 메일 — DB commit 후, fire-and-forget (결제 응답 차단 금지)
+    if (orderFull) {
+      const userEmail = await resolveUserEmail(orderFull.user_id)
+      if (userEmail) {
+        sendOrderConfirmation({
+          to: userEmail,
+          customerName: orderFull.recipient,
+          orderNo: orderFull.order_no,
+          orderDate: formatKST(orderFull.created_at),
+          items: orderFull.order_items.map(
+            (i: {
+              product_name: string
+              color: string
+              size: string
+              quantity: number
+              price: number
+            }) => ({
+              productName: i.product_name,
+              optionName: `${i.color} / ${i.size}`,
+              quantity: i.quantity,
+              priceEach: i.price,
+            })
+          ),
+          subtotal: orderFull.total_amount,
+          shippingFee: orderFull.shipping_fee,
+          discount:
+            orderFull.discount_amount > 0 ? orderFull.discount_amount : undefined,
+          total: orderFull.paid_amount,
+          paymentMethod: getPaymentMethodLabel(paymentMethod),
+          shipping: {
+            recipient: orderFull.recipient,
+            phone: orderFull.recipient_phone,
+            postalCode: orderFull.zipcode,
+            address: orderFull.address1,
+            addressDetail: orderFull.address2 || undefined,
+            message: orderFull.delivery_memo || undefined,
+          },
+          orderDetailUrl: getOrderDetailUrl(orderFull.id),
+          context: { orderId: orderFull.id, userId: orderFull.user_id },
+        })
+      } else {
+        Sentry.captureMessage("Email recipient missing", {
+          level: "info",
+          tags: { type: "email", event: "order_confirmation_skip" },
+          extra: { orderId: orderFull.id, userId: orderFull.user_id },
+        })
       }
     }
 

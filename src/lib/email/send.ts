@@ -1,8 +1,24 @@
 import * as Sentry from "@sentry/nextjs"
 import { render } from "@react-email/render"
-import type { ReactElement } from "react"
+import { createElement, type ReactElement } from "react"
 
 import { getResendClient } from "@/lib/email/client"
+import {
+  OrderConfirmation,
+  type OrderConfirmationProps,
+} from "@/lib/email/templates/OrderConfirmation"
+import {
+  RefundCompleted,
+  type RefundCompletedProps,
+} from "@/lib/email/templates/RefundCompleted"
+import {
+  ShippingDelivered,
+  type ShippingDeliveredProps,
+} from "@/lib/email/templates/ShippingDelivered"
+import {
+  ShippingStarted,
+  type ShippingStartedProps,
+} from "@/lib/email/templates/ShippingStarted"
 
 export type SendEmailOptions = {
   /** 도메인 이벤트명 (Sentry tag 'event'). 예: 'order_paid', 'cancel_confirm' */
@@ -15,6 +31,8 @@ export type SendEmailOptions = {
   react: ReactElement
   /** 발신자 override. 미지정 시 process.env.EMAIL_FROM 사용 */
   from?: string
+  /** 실패 시 Sentry extra로 함께 전송될 도메인 컨텍스트 (orderId 등) */
+  context?: Record<string, unknown>
 }
 
 /**
@@ -69,9 +87,77 @@ export function sendAsync(opts: SendEmailOptions): void {
         event: opts.event,
         env: process.env.VERCEL_ENV ?? "local",
       },
+      extra: opts.context,
     })
     if (process.env.NODE_ENV !== "production") {
       console.warn(`[email:${opts.event}] send failed (fire-and-forget):`, err)
     }
+  })
+}
+
+// =============================================================================
+// Production wrappers — 4종 호출부 통합용 (Phase 3)
+// =============================================================================
+// 각 wrapper는 sendAsync 기반 (fire-and-forget). 호출부에서 await/try-catch 금지.
+// Day 18 결제 라이프사이클 무결성 — 메일 발송 실패가 결제 응답을 차단하지 않도록.
+
+const PRODUCTION_SUBJECTS = {
+  orderConfirmation: "[쥴리씨] 주문 확정 안내",
+  shippingStarted: "[쥴리씨] 상품 출고 안내",
+  shippingDelivered: "[쥴리씨] 배송 완료 안내",
+  refundCompleted: "[쥴리씨] 환불 완료 안내",
+} as const
+
+export type SendContext = { context?: Record<string, unknown> }
+
+export const sendOrderConfirmation = (
+  params: { to: string | string[] } & OrderConfirmationProps & SendContext
+): void => {
+  const { to, context, ...props } = params
+  sendAsync({
+    event: "order_confirmation",
+    to,
+    subject: PRODUCTION_SUBJECTS.orderConfirmation,
+    react: createElement(OrderConfirmation, props),
+    context,
+  })
+}
+
+export const sendShippingStarted = (
+  params: { to: string | string[] } & ShippingStartedProps & SendContext
+): void => {
+  const { to, context, ...props } = params
+  sendAsync({
+    event: "shipping_started",
+    to,
+    subject: PRODUCTION_SUBJECTS.shippingStarted,
+    react: createElement(ShippingStarted, props),
+    context,
+  })
+}
+
+export const sendShippingDelivered = (
+  params: { to: string | string[] } & ShippingDeliveredProps & SendContext
+): void => {
+  const { to, context, ...props } = params
+  sendAsync({
+    event: "shipping_delivered",
+    to,
+    subject: PRODUCTION_SUBJECTS.shippingDelivered,
+    react: createElement(ShippingDelivered, props),
+    context,
+  })
+}
+
+export const sendRefundCompleted = (
+  params: { to: string | string[] } & RefundCompletedProps & SendContext
+): void => {
+  const { to, context, ...props } = params
+  sendAsync({
+    event: "refund_completed",
+    to,
+    subject: PRODUCTION_SUBJECTS.refundCompleted,
+    react: createElement(RefundCompleted, props),
+    context,
   })
 }
