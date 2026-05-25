@@ -53,8 +53,9 @@ export const PRIVACY_POLICY: TermsArticle[] = [
     items: [
       "토스페이먼츠: 결제 처리 및 결제 도용 방지",
       "CJ대한통운: 상품 배송",
-      "Upstash, Inc.: API 요청 빈도 제한(rate limiting) — 처리 항목: IP 주소·User-Agent / 보유 기간: 60초(rate limit 윈도우 만료 시 자동 삭제) / 이전 국가: 미국",
-      "Sentry (Functional Software, Inc.): 에러 모니터링 및 성능 추적 — 처리 항목: IP 주소·User-Agent·에러 스택트레이스 및 요청 컨텍스트(개인식별정보·결제정보·인증정보는 자동 필터링) / 보유 기간: 자사 서비스 이용 종료 시 또는 위탁 계약 종료 시 / 이전 국가: 미국",
+      "Upstash, Inc.: API 요청 빈도 제한(rate limiting) — 처리 항목: IP 주소·User-Agent / 보유 기간: 60초(rate limit 윈도우 만료 시 자동 삭제) / 이전 국가: 미국 / 문의처: privacy@upstash.com",
+      "Sentry (Functional Software, Inc.): 에러 모니터링 및 성능 추적 — 처리 항목: IP 주소·User-Agent·에러 스택트레이스 및 요청 컨텍스트(개인식별정보·결제정보·인증정보는 자동 필터링) / 보유 기간: 자사 서비스 이용 종료 시 또는 위탁 계약 종료 시 / 이전 국가: 미국 / 문의처: compliance@sentry.io",
+      "Resend, Inc.: 주문 안내 이메일 발송(주문 확정·배송 시작·배송 완료·환불 완료) — 처리 항목: 이메일 주소·이름·주문 정보(주문번호·상품명·옵션·가격·결제수단·송장번호·환불금액)·배송 정보(전화번호·우편번호·주소·배송 메모) / 보유 기간: 회원 탈퇴 시 또는 위탁 계약 종료 시 (Resend 자체 보존 정책 별도 적용) / 이전 국가: 미국 / 문의처: support@resend.com",
       "몰은 위탁계약 시 개인정보가 안전하게 관리될 수 있도록 필요한 사항을 규정하고 있으며, 위탁업무의 내용이나 수탁자가 변경될 경우 지체 없이 본 개인정보처리방침을 통하여 공개하겠습니다.",
     ],
   },
