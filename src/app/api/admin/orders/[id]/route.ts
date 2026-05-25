@@ -36,10 +36,11 @@ const patchHandler = async (
 
   // P1-22 terminal freeze — status 변경 시 현재 상태가 terminal(CANCELLED/DELIVERED)이면 거부.
   // 송장/courier만 단독으로 보내는 경우는 통과 (배송 완료 후 송장 정정 등 운영 케이스 보존).
+  // SHIPPING 전환 가드도 같은 분기에서 함께 처리 (RTT 1회 재사용).
   if (body.status !== undefined) {
     const { data: currentOrder } = await admin
       .from("orders")
-      .select("status")
+      .select("status, courier, tracking_no")
       .eq("id", orderId)
       .single()
 
@@ -59,6 +60,23 @@ const patchHandler = async (
         { status: 409 }
       )
     }
+
+    // SHIPPING 전환 시 송장 필수 — body 신규 값 또는 DB 기존 값 둘 중 하나라도 있으면 통과.
+    // 운영 흐름: 송장 입력(PATCH 1) → 상태 전환(PATCH 2) 분리 패턴 보존 (P1-23 인라인 입력).
+    // body에 송장이 없어도 DB에 이미 채워진 상태면 SHIPPING 전환 허용.
+    if (body.status === "SHIPPING") {
+      const finalCourier = body.courier ?? currentOrder.courier
+      const finalTrackingNo = body.tracking_no ?? currentOrder.tracking_no
+      if (!finalCourier || !finalTrackingNo) {
+        return NextResponse.json(
+          {
+            code: "TRACKING_REQUIRED",
+            error: "배송 시작 전환에는 택배사와 송장번호를 먼저 입력해주세요",
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   // body.status를 무검증 update하면 어드민 실수/내부자 위협으로 PAID→RETURNED 등
@@ -77,20 +95,6 @@ const patchHandler = async (
   }
   if (body.courier) updateData.courier = body.courier
   if (body.tracking_no) updateData.tracking_no = body.tracking_no
-
-  // SHIPPING 전환 시 courier + tracking_no 필수 — body로 함께 입력하는 운영 흐름 강제.
-  // 빈 송장으로 발송된 메일이 사용자에게 도달하는 회귀 차단 (Phase 3 가드).
-  if (body.status === "SHIPPING") {
-    if (!body.courier || !body.tracking_no) {
-      return NextResponse.json(
-        {
-          code: "TRACKING_REQUIRED",
-          error: "배송 시작 전환에는 택배사와 송장번호가 모두 필요합니다",
-        },
-        { status: 400 }
-      )
-    }
-  }
 
   const { error } = await admin
     .from("orders")
