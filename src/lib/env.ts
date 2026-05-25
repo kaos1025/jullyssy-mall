@@ -61,6 +61,22 @@ export function validateEnv() {
       )
     }
   }
+
+  // Resend (transactional email) — KV 선례와 동일 패턴
+  // VERCEL_ENV === "production"만 강제 검증. preview/dev는 fail-open
+  // (runtime guard는 send.ts에서 모든 환경 throw로 별도 처리)
+  if (process.env.VERCEL_ENV === "production") {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error(
+        "❌ 프로덕션에서 RESEND_API_KEY가 누락되었습니다."
+      )
+    }
+    if (!process.env.EMAIL_FROM) {
+      throw new Error(
+        "❌ 프로덕션에서 EMAIL_FROM이 누락되었습니다. (예: \"쥴리씨 <no-reply@juliessy.com>\")"
+      )
+    }
+  }
 }
 
 // KV 환경변수 export — 단일 진입점 원칙 (외부에서 process.env.KV_* 직접 참조 금지)
