@@ -7,6 +7,9 @@
 //
 // dry_run=true 시 큐 insert 없이 카운트/예상 비용만 응답.
 // 기존 pending/processing 큐 row가 있는 product는 자동 제외 (중복 회피).
+//
+// D3 PoC 보강: product_ids 옵션 (1~10 UUID). 제공 시 scope/limit 무시하고 명시 선정.
+// PoC §2 "샘플 3건 명시 선정" 정합성 100% 보장 + 정식 backfill 정확 선정 경로 동시 충족.
 
 import { NextRequest, NextResponse } from "next/server"
 import * as Sentry from "@sentry/nextjs"
@@ -20,12 +23,17 @@ const COST_PER_PRODUCT_USD = 0.0095
 const ALLOWED_SCOPES = ["active", "active_no_seo"] as const
 type BackfillScope = (typeof ALLOWED_SCOPES)[number]
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_PRODUCT_IDS = 10
+
 interface BackfillBody {
   scope?: BackfillScope
   limit?: number
   dry_run?: boolean
   /** D3 PoC — true 시 각 상품에 preserve + replace 2개 큐 insert. default false (회귀 0). */
   poc_mode?: boolean
+  /** D3 PoC 보강 — 1~10 UUID. 제공 시 scope/limit 무시하고 명시 선정. */
+  product_ids?: string[]
 }
 
 type Validation =
@@ -35,6 +43,8 @@ type Validation =
       limit: number
       dryRun: boolean
       pocMode: boolean
+      /** null이면 scope/limit 경로 (회귀 0). string[] 제공 시 product_ids 경로. */
+      productIds: string[] | null
     }
   | { ok: false; error: string }
 
@@ -66,7 +76,32 @@ const validateBody = (body: unknown): Validation => {
   if (typeof pocMode !== "boolean") {
     return { ok: false, error: "poc_mode는 boolean이어야 합니다" }
   }
-  return { ok: true, scope, limit, dryRun, pocMode }
+
+  // product_ids 검증 — undefined/null이면 scope/limit 경로 (회귀 0)
+  let productIds: string[] | null = null
+  if (b.product_ids !== undefined && b.product_ids !== null) {
+    if (!Array.isArray(b.product_ids)) {
+      return { ok: false, error: "product_ids는 배열이어야 합니다" }
+    }
+    if (b.product_ids.length === 0) {
+      return { ok: false, error: "product_ids 배열이 비어 있습니다" }
+    }
+    if (b.product_ids.length > MAX_PRODUCT_IDS) {
+      return {
+        ok: false,
+        error: `product_ids는 최대 ${MAX_PRODUCT_IDS}건까지 허용됩니다`,
+      }
+    }
+    for (const id of b.product_ids) {
+      if (typeof id !== "string" || !UUID_RE.test(id)) {
+        return { ok: false, error: `product_ids에 유효하지 않은 UUID: ${id}` }
+      }
+    }
+    // 중복 제거 (운영자 입력 안전)
+    productIds = Array.from(new Set(b.product_ids))
+  }
+
+  return { ok: true, scope, limit, dryRun, pocMode, productIds }
 }
 
 const postHandler = async (request: NextRequest) => {
@@ -83,7 +118,9 @@ const postHandler = async (request: NextRequest) => {
     return NextResponse.json({ error: v.error }, { status: 400 })
   }
 
-  const { scope, limit, dryRun, pocMode } = v
+  const { scope, limit, dryRun, pocMode, productIds: requestedIds } = v
+  const targetMode = requestedIds !== null ? "product_ids" : "scope"
+  Sentry.setTag("backfill_target_mode", targetMode)
   Sentry.setTag("backfill_scope", scope)
   Sentry.setTag("backfill_dry_run", String(dryRun))
   Sentry.setTag("backfill_poc_mode", String(pocMode))
@@ -103,24 +140,63 @@ const postHandler = async (request: NextRequest) => {
 
   const supabase = createAdminClient()
 
-  // 대상 products 카운트 + id 조회 (scope별)
-  let listQuery = supabase
-    .from("products")
-    .select("id")
-    .eq("status", "ACTIVE")
-    .order("id", { ascending: true })
-    .limit(limit)
-  if (scope === "active_no_seo") {
-    listQuery = listQuery.or("meta_title.is.null,seo_updated_at.is.null")
+  // 대상 products 조회 — product_ids 경로 또는 scope/limit 경로
+  let productIds: string[]
+  if (requestedIds !== null) {
+    // D3 PoC 보강 — product_ids 명시 선정 경로
+    const { data: foundProducts, error: lookupErr } = await supabase
+      .from("products")
+      .select("id, status")
+      .in("id", requestedIds)
+    if (lookupErr) {
+      Sentry.captureException(lookupErr, {
+        tags: { seo_event: "backfill_product_ids_lookup_failed" },
+      })
+      return NextResponse.json({ error: lookupErr.message }, { status: 500 })
+    }
+    const foundMap = new Map(
+      (foundProducts ?? []).map((p) => [p.id as string, p.status as string]),
+    )
+    const failed: Array<{ product_id: string; reason: string }> = []
+    for (const id of requestedIds) {
+      const status = foundMap.get(id)
+      if (status === undefined) {
+        failed.push({ product_id: id, reason: "NOT_FOUND" })
+      } else if (status !== "ACTIVE") {
+        failed.push({ product_id: id, reason: `STATUS=${status}` })
+      }
+    }
+    if (failed.length > 0) {
+      return NextResponse.json(
+        {
+          error: "유효하지 않은 product_ids",
+          code: "INVALID_PRODUCT_IDS",
+          failed,
+        },
+        { status: 422 },
+      )
+    }
+    productIds = requestedIds
+  } else {
+    // 기존 scope/limit 경로 (회귀 0)
+    let listQuery = supabase
+      .from("products")
+      .select("id")
+      .eq("status", "ACTIVE")
+      .order("id", { ascending: true })
+      .limit(limit)
+    if (scope === "active_no_seo") {
+      listQuery = listQuery.or("meta_title.is.null,seo_updated_at.is.null")
+    }
+    const { data: productsData, error: productsErr } = await listQuery
+    if (productsErr) {
+      Sentry.captureException(productsErr, {
+        tags: { seo_event: "backfill_products_query_failed" },
+      })
+      return NextResponse.json({ error: productsErr.message }, { status: 500 })
+    }
+    productIds = (productsData ?? []).map((p) => p.id as string)
   }
-  const { data: productsData, error: productsErr } = await listQuery
-  if (productsErr) {
-    Sentry.captureException(productsErr, {
-      tags: { seo_event: "backfill_products_query_failed" },
-    })
-    return NextResponse.json({ error: productsErr.message }, { status: 500 })
-  }
-  const productIds = (productsData ?? []).map((p) => p.id as string)
 
   // 비용 사전 검증 — poc_mode 시 preserve + replace 2배 (각 상품 2개 큐 row).
   const queueMultiplier = pocMode ? 2 : 1
@@ -172,6 +248,7 @@ const postHandler = async (request: NextRequest) => {
   if (dryRun) {
     return NextResponse.json({
       dry_run: true,
+      target_mode: targetMode,
       poc_mode: pocMode,
       would_queue: productIds.length * queueMultiplier,
       estimated_cost_usd: estimatedCostUsd,
@@ -256,6 +333,7 @@ const postHandler = async (request: NextRequest) => {
   return NextResponse.json({
     queued: queueRows.length,
     products: insertIds.length,
+    target_mode: targetMode,
     poc_mode: pocMode,
     skipped: excludeIds.size,
     estimated_cost_usd: queueRows.length * COST_PER_PRODUCT_USD,
