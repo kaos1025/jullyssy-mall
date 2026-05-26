@@ -13,6 +13,7 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
 }
 
 export { SHIPPING_FEE, FREE_SHIPPING_THRESHOLD } from "./shipping"
+export { WELCOME_COUPON_CODE } from "./coupon"
 
 export const SORT_OPTIONS = [
   { value: "newest", label: "신상품순" },
