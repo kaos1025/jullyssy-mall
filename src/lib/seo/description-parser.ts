@@ -9,9 +9,9 @@
 // import 메커니즘만 다르며 의미·인자·반환은 단일화. Day 28 학습 (의미 단일화).
 
 import { parse } from "node-html-parser"
-import type { AltInjection } from "@/types/seo"
+import type { AltInjection, SpecMetadata } from "@/types/seo"
 
-export type { AltInjection }
+export type { AltInjection, SpecMetadata }
 
 export interface InjectAltOptions {
   /** true 시 기존 alt가 있어도 덮어씀. 기본 false (보존). */
@@ -89,4 +89,102 @@ export function ensureImgAlts(
   if (html === null || html === undefined) return null
   if (html === "") return ""
   return injectAltTexts(html, injections, options).html
+}
+
+// =============================================================================
+// D3 PoC — extractSpecMetadata (spec-48-1-d3-poc-v0.1 Track B-1)
+//
+// 스마트스토어 임포트 HTML에서 spec 정보 (사이즈/소재/세탁법/모델착장)를 휴리스틱
+// 추출. AI 호출 없이 동기 처리. 정보 손실 0 — 추출 실패는 빈 객체 반환 (throw 금지).
+//
+// dual runtime: 본 모듈 + supabase/functions/_shared/seo/description-parser.ts
+// 시그니처/동작 동일 (Day 28 dual-runtime-signature feedback).
+// =============================================================================
+
+const SPEC_SIZE_LABEL_RE = /(사이즈|치수|SIZE|Size|size)/
+const SPEC_MATERIAL_LABEL_RE = /(소재|혼용률|혼방|원단|MATERIAL|Material)/
+const SPEC_WASH_LABEL_RE = /(세탁|관리법|드라이|손세탁|취급|세탁방법|WASH|CARE)/
+const SPEC_MODEL_LABEL_RE = /(모델|착장|착용정보|MODEL|Model)/
+
+const SIZE_TOKEN_RE = /\b(XS|S|M|L|XL|XXL|FREE|F|44|55|66|77|88|90|95|100)\b/g
+const MATERIAL_PERCENT_RE = /([가-힣A-Za-z]+\s*\d{1,3}\s*%(?:\s*[,，·]\s*[가-힣A-Za-z]+\s*\d{1,3}\s*%)*)/
+
+function extractSizeTokens(text: string): string[] {
+  const tokens = text.match(SIZE_TOKEN_RE)
+  if (!tokens) return []
+  return Array.from(new Set(tokens))
+}
+
+function pickFromLabelValue(
+  label: string,
+  value: string,
+  spec: SpecMetadata,
+): void {
+  if (!value) return
+  if (SPEC_SIZE_LABEL_RE.test(label) && !spec.size) {
+    const tokens = extractSizeTokens(value)
+    spec.size = tokens.length > 0 ? tokens : [value.slice(0, 100)]
+  } else if (SPEC_MATERIAL_LABEL_RE.test(label) && !spec.material) {
+    spec.material = value.slice(0, 200)
+  } else if (SPEC_WASH_LABEL_RE.test(label) && !spec.washCare) {
+    spec.washCare = value.slice(0, 200)
+  } else if (SPEC_MODEL_LABEL_RE.test(label) && !spec.modelInfo) {
+    spec.modelInfo = value.slice(0, 200)
+  }
+}
+
+function isEmptySpec(spec: SpecMetadata): boolean {
+  return !spec.size && !spec.material && !spec.washCare && !spec.modelInfo
+}
+
+/**
+ * 임포트 HTML에서 spec 정보를 휴리스틱 추출.
+ * 추출 우선순위: table tr (label/value 2-cell) → li (colon 패턴) → 정규식 fallback (소재 %).
+ * 추출 실패는 빈 객체 반환. throw 금지.
+ */
+export function extractSpecMetadata(html: string | null | undefined): SpecMetadata {
+  if (html === null || html === undefined || html === "") return {}
+  let root
+  try {
+    root = parse(html)
+  } catch {
+    return {}
+  }
+  const spec: SpecMetadata = {}
+
+  // 1. table tr 순회 (가장 흔한 패턴)
+  const rows = root.querySelectorAll("tr")
+  for (const row of rows) {
+    const cells = row.querySelectorAll("th, td")
+    if (cells.length < 2) continue
+    const label = (cells[0].text ?? "").trim()
+    const value = cells
+      .slice(1)
+      .map((c) => (c.text ?? "").trim())
+      .filter((s) => s !== "")
+      .join(" ")
+      .trim()
+    pickFromLabelValue(label, value, spec)
+  }
+
+  // 2. li 순회 (table 미사용 시 또는 보완)
+  const items = root.querySelectorAll("li")
+  for (const item of items) {
+    const text = (item.text ?? "").trim()
+    const colonMatch = text.match(/^([^:：]{1,30})[:：]\s*(.+)$/)
+    if (colonMatch) {
+      pickFromLabelValue(colonMatch[1].trim(), colonMatch[2].trim(), spec)
+    }
+  }
+
+  // 3. 정규식 fallback (소재 % 패턴, table/li 모두 매칭 실패 시)
+  if (!spec.material) {
+    const plainText = (root.text ?? "").replace(/\s+/g, " ")
+    const materialMatch = plainText.match(MATERIAL_PERCENT_RE)
+    if (materialMatch) spec.material = materialMatch[1].trim().slice(0, 200)
+  }
+
+  // 빈 객체면 그대로 반환 (정보 손실 0 원칙)
+  if (isEmptySpec(spec)) return {}
+  return spec
 }
