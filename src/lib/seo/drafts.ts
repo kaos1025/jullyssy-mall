@@ -8,6 +8,7 @@ import type {
   SeoDraftListItem,
   SeoDraftListResponse,
   SeoDraftStatus,
+  SpecMetadata,
 } from "@/types/seo"
 
 interface DraftRow {
@@ -22,6 +23,9 @@ interface DraftRow {
   cost_usd: number | string | null
   image_count: number | null
   created_at: string
+  description_mode: "preserve" | "replace"
+  product_description: string | null
+  spec_metadata: SpecMetadata | null
   products: {
     name: string
     product_images: Array<{ url: string; sort_order: number | null }> | null
@@ -46,6 +50,7 @@ export async function getSeoDraftsPendingPaginatedAdmin(
     .select(
       `id, product_id, meta_title, meta_description, search_tags,
        image_alt_texts, model, prompt_version, cost_usd, image_count, created_at,
+       description_mode, product_description, spec_metadata,
        products!inner ( name, product_images ( url, sort_order ) )`,
     )
     .eq("status", "pending_review")
@@ -73,6 +78,9 @@ export async function getSeoDraftsPendingPaginatedAdmin(
         cost_usd: Number(row.cost_usd ?? 0),
         image_count: row.image_count ?? 0,
         created_at: row.created_at,
+        description_mode: row.description_mode,
+        product_description: row.product_description,
+        spec_metadata: row.spec_metadata,
       }
     },
   )
@@ -93,6 +101,9 @@ interface DraftDetailRow {
   cost_usd: number | string | null
   image_count: number | null
   created_at: string
+  description_mode: "preserve" | "replace"
+  product_description: string | null
+  spec_metadata: SpecMetadata | null
   products: {
     name: string
     slug: string
@@ -115,6 +126,7 @@ export async function getSeoDraftDetailAdmin(
     .select(
       `id, product_id, status, meta_title, meta_description, search_tags,
        image_alt_texts, model, prompt_version, cost_usd, image_count, created_at,
+       description_mode, product_description, spec_metadata,
        products!inner (
          name, slug,
          product_images ( id, url, sort_order, alt_text )
@@ -148,5 +160,8 @@ export async function getSeoDraftDetailAdmin(
     cost_usd: Number(row.cost_usd ?? 0),
     image_count: row.image_count ?? 0,
     created_at: row.created_at,
+    description_mode: row.description_mode,
+    product_description: row.product_description,
+    spec_metadata: row.spec_metadata,
   }
 }

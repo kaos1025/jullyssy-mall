@@ -136,10 +136,11 @@ async function processQueueRow(
     tokens_input: draft.tokensInput,
     tokens_output: draft.tokensOutput,
     image_count: draft.imageCount,
-    // D3 PoC — replace mode 시 description_mode='replace' + spec_metadata 저장.
-    // preserve mode는 DB default 'preserve' + spec_metadata NULL (회귀 0).
+    // D3 PoC — replace mode 시 description_mode='replace' + spec_metadata +
+    // product_description 저장. preserve mode는 모두 default/NULL (회귀 0).
     description_mode: descMode,
     spec_metadata: draft.specMetadata ?? null,
+    product_description: draft.productDescription ?? null,
   });
   if (insertErr) {
     return { ok: false, error: `draft insert failed: ${insertErr.message}` };

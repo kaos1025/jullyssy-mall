@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dayjs from "dayjs"
 import {
@@ -8,6 +9,7 @@ import {
   ExternalLink,
   RotateCcw,
   Save,
+  Settings2,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react"
@@ -96,10 +98,40 @@ const SeoDraftsClient = ({
   )
 
   const [submitting, setSubmitting] = useState<
-    null | "save" | "approve" | "reject" | "regenerate"
+    null | "save" | "approve" | "reject" | "regenerate" | "poc"
   >(null)
+  /** D3 PoC — 사이드바이사이드 채택 시 자유 코멘트 (reject note + analysis). */
+  const [pocComment, setPocComment] = useState("")
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
+
+  // D3 PoC — 같은 product_id의 preserve + replace pending draft pair 검출.
+  // detail이 PoC pair 한쪽일 경우 우측 영역을 사이드바이사이드로 분기.
+  // limitation: drafts list (1 page)에서만 검출 — PoC trigger는 동일 시점에
+  // 큐에 함께 들어가 같은 페이지에 표시되므로 운영 시나리오에서 충족.
+  const pocPair = useMemo(() => {
+    if (!detail) return null
+    const oppositeMode =
+      detail.description_mode === "preserve" ? "replace" : "preserve"
+    const paired = drafts.find(
+      (d) =>
+        d.product_id === detail.product_id &&
+        d.description_mode === oppositeMode &&
+        d.id !== detail.id,
+    )
+    return paired ?? null
+  }, [detail, drafts])
+
+  // PoC 모드 시 preserve/replace draft 정렬 — UI 좌측 preserve, 우측 replace.
+  const pocLeft: SeoDraftListItem | SeoDraftDetail | null = useMemo(() => {
+    if (!pocPair || !detail) return null
+    return detail.description_mode === "preserve" ? detail : pocPair
+  }, [detail, pocPair])
+
+  const pocRight: SeoDraftListItem | SeoDraftDetail | null = useMemo(() => {
+    if (!pocPair || !detail) return null
+    return detail.description_mode === "replace" ? detail : pocPair
+  }, [detail, pocPair])
 
   // 목록 fetch (페이지 변경 시)
   const fetchList = useCallback(
@@ -344,6 +376,107 @@ const SeoDraftsClient = ({
     }
   }
 
+  // D3 PoC — 사이드바이사이드 채택. winner approve + loser reject sequencing.
+  // approve 성공 후 reject 실패 시 부분 상태 (운영자 수동 처리 필요) — toast 알림.
+  const handlePocSelect = async (winnerId: string, loserId: string) => {
+    if (
+      !confirm(
+        `${winnerId === pocLeft?.id ? "preserve" : "replace"} draft를 채택하고 적용합니다. 다른 한쪽은 자동 거절됩니다.`,
+      )
+    ) {
+      return
+    }
+    setSubmitting("poc")
+    try {
+      const approveRes = await fetch(
+        `/api/admin/seo-drafts/${winnerId}/approve`,
+        { method: "POST" },
+      )
+      if (!approveRes.ok) {
+        const j = await approveRes.json().catch(() => ({}))
+        throw new Error(j.error ?? `approve ${approveRes.status}`)
+      }
+      const rejectNote = `[PoC] 비교 검수에서 미채택. ${pocComment}`.trim()
+      const rejectRes = await fetch(
+        `/api/admin/seo-drafts/${loserId}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note: rejectNote }),
+        },
+      )
+      if (!rejectRes.ok) {
+        const j = await rejectRes.json().catch(() => ({}))
+        toast({
+          variant: "destructive",
+          title: "PoC 부분 실패",
+          description: `채택은 성공했으나 다른 draft 거절 실패: ${j.error ?? rejectRes.status}. 수동 처리 필요.`,
+        })
+      } else {
+        toast({ title: "PoC 채택 완료 — 상품에 적용됨" })
+      }
+      setDrafts((prev) =>
+        prev.filter((d) => d.id !== winnerId && d.id !== loserId),
+      )
+      setTotal((t) => Math.max(0, t - 2))
+      const remaining = drafts.filter(
+        (d) => d.id !== winnerId && d.id !== loserId,
+      )
+      setSelectedId(remaining[0]?.id ?? null)
+      setPocComment("")
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "PoC 채택 실패",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setSubmitting(null)
+    }
+  }
+
+  const handlePocRejectBoth = async () => {
+    if (!pocLeft || !pocRight) return
+    if (!confirm("preserve / replace 양쪽 모두 거절합니다.")) return
+    setSubmitting("poc")
+    try {
+      const note = `[PoC] 둘 다 거절. ${pocComment}`.trim()
+      const targets = [pocLeft.id, pocRight.id]
+      const results = await Promise.all(
+        targets.map((id) =>
+          fetch(`/api/admin/seo-drafts/${id}/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ note }),
+          }).then((r) => ({ id, ok: r.ok })),
+        ),
+      )
+      const failed = results.filter((r) => !r.ok)
+      if (failed.length > 0) {
+        toast({
+          variant: "destructive",
+          title: `${failed.length}건 거절 실패 — 수동 처리 필요`,
+        })
+      } else {
+        toast({ title: "양쪽 거절 완료" })
+      }
+      const okIds = new Set(results.filter((r) => r.ok).map((r) => r.id))
+      setDrafts((prev) => prev.filter((d) => !okIds.has(d.id)))
+      setTotal((t) => Math.max(0, t - okIds.size))
+      const remaining = drafts.filter((d) => !okIds.has(d.id))
+      setSelectedId(remaining[0]?.id ?? null)
+      setPocComment("")
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "PoC 거절 실패",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setSubmitting(null)
+    }
+  }
+
   const handleRegenerate = async () => {
     if (!detail) return
     if (
@@ -377,11 +510,19 @@ const SeoDraftsClient = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">AI SEO Draft 검토</h1>
-        <Badge variant="outline" className="text-sm">
-          pending: {total}건
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-sm">
+            pending: {total}건
+          </Badge>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/seo-drafts/backfill">
+              <Settings2 className="h-4 w-4 mr-1.5" />
+              Backfill
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
@@ -420,8 +561,13 @@ const SeoDraftsClient = ({
                     <div className="w-12 h-12 rounded bg-muted shrink-0" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">
-                      {d.product_name}
+                    <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                      <span className="truncate">{d.product_name}</span>
+                      {d.description_mode === "replace" && (
+                        <Badge variant="secondary" className="text-[10px] shrink-0">
+                          replace
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {dayjs(d.created_at).format("MM.DD HH:mm")} · $
@@ -470,13 +616,137 @@ const SeoDraftsClient = ({
             <div className="text-center text-sm text-muted-foreground py-12">
               좌측에서 draft를 선택하세요
             </div>
+          ) : pocPair && pocLeft && pocRight ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold truncate">
+                      {detail.product_name}
+                    </h2>
+                    <Badge variant="secondary" className="shrink-0">PoC 비교</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    /products/{detail.product_slug} · preserve vs replace
+                  </p>
+                </div>
+                <a
+                  href={`/products/${detail.product_slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 shrink-0"
+                >
+                  미리보기 <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { side: "left" as const, draft: pocLeft, label: "preserve (v0.6 baseline)", color: "bg-slate-50" },
+                  { side: "right" as const, draft: pocRight, label: "replace (PoC)", color: "bg-amber-50" },
+                ].map(({ side, draft, label, color }) => (
+                  <div key={side} className={cn("border rounded-md p-3 space-y-2 text-xs", color)}>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-xs">{label}</Badge>
+                      <span className="text-muted-foreground">${draft.cost_usd.toFixed(4)}</span>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">meta_title</div>
+                      <div className="font-medium break-words">{draft.meta_title}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">meta_description</div>
+                      <div className="break-words">{draft.meta_description}</div>
+                    </div>
+                    {draft.description_mode === "replace" && draft.product_description && (
+                      <div>
+                        <div className="text-muted-foreground">product_description</div>
+                        <div className="whitespace-pre-wrap break-words border-l-2 border-amber-300 pl-2">
+                          {draft.product_description}
+                        </div>
+                      </div>
+                    )}
+                    {draft.description_mode === "replace" && draft.spec_metadata && Object.keys(draft.spec_metadata).length > 0 && (
+                      <div>
+                        <div className="text-muted-foreground">spec_metadata</div>
+                        <pre className="whitespace-pre-wrap break-words bg-white/50 rounded p-2 text-[10px] font-mono">
+                          {JSON.stringify(draft.spec_metadata, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-muted-foreground">search_tags</div>
+                      <div className="flex flex-wrap gap-1">
+                        {(draft.search_tags ?? []).map((tag, i) => (
+                          <Badge key={i} variant="secondary" className="text-[10px]">{tag}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">image_alt_texts</div>
+                      <ul className="space-y-0.5 list-disc list-inside">
+                        {(draft.image_alt_texts ?? []).map((alt, i) => (
+                          <li key={i} className="break-words">{alt.alt_text}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground pt-1 border-t">
+                      {draft.prompt_version} · {draft.image_count}장 · {dayjs(draft.created_at).format("MM.DD HH:mm")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 border-t pt-3">
+                <Label className="text-xs">자유 코멘트 (채택 이유 / 거절 사유, 양쪽 reject note에 함께 저장)</Label>
+                <textarea
+                  value={pocComment}
+                  onChange={(e) => setPocComment(e.target.value)}
+                  rows={2}
+                  placeholder="예: preserve는 spec 표현이 정확하나 replace의 셀링포인트 묘사가 더 자연스러움"
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2 border-t pt-4">
+                <Button
+                  onClick={() => handlePocSelect(pocLeft.id, pocRight.id)}
+                  disabled={submitting !== null}
+                  variant="outline"
+                >
+                  <ThumbsUp className="h-4 w-4 mr-1.5" />
+                  preserve 채택
+                </Button>
+                <Button
+                  onClick={() => handlePocSelect(pocRight.id, pocLeft.id)}
+                  disabled={submitting !== null}
+                >
+                  <ThumbsUp className="h-4 w-4 mr-1.5" />
+                  replace 채택
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handlePocRejectBoth}
+                  disabled={submitting !== null}
+                  className="ml-auto"
+                >
+                  <ThumbsDown className="h-4 w-4 mr-1.5" />
+                  둘 다 거절
+                </Button>
+              </div>
+            </>
           ) : (
             <>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold truncate">
-                    {detail.product_name}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold truncate">
+                      {detail.product_name}
+                    </h2>
+                    {detail.description_mode === "replace" && (
+                      <Badge variant="secondary" className="shrink-0">replace</Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     /products/{detail.product_slug}
                   </p>

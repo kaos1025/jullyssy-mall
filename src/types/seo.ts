@@ -45,6 +45,12 @@ export interface SeoDraftListItem {
   cost_usd: number
   image_count: number
   created_at: string
+  /** D3 PoC — replace 정책 draft 식별. preserve = baseline 동작. */
+  description_mode: "preserve" | "replace"
+  /** D3 PoC — replace mode 자연어 본문 (200~400자). preserve mode는 NULL. */
+  product_description: string | null
+  /** D3 PoC — replace mode 구조화 spec. preserve mode는 NULL. */
+  spec_metadata: SpecMetadata | null
 }
 
 export interface SeoDraftListResponse {
