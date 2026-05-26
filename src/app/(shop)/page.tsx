@@ -214,13 +214,13 @@ const HomePage = async () => {
         <div className="container">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <Link
-              href="/products"
+              href="/welcome"
               className="relative block h-40 md:h-52 rounded-lg overflow-hidden bg-gradient-to-r from-primary/10 to-accent/10 group"
             >
               <div className="absolute inset-0 flex flex-col justify-center px-8">
                 <p className="text-xs tracking-[0.2em] text-muted-foreground mb-2">EVENT</p>
                 <h3 className="text-lg md:text-xl font-bold mb-1">신규 가입 혜택</h3>
-                <p className="text-sm text-muted-foreground">회원가입 시 3,000원 쿠폰 즉시 발급</p>
+                <p className="text-sm text-muted-foreground">회원가입 시 5,000원 쿠폰 즉시 발급</p>
               </div>
               <div className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground/30 group-hover:text-muted-foreground/50 transition-colors">
                 <ArrowRight className="h-6 w-6" />
