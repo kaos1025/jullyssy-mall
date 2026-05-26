@@ -8,6 +8,22 @@ export interface AltInjection {
   altText: string
 }
 
+/**
+ * D3 PoC — description-parser가 임포트 HTML에서 추출한 구조화 spec.
+ * 정보 손실 0 원칙: 추출 못한 필드는 undefined로 비움 (오류 throw 금지).
+ * seo_metadata_drafts.spec_metadata JSONB 컬럼 + AI hint 양쪽 공유.
+ */
+export interface SpecMetadata {
+  /** 사이즈 옵션 (예: ['S', 'M', 'L', 'FREE']) 또는 단일 치수 문자열 배열. */
+  size?: string[]
+  /** 소재 (예: '폴리에스터 95%, 스판덱스 5%'). */
+  material?: string
+  /** 세탁법 (예: '드라이클리닝 권장', '30도 손세탁'). */
+  washCare?: string
+  /** 모델 착장 정보 (예: '모델 신장 168cm, M 사이즈 착용'). 외모/인종/나이 추정 금지. */
+  modelInfo?: string
+}
+
 /** seo_metadata_drafts.image_alt_texts JSONB 행 구조 (AI 산출). */
 export interface DraftImageAlt {
   image_index: number
