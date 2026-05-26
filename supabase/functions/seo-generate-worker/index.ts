@@ -20,6 +20,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.100.1";
 import { generateSeoMetadata, type ImageInput } from "../_shared/seo/ai-client.ts";
+import { extractSpecMetadata } from "../_shared/seo/description-parser.ts";
+import type { DescriptionMode } from "../_shared/seo/prompts.ts";
 
 const BATCH_SIZE = 10;
 const MAX_RETRY = 3;
@@ -30,6 +32,8 @@ interface QueueRow {
   product_id: string;
   retry_count: number;
   trigger_source: string;
+  /** D3 PoC — 큐 row의 description 정책. DB default 'preserve' (회귀 0). */
+  description_mode: DescriptionMode;
 }
 
 interface ProductRow {
@@ -91,6 +95,18 @@ async function processQueueRow(
     url: img.url,
   }));
 
+  // D3 PoC — replace mode 시 description plain text + spec hint 사전 추출.
+  // preserve mode는 둘 다 무시되므로 추출 자체 생략 (회귀 0).
+  const descMode: DescriptionMode = row.description_mode ?? "preserve";
+  const descriptionPlainText =
+    descMode === "replace" && product.description
+      ? product.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000)
+      : null;
+  const specHint =
+    descMode === "replace" && product.description
+      ? extractSpecMetadata(product.description)
+      : null;
+
   const draft = await generateSeoMetadata({
     product: {
       name: product.name,
@@ -101,6 +117,9 @@ async function processQueueRow(
     images: topImages,
     mode,
     apiKey,
+    descriptionMode: descMode,
+    descriptionPlainText,
+    specMetadataHint: specHint,
   });
 
   const { error: insertErr } = await supabase.from("seo_metadata_drafts").insert({
@@ -117,6 +136,10 @@ async function processQueueRow(
     tokens_input: draft.tokensInput,
     tokens_output: draft.tokensOutput,
     image_count: draft.imageCount,
+    // D3 PoC — replace mode 시 description_mode='replace' + spec_metadata 저장.
+    // preserve mode는 DB default 'preserve' + spec_metadata NULL (회귀 0).
+    description_mode: descMode,
+    spec_metadata: draft.specMetadata ?? null,
   });
   if (insertErr) {
     return { ok: false, error: `draft insert failed: ${insertErr.message}` };
@@ -148,7 +171,7 @@ async function handle(): Promise<Response> {
 
   const { data: pending, error: qErr } = await supabase
     .from("seo_generation_queue")
-    .select("id, product_id, retry_count, trigger_source")
+    .select("id, product_id, retry_count, trigger_source, description_mode")
     .eq("status", "pending")
     .order("scheduled_at", { ascending: true })
     .limit(BATCH_SIZE)

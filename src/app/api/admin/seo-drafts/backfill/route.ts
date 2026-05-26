@@ -24,10 +24,18 @@ interface BackfillBody {
   scope?: BackfillScope
   limit?: number
   dry_run?: boolean
+  /** D3 PoC — true 시 각 상품에 preserve + replace 2개 큐 insert. default false (회귀 0). */
+  poc_mode?: boolean
 }
 
 type Validation =
-  | { ok: true; scope: BackfillScope; limit: number; dryRun: boolean }
+  | {
+      ok: true
+      scope: BackfillScope
+      limit: number
+      dryRun: boolean
+      pocMode: boolean
+    }
   | { ok: false; error: string }
 
 const validateBody = (body: unknown): Validation => {
@@ -54,7 +62,11 @@ const validateBody = (body: unknown): Validation => {
   if (typeof dryRun !== "boolean") {
     return { ok: false, error: "dry_run은 boolean이어야 합니다" }
   }
-  return { ok: true, scope, limit, dryRun }
+  const pocMode = b.poc_mode ?? false
+  if (typeof pocMode !== "boolean") {
+    return { ok: false, error: "poc_mode는 boolean이어야 합니다" }
+  }
+  return { ok: true, scope, limit, dryRun, pocMode }
 }
 
 const postHandler = async (request: NextRequest) => {
@@ -71,9 +83,10 @@ const postHandler = async (request: NextRequest) => {
     return NextResponse.json({ error: v.error }, { status: 400 })
   }
 
-  const { scope, limit, dryRun } = v
+  const { scope, limit, dryRun, pocMode } = v
   Sentry.setTag("backfill_scope", scope)
   Sentry.setTag("backfill_dry_run", String(dryRun))
+  Sentry.setTag("backfill_poc_mode", String(pocMode))
 
   // SEO_AI_MONTHLY_USD_CAP 등록 확증
   const capRaw = process.env.SEO_AI_MONTHLY_USD_CAP
@@ -109,8 +122,9 @@ const postHandler = async (request: NextRequest) => {
   }
   const productIds = (productsData ?? []).map((p) => p.id as string)
 
-  // 비용 사전 검증
-  const estimatedCostUsd = productIds.length * COST_PER_PRODUCT_USD
+  // 비용 사전 검증 — poc_mode 시 preserve + replace 2배 (각 상품 2개 큐 row).
+  const queueMultiplier = pocMode ? 2 : 1
+  const estimatedCostUsd = productIds.length * COST_PER_PRODUCT_USD * queueMultiplier
 
   const { data: monthCostData, error: monthCostErr } = await supabase.rpc(
     "seo_monthly_cost_usd",
@@ -158,7 +172,8 @@ const postHandler = async (request: NextRequest) => {
   if (dryRun) {
     return NextResponse.json({
       dry_run: true,
-      would_queue: productIds.length,
+      poc_mode: pocMode,
+      would_queue: productIds.length * queueMultiplier,
       estimated_cost_usd: estimatedCostUsd,
       month_cost_usd: monthCost,
       remaining_budget_usd: remainingBudget,
@@ -201,28 +216,49 @@ const postHandler = async (request: NextRequest) => {
     })
   }
 
-  // bulk insert
-  const { error: insertErr } = await supabase
-    .from("seo_generation_queue")
-    .insert(
-      insertIds.map((productId) => ({
+  // bulk insert — poc_mode 시 각 product에 preserve + replace 2개 row.
+  const queueRows = pocMode
+    ? insertIds.flatMap((productId) => [
+        {
+          product_id: productId,
+          status: "pending",
+          trigger_source: "backfill_poc",
+          description_mode: "preserve",
+        },
+        {
+          product_id: productId,
+          status: "pending",
+          trigger_source: "backfill_poc",
+          description_mode: "replace",
+        },
+      ])
+    : insertIds.map((productId) => ({
         product_id: productId,
         status: "pending",
         trigger_source: "backfill",
-      })),
-    )
+      }))
+
+  const { error: insertErr } = await supabase
+    .from("seo_generation_queue")
+    .insert(queueRows)
   if (insertErr) {
     Sentry.captureException(insertErr, {
       tags: { seo_event: "backfill_insert_failed" },
-      extra: { insert_count: insertIds.length },
+      extra: {
+        insert_count: queueRows.length,
+        product_count: insertIds.length,
+        poc_mode: pocMode,
+      },
     })
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }
 
   return NextResponse.json({
-    queued: insertIds.length,
+    queued: queueRows.length,
+    products: insertIds.length,
+    poc_mode: pocMode,
     skipped: excludeIds.size,
-    estimated_cost_usd: insertIds.length * COST_PER_PRODUCT_USD,
+    estimated_cost_usd: queueRows.length * COST_PER_PRODUCT_USD,
     month_cost_usd: monthCost,
     remaining_budget_usd: remainingBudget,
     cap_usd: cap,
