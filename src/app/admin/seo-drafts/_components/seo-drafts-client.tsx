@@ -825,6 +825,19 @@ const SeoDraftsClient = ({
                 )}
               </section>
 
+              {/* 본문 (replace mode 전용, read-only) */}
+              {detail.description_mode === "replace" &&
+                detail.product_description && (
+                  <section className="space-y-2">
+                    <h3 className="text-sm font-medium">
+                      본문 (product_description)
+                    </h3>
+                    <div className="whitespace-pre-wrap break-words border-l-2 border-amber-300 bg-amber-50/40 rounded px-3 py-2 text-sm">
+                      {detail.product_description}
+                    </div>
+                  </section>
+                )}
+
               {/* 메타데이터 편집 */}
               <section className="space-y-3">
                 <h3 className="text-sm font-medium">메타데이터</h3>
@@ -870,6 +883,20 @@ const SeoDraftsClient = ({
                   </div>
                 </div>
               </section>
+
+              {/* 사양 (replace mode 전용, read-only) */}
+              {detail.description_mode === "replace" &&
+                detail.spec_metadata &&
+                Object.keys(detail.spec_metadata).length > 0 && (
+                  <section className="space-y-2">
+                    <h3 className="text-sm font-medium">
+                      사양 (spec_metadata)
+                    </h3>
+                    <pre className="whitespace-pre-wrap break-words bg-muted/50 rounded p-3 text-xs font-mono">
+                      {JSON.stringify(detail.spec_metadata, null, 2)}
+                    </pre>
+                  </section>
+                )}
 
               {/* 요약 정보 */}
               <section className="text-xs text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 border-t pt-3">
