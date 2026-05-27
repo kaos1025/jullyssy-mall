@@ -29,7 +29,9 @@ type DescriptionMode = (typeof ALLOWED_DESCRIPTION_MODES)[number]
 const DEFAULT_DESCRIPTION_MODE: DescriptionMode = "replace"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MAX_PRODUCT_IDS = 10
+// 1회 호출 비용 임계 가드: 50건 × $0.01523 ≈ $0.76 (cap $20 대비 3.8%).
+// 412 cap 사전 검증은 별도 layer로 유지.
+const MAX_PRODUCT_IDS = 50
 
 interface BackfillBody {
   scope?: BackfillScope
