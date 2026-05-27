@@ -26,6 +26,7 @@ import type {
   SeoDraftDetail,
   SeoDraftListItem,
   SeoDraftListResponse,
+  SpecMetadata,
 } from "@/types/seo"
 
 interface Props {
@@ -40,6 +41,18 @@ const META_DESCRIPTION_MAX = 155
 const SEARCH_TAGS_MIN = 5
 const SEARCH_TAGS_MAX = 10
 const ALT_TEXT_MAX = 100
+// SEO-DRAFT-EDIT-INLINE-1 — PATCH endpoint와 동일 제약.
+const PRODUCT_DESCRIPTION_MIN = 100
+const PRODUCT_DESCRIPTION_MAX = 600
+
+const sizeArrayToInput = (size: string[] | undefined): string =>
+  (size ?? []).join(", ")
+
+const inputToSizeArray = (input: string): string[] =>
+  input
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
 
 const tagsToInput = (tags: string[] | null): string =>
   (tags ?? []).join(", ")
@@ -95,6 +108,22 @@ const SeoDraftsClient = ({
   )
   const [altTexts, setAltTexts] = useState<Record<number, string>>(
     buildAltMap(initialDetail?.image_alt_texts ?? null),
+  )
+  // SEO-DRAFT-EDIT-INLINE-1 — replace mode 인라인 편집 state.
+  const [productDescription, setProductDescription] = useState(
+    initialDetail?.product_description ?? "",
+  )
+  const [specSize, setSpecSize] = useState(
+    sizeArrayToInput(initialDetail?.spec_metadata?.size),
+  )
+  const [specMaterial, setSpecMaterial] = useState(
+    initialDetail?.spec_metadata?.material ?? "",
+  )
+  const [specWashCare, setSpecWashCare] = useState(
+    initialDetail?.spec_metadata?.washCare ?? "",
+  )
+  const [specModelInfo, setSpecModelInfo] = useState(
+    initialDetail?.spec_metadata?.modelInfo ?? "",
   )
 
   const [submitting, setSubmitting] = useState<
@@ -181,6 +210,11 @@ const SeoDraftsClient = ({
         setMetaDescription(data.meta_description ?? "")
         setSearchTagsInput(tagsToInput(data.search_tags))
         setAltTexts(buildAltMap(data.image_alt_texts))
+        setProductDescription(data.product_description ?? "")
+        setSpecSize(sizeArrayToInput(data.spec_metadata?.size))
+        setSpecMaterial(data.spec_metadata?.material ?? "")
+        setSpecWashCare(data.spec_metadata?.washCare ?? "")
+        setSpecModelInfo(data.spec_metadata?.modelInfo ?? "")
       } catch (e) {
         toast({
           variant: "destructive",
@@ -241,8 +275,15 @@ const SeoDraftsClient = ({
         return `이미지 ${i + 1}번 alt text는 ${ALT_TEXT_MAX}자 이내여야 합니다`
       }
     }
+    // SEO-DRAFT-EDIT-INLINE-1 — replace mode 한정 product_description 길이 검증.
+    if (detail?.description_mode === "replace") {
+      const len = productDescription.length
+      if (len < PRODUCT_DESCRIPTION_MIN || len > PRODUCT_DESCRIPTION_MAX) {
+        return `product_description은 ${PRODUCT_DESCRIPTION_MIN}~${PRODUCT_DESCRIPTION_MAX}자여야 합니다`
+      }
+    }
     return null
-  }, [metaTitle, metaDescription, currentTags, altTexts, detail])
+  }, [metaTitle, metaDescription, currentTags, altTexts, detail, productDescription])
 
   const buildPayload = () => {
     const imgCount = Math.min(detail?.image_count ?? 0, 3)
@@ -250,12 +291,27 @@ const SeoDraftsClient = ({
     for (let i = 0; i < imgCount; i++) {
       image_alt_texts.push({ image_index: i, alt_text: altTexts[i].trim() })
     }
-    return {
+    const payload: Record<string, unknown> = {
       meta_title: metaTitle.trim(),
       meta_description: metaDescription.trim(),
       search_tags: currentTags,
       image_alt_texts,
     }
+    // SEO-DRAFT-EDIT-INLINE-1 — replace mode 한정 양 필드 포함.
+    if (detail?.description_mode === "replace") {
+      payload.product_description = productDescription.trim()
+      const spec: SpecMetadata = {}
+      const sizes = inputToSizeArray(specSize)
+      if (sizes.length > 0) spec.size = sizes
+      const material = specMaterial.trim()
+      if (material) spec.material = material
+      const washCare = specWashCare.trim()
+      if (washCare) spec.washCare = washCare
+      const modelInfo = specModelInfo.trim()
+      if (modelInfo) spec.modelInfo = modelInfo
+      payload.spec_metadata = spec
+    }
+    return payload
   }
 
   const handleSave = async () => {
@@ -825,18 +881,22 @@ const SeoDraftsClient = ({
                 )}
               </section>
 
-              {/* 본문 (replace mode 전용, read-only) */}
-              {detail.description_mode === "replace" &&
-                detail.product_description && (
-                  <section className="space-y-2">
-                    <h3 className="text-sm font-medium">
-                      본문 (product_description)
-                    </h3>
-                    <div className="whitespace-pre-wrap break-words border-l-2 border-amber-300 bg-amber-50/40 rounded px-3 py-2 text-sm">
-                      {detail.product_description}
-                    </div>
-                  </section>
-                )}
+              {/* 본문 (replace mode 전용, 인라인 편집) */}
+              {detail.description_mode === "replace" && (
+                <section className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    본문 (product_description) ({productDescription.length}/
+                    {PRODUCT_DESCRIPTION_MAX})
+                  </Label>
+                  <textarea
+                    value={productDescription}
+                    onChange={(e) => setProductDescription(e.target.value)}
+                    maxLength={PRODUCT_DESCRIPTION_MAX}
+                    rows={6}
+                    className="flex w-full rounded-md border border-input bg-amber-50/40 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 whitespace-pre-wrap break-words"
+                  />
+                </section>
+              )}
 
               {/* 메타데이터 편집 */}
               <section className="space-y-3">
@@ -884,19 +944,46 @@ const SeoDraftsClient = ({
                 </div>
               </section>
 
-              {/* 사양 (replace mode 전용, read-only) */}
-              {detail.description_mode === "replace" &&
-                detail.spec_metadata &&
-                Object.keys(detail.spec_metadata).length > 0 && (
-                  <section className="space-y-2">
-                    <h3 className="text-sm font-medium">
-                      사양 (spec_metadata)
-                    </h3>
-                    <pre className="whitespace-pre-wrap break-words bg-muted/50 rounded p-3 text-xs font-mono">
-                      {JSON.stringify(detail.spec_metadata, null, 2)}
-                    </pre>
-                  </section>
-                )}
+              {/* 사양 (replace mode 전용, 4 필드 분리 인라인 편집) */}
+              {detail.description_mode === "replace" && (
+                <section className="space-y-3">
+                  <h3 className="text-sm font-medium">사양 (spec_metadata)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">size (콤마 구분)</Label>
+                      <Input
+                        value={specSize}
+                        onChange={(e) => setSpecSize(e.target.value)}
+                        placeholder="예: S, M, L, FREE"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">material</Label>
+                      <Input
+                        value={specMaterial}
+                        onChange={(e) => setSpecMaterial(e.target.value)}
+                        placeholder="예: 폴리에스터 95%, 스판덱스 5%"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">washCare</Label>
+                      <Input
+                        value={specWashCare}
+                        onChange={(e) => setSpecWashCare(e.target.value)}
+                        placeholder="예: 드라이클리닝 권장"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">modelInfo</Label>
+                      <Input
+                        value={specModelInfo}
+                        onChange={(e) => setSpecModelInfo(e.target.value)}
+                        placeholder="예: 모델 신장 168cm, M 사이즈 착용"
+                      />
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {/* 요약 정보 */}
               <section className="text-xs text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 border-t pt-3">
