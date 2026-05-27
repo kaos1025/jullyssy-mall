@@ -237,6 +237,7 @@ const importSingleProduct = async (
       product_id: product.id,
       status: "pending",
       trigger_source: "naver_import",
+      description_mode: "replace",
     })
     if (queueErr) {
       Sentry.captureMessage(`seo_generation_queue insert failed: ${queueErr.message}`, {
