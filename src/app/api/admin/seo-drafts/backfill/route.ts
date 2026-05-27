@@ -23,6 +23,11 @@ const COST_PER_PRODUCT_USD = 0.0095
 const ALLOWED_SCOPES = ["active", "active_no_seo"] as const
 type BackfillScope = (typeof ALLOWED_SCOPES)[number]
 
+const ALLOWED_DESCRIPTION_MODES = ["preserve", "replace"] as const
+type DescriptionMode = (typeof ALLOWED_DESCRIPTION_MODES)[number]
+// spec v0.7 §4.1 [2단계] — 신규 default for v0.7 = 'replace' (DB column default 'preserve' 의존 차단).
+const DEFAULT_DESCRIPTION_MODE: DescriptionMode = "replace"
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_PRODUCT_IDS = 10
 
@@ -34,6 +39,8 @@ interface BackfillBody {
   poc_mode?: boolean
   /** D3 PoC 보강 — 1~10 UUID. 제공 시 scope/limit 무시하고 명시 선정. */
   product_ids?: string[]
+  /** spec v0.7 §4.1 — 일반 경로 큐 description_mode. default 'replace'. poc_mode=true 시 무시. */
+  description_mode?: DescriptionMode
 }
 
 type Validation =
@@ -45,6 +52,7 @@ type Validation =
       pocMode: boolean
       /** null이면 scope/limit 경로 (회귀 0). string[] 제공 시 product_ids 경로. */
       productIds: string[] | null
+      descriptionMode: DescriptionMode
     }
   | { ok: false; error: string }
 
@@ -77,6 +85,15 @@ const validateBody = (body: unknown): Validation => {
     return { ok: false, error: "poc_mode는 boolean이어야 합니다" }
   }
 
+  const descriptionMode: DescriptionMode =
+    b.description_mode ?? DEFAULT_DESCRIPTION_MODE
+  if (!ALLOWED_DESCRIPTION_MODES.includes(descriptionMode)) {
+    return {
+      ok: false,
+      error: `description_mode는 ${ALLOWED_DESCRIPTION_MODES.join(" 또는 ")}여야 합니다`,
+    }
+  }
+
   // product_ids 검증 — undefined/null이면 scope/limit 경로 (회귀 0)
   let productIds: string[] | null = null
   if (b.product_ids !== undefined && b.product_ids !== null) {
@@ -101,7 +118,7 @@ const validateBody = (body: unknown): Validation => {
     productIds = Array.from(new Set(b.product_ids))
   }
 
-  return { ok: true, scope, limit, dryRun, pocMode, productIds }
+  return { ok: true, scope, limit, dryRun, pocMode, productIds, descriptionMode }
 }
 
 const postHandler = async (request: NextRequest) => {
@@ -118,12 +135,13 @@ const postHandler = async (request: NextRequest) => {
     return NextResponse.json({ error: v.error }, { status: 400 })
   }
 
-  const { scope, limit, dryRun, pocMode, productIds: requestedIds } = v
+  const { scope, limit, dryRun, pocMode, productIds: requestedIds, descriptionMode } = v
   const targetMode = requestedIds !== null ? "product_ids" : "scope"
   Sentry.setTag("backfill_target_mode", targetMode)
   Sentry.setTag("backfill_scope", scope)
   Sentry.setTag("backfill_dry_run", String(dryRun))
   Sentry.setTag("backfill_poc_mode", String(pocMode))
+  Sentry.setTag("backfill_description_mode", descriptionMode)
 
   // SEO_AI_MONTHLY_USD_CAP 등록 확증
   const capRaw = process.env.SEO_AI_MONTHLY_USD_CAP
@@ -250,6 +268,7 @@ const postHandler = async (request: NextRequest) => {
       dry_run: true,
       target_mode: targetMode,
       poc_mode: pocMode,
+      description_mode: pocMode ? null : descriptionMode,
       would_queue: productIds.length * queueMultiplier,
       estimated_cost_usd: estimatedCostUsd,
       month_cost_usd: monthCost,
@@ -313,6 +332,7 @@ const postHandler = async (request: NextRequest) => {
         product_id: productId,
         status: "pending",
         trigger_source: "backfill",
+        description_mode: descriptionMode,
       }))
 
   const { error: insertErr } = await supabase
@@ -335,6 +355,7 @@ const postHandler = async (request: NextRequest) => {
     products: insertIds.length,
     target_mode: targetMode,
     poc_mode: pocMode,
+    description_mode: pocMode ? null : descriptionMode,
     skipped: excludeIds.size,
     estimated_cost_usd: queueRows.length * COST_PER_PRODUCT_USD,
     month_cost_usd: monthCost,
