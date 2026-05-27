@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils"
 type Scope = "active" | "active_no_seo"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MAX_PRODUCT_IDS = 10
+// API route 상수와 동일 (1회 호출 비용 임계 ~$0.76, cap $20 대비 3.8%).
+const MAX_PRODUCT_IDS = 50
 
 interface BackfillResponse {
   dry_run?: boolean
