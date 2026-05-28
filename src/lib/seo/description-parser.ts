@@ -10,6 +10,7 @@
 
 import { parse } from "node-html-parser"
 import type { AltInjection, SpecMetadata } from "@/types/seo"
+import type { FitType } from "@/lib/product/fit-type"
 
 export type { AltInjection, SpecMetadata }
 
@@ -187,4 +188,45 @@ export function extractSpecMetadata(html: string | null | undefined): SpecMetada
   // 빈 객체면 그대로 반환 (정보 손실 0 원칙)
   if (isEmptySpec(spec)) return {}
   return spec
+}
+
+// =============================================================================
+// v0.8 Track 1-A A-3 — extractFitFromDescription
+//
+// description HTML 본문에서 fit 키워드를 휴리스틱 매칭. 무매치 시 null.
+// Layer 3 default 'REGULAR' fallback은 호출 측(네이버 import route, A-2 세션 2) 책임.
+//
+// ⚠️ Edge worker sync 의무 외 — 본 함수는 Vercel Node 측만 사용(네이버 import route).
+// Edge worker는 fit_type을 prompt 입력 컨텍스트로만 활용(A-4). 운영 데이터 누적 후 키워드 보정 가능.
+// =============================================================================
+
+// 우선순위 영역(상위 → 하위, 첫 매치 반환). 충돌 시 더 강한 신호 우선
+// (예: "오버사이즈 슬림" → OVERSIZED, "와이드 슬림" → WIDE).
+const FIT_KEYWORD_MAP: Array<[RegExp, FitType]> = [
+  [/오버(핏|\s*사이즈)|박시|oversized?/i, "OVERSIZED"],
+  [/크롭(드|핏)?|cropped?/i, "CROPPED"],
+  [/스트레이트|straight/i, "STRAIGHT"],
+  [/와이드(핏)?|wide(\s*fit)?/i, "WIDE"],
+  [/루즈(핏)?|loose(\s*fit)?/i, "LOOSE"],
+  [/슬림(핏)?|스키니|slim(\s*fit)?/i, "SLIM"],
+  [/기본핏|레귤러|regular(\s*fit)?/i, "REGULAR"],
+]
+
+/**
+ * description HTML/텍스트에서 fit 키워드 매칭. 매칭 실패 시 null 반환.
+ * Layer 3 default 'REGULAR'는 호출 측 책임.
+ */
+export function extractFitFromDescription(
+  html: string | null | undefined,
+): FitType | null {
+  if (!html) return null
+
+  // HTML 태그 제거 + 공백 정리 (간이 텍스트 추출)
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase()
+
+  for (const [pattern, fitType] of FIT_KEYWORD_MAP) {
+    if (pattern.test(text)) return fitType
+  }
+
+  return null
 }

@@ -35,6 +35,8 @@ export interface ProductInput {
   categoryName: string | null;
   basePrice: number;
   description: string | null;
+  /** v0.8 A-4 — fit_type 한국어 라벨. replace mode prompt 입력에만 사용 (preserve 무시). */
+  fitTypeLabel?: string | null;
 }
 
 export interface ImageInput {
@@ -258,6 +260,7 @@ async function callAnthropicReplace(
     descriptionPlainText,
     specMetadataHint,
     imageCount: images.length,
+    fitTypeLabel: product.fitTypeLabel ?? null,
   });
 
   const content: Array<
