@@ -22,6 +22,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.100.1";
 import { generateSeoMetadata, type ImageInput } from "../_shared/seo/ai-client.ts";
 import { extractSpecMetadata } from "../_shared/seo/description-parser.ts";
 import type { DescriptionMode } from "../_shared/seo/prompts.ts";
+import { FIT_TYPE_LABELS, type FitType } from "../_shared/seo/fit-type.ts";
 
 const BATCH_SIZE = 10;
 const MAX_RETRY = 3;
@@ -42,6 +43,7 @@ interface ProductRow {
   price: number;
   description: string | null;
   category_id: string | null;
+  fit_type: string;
 }
 
 interface ProductImageRow {
@@ -62,7 +64,7 @@ async function processQueueRow(
 ): Promise<{ ok: boolean; error?: string }> {
   const { data: product, error: pErr } = await supabase
     .from("products")
-    .select("id, name, price, description, category_id")
+    .select("id, name, price, description, category_id, fit_type")
     .eq("id", row.product_id)
     .single<ProductRow>();
   if (pErr || !product) {
@@ -107,12 +109,16 @@ async function processQueueRow(
       ? extractSpecMetadata(product.description)
       : null;
 
+  // v0.8 A-4 — fit_type 한국어 라벨 (replace mode prompt 입력). DB CHECK 보장값 → 직접 lookup.
+  const fitTypeLabel = FIT_TYPE_LABELS[product.fit_type as FitType] ?? null;
+
   const draft = await generateSeoMetadata({
     product: {
       name: product.name,
       categoryName,
       basePrice: product.price,
       description: product.description,
+      fitTypeLabel,
     },
     images: topImages,
     mode,
