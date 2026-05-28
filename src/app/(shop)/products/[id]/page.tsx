@@ -21,6 +21,8 @@ import ReviewTagSummary from "@/components/review/ReviewTagSummary"
 import MiniReviewCarousel from "@/components/review/MiniReviewCarousel"
 import { SHOPPING_GUIDE } from "@/constants/shopping-guide"
 import { BUSINESS_INFO } from "@/constants/business"
+import { SHIPPING_CONFIG } from "@/constants/shipping"
+import { FIT_TYPE_LABELS, parseFitType } from "@/lib/product/fit-type"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
 import type { ReviewTagSummaryRow } from "@/types/review"
@@ -243,6 +245,37 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
           : "https://schema.org/OutOfStock",
       seller: { "@type": "Organization", name: BUSINESS_INFO.companyName },
       url: `${SITE_URL}/products/${product.slug || product.id}`,
+      // v0.8 Track 1-D — 반품정책 SSOT: 약관 제14조 (수령 후 7일, 변심 시 왕복배송비 고객 부담)
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "KR",
+        returnPolicyCategory:
+          "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: 7,
+        returnMethod: "https://schema.org/ReturnByMail",
+        returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+      },
+      // v0.8 Track 1-D — 배송 SSOT: SHIPPING_CONFIG (무료배송 상품은 0원, 1~3 영업일)
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+          "@type": "MonetaryAmount",
+          value: product.free_shipping ? 0 : SHIPPING_CONFIG.baseFee,
+          currency: "KRW",
+        },
+        shippingDestination: {
+          "@type": "DefinedRegion",
+          addressCountry: "KR",
+        },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          businessDays: {
+            "@type": "QuantitativeValue",
+            minValue: 1,
+            maxValue: 3,
+          },
+        },
+      },
     },
   }
 
@@ -254,6 +287,15 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       bestRating: 5,
       worstRating: 1,
     }
+  }
+
+  // v0.8 Track 1-A A-5 — fit_type을 additionalProperty로 노출 (SSOT: fit-type.ts)
+  const fitType = parseFitType(product.fit_type)
+  const fitLabel = fitType ? FIT_TYPE_LABELS[fitType] : null
+  if (fitLabel) {
+    jsonLd.additionalProperty = [
+      { "@type": "PropertyValue", name: "fit", value: fitLabel },
+    ]
   }
 
   return (
