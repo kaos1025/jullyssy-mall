@@ -279,6 +279,9 @@ const postHandler = async (request: NextRequest) => {
   let successCount = 0
   let failCount = 0
   const errors: string[] = []
+  // [TEMP v0.8 phase0-A] 다음 자연 신규 입고 1건의 detailAttribute raw 회수용 (cap 1).
+  // 세션 2(Track 1-A A-2 네이버 API 매핑) 완료 후 revert 의무. 마커: _temp_phase0_a_recovery
+  const capturedAttributes: Array<Record<string, unknown>> = []
 
   try {
     const token = await getNaverAccessToken()
@@ -346,8 +349,21 @@ const postHandler = async (request: NextRequest) => {
         const detail: ChannelProductDetail = await detailRes.json()
         const result = await importSingleProduct(admin, item.productNo, detail, token, existingSlugs)
         successCount++
-        if (result.skipped) {
-          // 이미 존재하는 상품도 성공으로 카운트
+        // 이미 존재하는 상품(skipped)도 성공으로 카운트
+        // [TEMP v0.8 phase0-A] 신규 입고 1건의 detailAttribute 회수 (logging 실패가 import 차단 금지)
+        if (!result.skipped && capturedAttributes.length === 0) {
+          try {
+            const da = detail.originProduct?.detailAttribute
+            if (da) {
+              capturedAttributes.push({
+                productNo: item.productNo,
+                name: detail.originProduct?.name ?? null,
+                detailAttribute: da,
+              })
+            }
+          } catch {
+            // 회수 실패 무시 — import success path 보호
+          }
         }
       } catch (e) {
         failCount++
@@ -357,13 +373,27 @@ const postHandler = async (request: NextRequest) => {
 
     // 동기화 로그 저장
     const totalCount = items.length
+    // [TEMP v0.8 phase0-A] capturedAttributes가 있으면 마커와 함께 error_details에 임시 저장. 세션 2 revert 의무.
+    const recoveryDetails =
+      capturedAttributes.length > 0
+        ? {
+            _temp_phase0_a_recovery: true,
+            captured_for: "v0.8 phase 0 area A",
+            captured_at: new Date().toISOString(),
+            items: capturedAttributes,
+          }
+        : null
+    const errorDetails =
+      errors.length > 0 || recoveryDetails
+        ? { ...(errors.length > 0 ? { errors } : {}), ...(recoveryDetails ?? {}) }
+        : null
     await admin.from("naver_sync_logs").insert({
       sync_type: "IMPORT",
       status: failCount === 0 ? "SUCCESS" : failCount === totalCount ? "FAILED" : "PARTIAL",
       total_count: totalCount,
       success_count: successCount,
       fail_count: failCount,
-      error_details: errors.length > 0 ? { errors } : null,
+      error_details: errorDetails,
     })
 
     return NextResponse.json({
