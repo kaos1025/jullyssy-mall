@@ -6,6 +6,12 @@ import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
 import { toSlug, dedupeSlug } from "@/lib/slug"
+import { extractFitFromDescription, extractFitFromTags } from "@/lib/seo/description-parser"
+import {
+  getNaverAttributeDict,
+  lookupFitFromProductAttributes,
+} from "@/lib/seo/naver-attribute-dict"
+import type { FitType } from "@/lib/product/fit-type"
 
 interface ImportItem {
   productNo: string
@@ -58,6 +64,7 @@ interface OriginProduct {
       originAreaCode?: string
       content?: string
     }
+    productAttributes?: Array<{ attributeSeq: number; attributeValueSeq: number }>
     [key: string]: unknown
   }
   seoInfo?: {
@@ -68,6 +75,41 @@ interface OriginProduct {
 interface ChannelProductDetail {
   originProduct: OriginProduct
   smartstoreChannelProduct?: unknown
+}
+
+// fit_type 결정 (v0.8 A-2). Layer 1 productAttributes+dictionary → 1.5 sellerTags
+// → 2 description 휴리스틱 → 3 REGULAR default. 각 Layer 실패는 다음 Layer로 진행.
+const resolveFitType = async (
+  op: OriginProduct,
+  naverCategoryId: string | null,
+  token: string
+): Promise<FitType> => {
+  // Layer 1: productAttributes + 카테고리 dictionary (가장 신뢰도 높음)
+  if (naverCategoryId) {
+    try {
+      const dict = await getNaverAttributeDict(naverCategoryId, token)
+      const fit = lookupFitFromProductAttributes(
+        op.detailAttribute?.productAttributes ?? [],
+        dict
+      )
+      if (fit) return fit
+    } catch {
+      // dictionary 조회 실패 → 하위 Layer로 진행 (import 차단 금지)
+    }
+  }
+
+  // Layer 1.5: sellerTags 키워드
+  const fitFromTags = extractFitFromTags(
+    (op.seoInfo?.sellerTags ?? []).map((t) => t.text)
+  )
+  if (fitFromTags) return fitFromTags
+
+  // Layer 2: description 휴리스틱
+  const fitFromDesc = extractFitFromDescription(op.detailContent)
+  if (fitFromDesc) return fitFromDesc
+
+  // Layer 3: default
+  return "REGULAR"
 }
 
 const importSingleProduct = async (
@@ -151,6 +193,9 @@ const importSingleProduct = async (
     }
   }
 
+  // fit_type 결정 (신규 상품만 — skip된 기존 상품은 위에서 early return)
+  const fitType = await resolveFitType(op, naverCategoryId, token)
+
   // slug 생성 (NOT NULL + UNIQUE 제약 사전 충돌 방지)
   // toSlug는 빈 결과 시 throw → 상위 try/catch에서 errors[]로 기록됨
   const baseSlug = toSlug(name)
@@ -170,6 +215,7 @@ const importSingleProduct = async (
       status: statusType === "SALE" ? "ACTIVE" : "HIDDEN",
       naver_product_no: originProductNo,
       search_tags: searchTags,
+      fit_type: fitType,
     })
     .select()
     .single()
@@ -279,9 +325,6 @@ const postHandler = async (request: NextRequest) => {
   let successCount = 0
   let failCount = 0
   const errors: string[] = []
-  // [TEMP v0.8 phase0-A] 다음 자연 신규 입고 1건의 detailAttribute raw 회수용 (cap 1).
-  // 세션 2(Track 1-A A-2 네이버 API 매핑) 완료 후 revert 의무. 마커: _temp_phase0_a_recovery
-  const capturedAttributes: Array<Record<string, unknown>> = []
 
   try {
     const token = await getNaverAccessToken()
@@ -347,24 +390,9 @@ const postHandler = async (request: NextRequest) => {
         }
 
         const detail: ChannelProductDetail = await detailRes.json()
-        const result = await importSingleProduct(admin, item.productNo, detail, token, existingSlugs)
+        await importSingleProduct(admin, item.productNo, detail, token, existingSlugs)
         successCount++
         // 이미 존재하는 상품(skipped)도 성공으로 카운트
-        // [TEMP v0.8 phase0-A] 신규 입고 1건의 detailAttribute 회수 (logging 실패가 import 차단 금지)
-        if (!result.skipped && capturedAttributes.length === 0) {
-          try {
-            const da = detail.originProduct?.detailAttribute
-            if (da) {
-              capturedAttributes.push({
-                productNo: item.productNo,
-                name: detail.originProduct?.name ?? null,
-                detailAttribute: da,
-              })
-            }
-          } catch {
-            // 회수 실패 무시 — import success path 보호
-          }
-        }
       } catch (e) {
         failCount++
         errors.push(`상품번호 ${item.productNo}: ${e instanceof Error ? e.message : "알 수 없는 오류"}`)
@@ -373,27 +401,13 @@ const postHandler = async (request: NextRequest) => {
 
     // 동기화 로그 저장
     const totalCount = items.length
-    // [TEMP v0.8 phase0-A] capturedAttributes가 있으면 마커와 함께 error_details에 임시 저장. 세션 2 revert 의무.
-    const recoveryDetails =
-      capturedAttributes.length > 0
-        ? {
-            _temp_phase0_a_recovery: true,
-            captured_for: "v0.8 phase 0 area A",
-            captured_at: new Date().toISOString(),
-            items: capturedAttributes,
-          }
-        : null
-    const errorDetails =
-      errors.length > 0 || recoveryDetails
-        ? { ...(errors.length > 0 ? { errors } : {}), ...(recoveryDetails ?? {}) }
-        : null
     await admin.from("naver_sync_logs").insert({
       sync_type: "IMPORT",
       status: failCount === 0 ? "SUCCESS" : failCount === totalCount ? "FAILED" : "PARTIAL",
       total_count: totalCount,
       success_count: successCount,
       fail_count: failCount,
-      error_details: errorDetails,
+      error_details: errors.length > 0 ? { errors } : null,
     })
 
     return NextResponse.json({

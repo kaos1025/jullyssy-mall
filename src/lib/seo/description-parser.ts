@@ -191,26 +191,35 @@ export function extractSpecMetadata(html: string | null | undefined): SpecMetada
 }
 
 // =============================================================================
-// v0.8 Track 1-A A-3 — extractFitFromDescription
+// v0.8 Track 1-A A-3 — fit 키워드 휴리스틱 (description + sellerTags)
 //
-// description HTML 본문에서 fit 키워드를 휴리스틱 매칭. 무매치 시 null.
-// Layer 3 default 'REGULAR' fallback은 호출 측(네이버 import route, A-2 세션 2) 책임.
+// 무매치 시 null. Layer 3 default 'REGULAR' fallback은 호출 측(네이버 import route) 책임.
 //
-// ⚠️ Edge worker sync 의무 외 — 본 함수는 Vercel Node 측만 사용(네이버 import route).
-// Edge worker는 fit_type을 prompt 입력 컨텍스트로만 활용(A-4). 운영 데이터 누적 후 키워드 보정 가능.
+// ⚠️ Edge worker sync 의무 외 — 본 영역은 Vercel Node 측만 사용(네이버 import route).
+// Edge worker는 fit_type을 prompt 입력 컨텍스트로만 활용(A-4)하며 fit 추출 로직이 없다.
+//
+// A-2(세션 2) 정정: fit 컨텍스트가 명시된 표현("슬림핏"/"와이드핏" 등)만 매칭한다.
+// 단독 "슬림"(86건 중 57.6%)·"와이드"(44.1%)·"크롭"은 false positive 위험이 커 제외.
 // =============================================================================
 
-// 우선순위 영역(상위 → 하위, 첫 매치 반환). 충돌 시 더 강한 신호 우선
-// (예: "오버사이즈 슬림" → OVERSIZED, "와이드 슬림" → WIDE).
-const FIT_KEYWORD_MAP: Array<[RegExp, FitType]> = [
-  [/오버(핏|\s*사이즈)|박시|oversized?/i, "OVERSIZED"],
-  [/크롭(드|핏)?|cropped?/i, "CROPPED"],
-  [/스트레이트|straight/i, "STRAIGHT"],
-  [/와이드(핏)?|wide(\s*fit)?/i, "WIDE"],
-  [/루즈(핏)?|loose(\s*fit)?/i, "LOOSE"],
-  [/슬림(핏)?|스키니|slim(\s*fit)?/i, "SLIM"],
-  [/기본핏|레귤러|regular(\s*fit)?/i, "REGULAR"],
+// 우선순위(상위 → 하위, 첫 매치 반환). 충돌 시 더 강한 신호 우선
+// (예: "오버사이즈 슬림핏" → OVERSIZED).
+const FIT_KEYWORD_MAP: ReadonlyArray<readonly [RegExp, FitType]> = [
+  [/오버\s*사이즈|오버\s*핏|박시|oversized?/i, "OVERSIZED"],
+  [/크롭\s*(핏|드)|cropped/i, "CROPPED"],
+  [/스트레이트\s*핏|straight\s*fit/i, "STRAIGHT"],
+  [/와이드\s*핏|wide\s*fit/i, "WIDE"],
+  [/루즈\s*핏|loose\s*fit/i, "LOOSE"],
+  [/슬림\s*핏|스키니\s*핏?|slim\s*fit/i, "SLIM"],
+  [/기본\s*핏|레귤러\s*핏?|regular\s*fit/i, "REGULAR"],
 ]
+
+const matchFitKeyword = (text: string): FitType | null => {
+  for (const [pattern, fitType] of FIT_KEYWORD_MAP) {
+    if (pattern.test(text)) return fitType
+  }
+  return null
+}
 
 /**
  * description HTML/텍스트에서 fit 키워드 매칭. 매칭 실패 시 null 반환.
@@ -220,13 +229,19 @@ export function extractFitFromDescription(
   html: string | null | undefined,
 ): FitType | null {
   if (!html) return null
-
   // HTML 태그 제거 + 공백 정리 (간이 텍스트 추출)
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase()
+  return matchFitKeyword(text)
+}
 
-  for (const [pattern, fitType] of FIT_KEYWORD_MAP) {
-    if (pattern.test(text)) return fitType
-  }
-
-  return null
+/**
+ * 네이버 sellerTags 텍스트에서 fit 키워드 매칭 (Layer 1.5).
+ * 태그들을 합쳐 동일 키워드 맵으로 판정. 매칭 실패 시 null.
+ */
+export function extractFitFromTags(
+  tags: Array<string | null | undefined>,
+): FitType | null {
+  const joined = tags.filter((t): t is string => !!t).join(" ").toLowerCase()
+  if (!joined) return null
+  return matchFitKeyword(joined)
 }
