@@ -11,11 +11,18 @@ interface RouteContext {
 
 const ALLOWED_STATUSES = ["ACTIVE", "SOLDOUT", "HIDDEN"] as const
 
-const postHandler = async (_request: NextRequest, context: RouteContext) => {
+const postHandler = async (request: NextRequest, context: RouteContext) => {
   const productId = context.params.id
   Sentry.setTag("seo_draft_action", "regenerate")
   Sentry.setTag("product_id", productId)
   Sentry.setTag("trigger_source", "manual_regenerate")
+
+  // description 정책: 기본 preserve, 호출 측이 replace 명시 시에만 replace (핏 변경 등)
+  const body = await request.json().catch(() => ({}))
+  const descriptionMode =
+    (body as { description_mode?: string })?.description_mode === "replace"
+      ? "replace"
+      : "preserve"
 
   const admin = await verifyAdmin()
   if (!admin) {
@@ -72,6 +79,7 @@ const postHandler = async (_request: NextRequest, context: RouteContext) => {
       product_id: productId,
       status: "pending",
       trigger_source: "manual_regenerate",
+      description_mode: descriptionMode,
     })
     .select("id")
     .maybeSingle()

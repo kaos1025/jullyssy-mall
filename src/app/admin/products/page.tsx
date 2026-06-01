@@ -15,7 +15,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import NaverImportButton from "@/components/layout/NaverImportButton"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { FIT_TYPE_VALUES, FIT_TYPE_LABELS } from "@/lib/product/fit-type"
 
 interface CategoryItem {
   id: string
@@ -34,6 +43,24 @@ interface ProductRow {
   thumbnail_url: string | null
   category_id: string | null
   category_name: string | null
+  fit_type: string
+}
+
+interface RefitChange {
+  id: string
+  name: string
+  to: string
+  via: string
+}
+
+interface RefitResult {
+  active_regular: number
+  candidates: number
+  changes: RefitChange[]
+  skipped: { non_apparel: number; no_category: number; no_extract: number }
+  applied?: number
+  enqueued?: number
+  preview?: boolean
 }
 
 type EditingCell = { id: string; field: "name" | "price" | "sale_price" } | null
@@ -180,6 +207,8 @@ const AdminProductsPage = () => {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
   const [totalCount, setTotalCount] = useState(0)
+  const [refitPreview, setRefitPreview] = useState<RefitResult | null>(null)
+  const [refitLoading, setRefitLoading] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
 
@@ -343,13 +372,104 @@ const AdminProductsPage = () => {
     fetchProducts()
   }
 
-  const colSpan = 10
+  // fit_type 인라인/일괄
+  const handleFitTypeChange = async (id: string, newFit: string) => {
+    const ok = await patchProduct(id, { fit_type: newFit })
+    if (ok) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, fit_type: newFit } : p))
+      )
+    }
+  }
+
+  const bulkChangeFitType = async (newFit: string) => {
+    const ids = Array.from(selectedIds)
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/products/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fit_type: newFit }),
+        })
+      )
+    )
+    const successCount = results.filter((r) => r.ok).length
+    toast({ title: `${successCount}건 핏 적용 완료` })
+    setSelectedIds(new Set())
+    fetchProducts()
+  }
+
+  // 선택 항목 SEO 재생성 큐 적재 (replace — 핏 반영). 중복/터미널은 서버에서 409로 제외.
+  const bulkEnqueueRegen = async () => {
+    const ids = Array.from(selectedIds)
+    if (!confirm(`${ids.length}개 상품 SEO를 재생성 큐에 적재할까요?`)) return
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/products/${id}/regenerate-seo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description_mode: "replace" }),
+        })
+      )
+    )
+    const successCount = results.filter((r) => r.ok).length
+    toast({ title: `${successCount}건 재생성 큐 적재 (중복/터미널 제외)` })
+    setSelectedIds(new Set())
+  }
+
+  // 핏 자동 재매핑 (의류 한정) — 미리보기 후 적용 (D5)
+  const openRefitPreview = async () => {
+    setRefitLoading(true)
+    try {
+      const res = await fetch(`/api/admin/products/refit-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apply: false }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ variant: "destructive", title: data.error || "미리보기 실패" })
+        return
+      }
+      setRefitPreview(data as RefitResult)
+    } finally {
+      setRefitLoading(false)
+    }
+  }
+
+  const applyRefit = async () => {
+    setRefitLoading(true)
+    try {
+      const res = await fetch(`/api/admin/products/refit-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apply: true, enqueue: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ variant: "destructive", title: data.error || "적용 실패" })
+        return
+      }
+      toast({
+        title: `${data.applied}건 핏 자동 적용, ${data.enqueued}건 재생성 큐 적재`,
+      })
+      setRefitPreview(null)
+      fetchProducts()
+    } finally {
+      setRefitLoading(false)
+    }
+  }
+
+  const colSpan = 11
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">상품 관리</h1>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={openRefitPreview} disabled={refitLoading}>
+            핏 자동 재매핑
+          </Button>
           <NaverImportButton onClose={fetchProducts} />
           <Button asChild>
             <Link href="/admin/products/new">
@@ -401,6 +521,21 @@ const AdminProductsPage = () => {
               <SelectItem value="HIDDEN">숨김</SelectItem>
             </SelectContent>
           </Select>
+          <Select onValueChange={bulkChangeFitType}>
+            <SelectTrigger className="w-[140px] h-8">
+              <SelectValue placeholder="일괄 핏 적용" />
+            </SelectTrigger>
+            <SelectContent>
+              {FIT_TYPE_VALUES.map((ft) => (
+                <SelectItem key={ft} value={ft}>
+                  {FIT_TYPE_LABELS[ft]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={bulkEnqueueRegen}>
+            SEO 재생성 큐 적재
+          </Button>
           <Button variant="destructive" size="sm" onClick={bulkDelete}>
             <Trash2 className="h-4 w-4 mr-1" />
             일괄 삭제
@@ -425,6 +560,7 @@ const AdminProductsPage = () => {
               <th className="p-3 text-right">정가</th>
               <th className="p-3 text-right">할인가</th>
               <th className="p-3 text-center">판매상태</th>
+              <th className="p-3 text-center">핏</th>
               <th className="p-3 text-right hidden md:table-cell">재고</th>
               <th className="p-3 text-left hidden md:table-cell">등록일</th>
               <th className="p-3 text-center w-16">수정</th>
@@ -574,6 +710,25 @@ const AdminProductsPage = () => {
                     </Select>
                   </td>
 
+                  {/* 핏 (드롭다운) */}
+                  <td className="p-3 text-center">
+                    <Select
+                      value={product.fit_type}
+                      onValueChange={(v) => handleFitTypeChange(product.id, v)}
+                    >
+                      <SelectTrigger className="w-[110px] h-8 mx-auto">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FIT_TYPE_VALUES.map((ft) => (
+                          <SelectItem key={ft} value={ft}>
+                            {FIT_TYPE_LABELS[ft]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+
                   {/* 재고 */}
                   <td className="p-3 text-right hidden md:table-cell">
                     {product.stock_sum}
@@ -656,6 +811,84 @@ const AdminProductsPage = () => {
           </div>
         </div>
       )}
+
+      {/* 핏 자동 재매핑 미리보기/적용 모달 (D5, 의류 카테고리 한정) */}
+      <Dialog
+        open={!!refitPreview}
+        onOpenChange={(o) => {
+          if (!o) setRefitPreview(null)
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>핏 자동 재매핑 (의류 한정)</DialogTitle>
+            <DialogDescription>
+              ACTIVE 의류 상품 중 핏이 &apos;기본핏&apos;인 항목의 상세설명/태그에서
+              핏을 추출해 적용합니다. 가방·신발·악세서리·미분류는 제외됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          {refitPreview && (
+            <div className="space-y-3 text-sm">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                <span>
+                  기본핏 ACTIVE:{" "}
+                  <b className="text-foreground">{refitPreview.active_regular}</b>
+                </span>
+                <span>
+                  변경 예정:{" "}
+                  <b className="text-foreground">{refitPreview.candidates}</b>
+                </span>
+                <span>비의류 제외: {refitPreview.skipped.non_apparel}</span>
+                <span>미분류 제외: {refitPreview.skipped.no_category}</span>
+                <span>추출 불가: {refitPreview.skipped.no_extract}</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto border rounded divide-y">
+                {refitPreview.changes.length === 0 ? (
+                  <div className="p-3 text-muted-foreground">
+                    변경 대상이 없습니다.
+                  </div>
+                ) : (
+                  refitPreview.changes.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-2 p-2"
+                    >
+                      <span className="truncate">{c.name}</span>
+                      <span className="shrink-0 text-xs">
+                        →{" "}
+                        <b>
+                          {FIT_TYPE_LABELS[c.to as keyof typeof FIT_TYPE_LABELS] ??
+                            c.to}
+                        </b>
+                        <span className="text-muted-foreground ml-1">({c.via})</span>
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setRefitPreview(null)}
+              disabled={refitLoading}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={applyRefit}
+              disabled={
+                refitLoading || !refitPreview || refitPreview.candidates === 0
+              }
+            >
+              {refitLoading
+                ? "적용 중..."
+                : `${refitPreview?.candidates ?? 0}건 적용 + 재생성`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

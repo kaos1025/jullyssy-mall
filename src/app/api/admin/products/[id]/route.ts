@@ -215,6 +215,18 @@ const patchHandler = async (
       }
     }
 
+    // material/care_info: 빈 문자열은 null로 정규화 (PUT 핸들러와 일관)
+    for (const key of ["material", "care_info"]) {
+      if (key in body) {
+        updates[key] = body[key] || null
+      }
+    }
+
+    // fit_type: SSOT 검증 후에만 허용 (잘못된 값 → REGULAR fallback)
+    if ("fit_type" in body) {
+      updates.fit_type = parseFitType(body.fit_type) ?? "REGULAR"
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "변경할 항목이 없습니다" }, { status: 400 })
     }
