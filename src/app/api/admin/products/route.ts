@@ -4,6 +4,7 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { parseFitType } from "@/lib/product/fit-type"
 
 const getHandler = async (request: NextRequest) => {
   const user = await verifyAdmin()
@@ -121,6 +122,7 @@ const postHandler = async (request: Request) => {
         material: productData.material || null,
         care_info: productData.care_info || null,
         origin: productData.origin || null,
+        fit_type: parseFitType(productData.fit_type) ?? "REGULAR",
         status: productData.status || "ACTIVE",
         free_shipping: productData.free_shipping === true,
         search_tags: productData.search_tags || [],

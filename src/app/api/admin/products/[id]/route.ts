@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { revalidatePath } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { parseFitType } from "@/lib/product/fit-type"
 
 const putHandler = async (
   request: Request,
@@ -28,6 +30,8 @@ const putHandler = async (
     const existingImageIds: string[] = JSON.parse(
       (formData.get("existing_image_ids") as string) || "[]"
     )
+    // fit_type 변경 모달에서 [재생성 큐 적재] 선택 시에만 true (B-2 / G2)
+    const enqueueSeo = formData.get("enqueue_seo") === "true"
 
     // 1. 상품 수정
     const { error } = await admin
@@ -42,6 +46,7 @@ const putHandler = async (
         material: productData.material || null,
         care_info: productData.care_info || null,
         origin: productData.origin || null,
+        fit_type: parseFitType(productData.fit_type) ?? "REGULAR",
         status: productData.status || "ACTIVE",
         free_shipping: productData.free_shipping === true,
         search_tags: productData.search_tags || [],
@@ -53,6 +58,43 @@ const putHandler = async (
         { error: error.message },
         { status: 500 }
       )
+    }
+
+    // 1-b. fit_type 변경 시 SEO 재생성 큐 적재 (모달 [재생성 큐 적재] 선택 시에만)
+    // G2: products edit 경로 전용 INSERT — seo-drafts 즉시 sync 경로와 책임 분리, pending 중복 방지
+    let seoEnqueued: "queued" | "already_pending" | "skipped" = "skipped"
+    if (enqueueSeo) {
+      const { data: pending } = await admin
+        .from("seo_generation_queue")
+        .select("id")
+        .eq("product_id", productId)
+        .eq("status", "pending")
+        .maybeSingle()
+
+      if (pending) {
+        seoEnqueued = "already_pending"
+      } else {
+        const { error: queueErr } = await admin
+          .from("seo_generation_queue")
+          .insert({
+            product_id: productId,
+            status: "pending",
+            trigger_source: "admin_fit_change",
+            description_mode: "replace",
+          })
+
+        if (queueErr) {
+          // 상품 수정은 이미 커밋됨 — 큐 적재 실패는 soft-fail (Sentry 기록 후 진행)
+          Sentry.captureException(queueErr, {
+            tags: {
+              seo_event: "admin_fit_change_enqueue_failed",
+              product_id: productId,
+            },
+          })
+        } else {
+          seoEnqueued = "queued"
+        }
+      }
     }
 
     // 2. 삭제된 이미지 제거 (existing_image_ids에 없는 기존 이미지 삭제)
@@ -142,6 +184,7 @@ const putHandler = async (
 
     return NextResponse.json({
       id: productId,
+      seo_enqueued: seoEnqueued,
       ...(uploadErrors.length > 0 && { image_errors: uploadErrors }),
     })
   } catch {
