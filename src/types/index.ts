@@ -95,6 +95,7 @@ export interface Product {
   care_info: string | null
   origin: string | null
   fit_type: FitType | null
+  search_tags: string[] | null
   free_shipping: boolean
   naver_product_no: string | null
   view_count: number

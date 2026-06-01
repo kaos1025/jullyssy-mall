@@ -83,8 +83,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
   )
 
   const [searchTags, setSearchTags] = useState<string[]>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((product as any)?.search_tags as string[]) ?? []
+    product?.search_tags ?? []
   )
   const [tagInput, setTagInput] = useState("")
 
