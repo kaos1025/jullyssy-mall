@@ -1,3 +1,5 @@
+import type { FitType } from "@/lib/product/fit-type"
+
 // =============================================
 // 상태값 Union 타입
 // =============================================
@@ -92,6 +94,7 @@ export interface Product {
   material: string | null
   care_info: string | null
   origin: string | null
+  fit_type: FitType | null
   free_shipping: boolean
   naver_product_no: string | null
   view_count: number

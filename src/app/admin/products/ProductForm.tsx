@@ -16,8 +16,17 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { FIT_TYPE_VALUES, FIT_TYPE_LABELS } from "@/lib/product/fit-type"
 import type { Category, Product, ProductOption, ProductImage } from "@/types"
 
 interface OptionRow {
@@ -40,10 +49,12 @@ const ProductForm = ({ product }: ProductFormProps) => {
   const router = useRouter()
   const { toast } = useToast()
   const isEdit = !!product
+  const initialFitType = product?.fit_type || "REGULAR"
 
   const [categories, setCategories] = useState<Category[]>([])
   const [parentCategories, setParentCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
+  const [showFitModal, setShowFitModal] = useState(false)
 
   const [form, setForm] = useState({
     name: product?.name || "",
@@ -55,6 +66,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
     material: product?.material || "",
     care_info: product?.care_info || "",
     origin: product?.origin || "",
+    fit_type: product?.fit_type || "REGULAR",
     status: product?.status || "ACTIVE",
     free_shipping: product?.free_shipping === true,
   })
@@ -120,13 +132,8 @@ const ProductForm = ({ product }: ProductFormProps) => {
     )
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name || !form.price) {
-      toast({ variant: "destructive", title: "상품명과 가격은 필수입니다" })
-      return
-    }
-
+  const doSubmit = async (enqueueSeo: boolean) => {
+    setShowFitModal(false)
     setLoading(true)
 
     try {
@@ -137,6 +144,10 @@ const ProductForm = ({ product }: ProductFormProps) => {
         "existing_image_ids",
         JSON.stringify(existingImages.map((img) => img.id))
       )
+      // fit_type 변경 모달의 결정 전달 (수정 시에만 의미 있음)
+      if (isEdit) {
+        formData.append("enqueue_seo", enqueueSeo ? "true" : "false")
+      }
       imageFiles.forEach((file) => formData.append("images", file))
 
       const url = isEdit
@@ -169,6 +180,22 @@ const ProductForm = ({ product }: ProductFormProps) => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.name || !form.price) {
+      toast({ variant: "destructive", title: "상품명과 가격은 필수입니다" })
+      return
+    }
+
+    // 수정 모드에서 fit_type이 변경된 경우에만 SEO 재생성 권고 모달 (B-2)
+    if (isEdit && form.fit_type !== initialFitType) {
+      setShowFitModal(true)
+      return
+    }
+
+    await doSubmit(false)
   }
 
   return (
@@ -350,6 +377,27 @@ const ProductForm = ({ product }: ProductFormProps) => {
       {/* 추가 정보 */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">추가 정보</h2>
+        <div>
+          <Label>핏 *</Label>
+          <Select
+            value={form.fit_type}
+            onValueChange={(v) => updateForm("fit_type", v)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FIT_TYPE_VALUES.map((ft) => (
+                <SelectItem key={ft} value={ft}>
+                  {FIT_TYPE_LABELS[ft]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            상품 핏. SEO 상세설명 자동 생성에 사용됩니다.
+          </p>
+        </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
             <Label>소재</Label>
@@ -521,6 +569,37 @@ const ProductForm = ({ product }: ProductFormProps) => {
           취소
         </Button>
       </div>
+
+      {/* fit_type 변경 시 SEO 재생성 권고 모달 (B-2 / G2) */}
+      <Dialog open={showFitModal} onOpenChange={setShowFitModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>SEO 재생성 권고</DialogTitle>
+            <DialogDescription>
+              핏 정보가 변경되었습니다. 변경된 핏을 반영해 SEO 상세설명을 다시
+              생성할까요? 재생성을 선택하면 백그라운드 큐에 적재되어 순차
+              처리됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => doSubmit(false)}
+              disabled={loading}
+            >
+              수정만, 재생성 안 함
+            </Button>
+            <Button
+              type="button"
+              onClick={() => doSubmit(true)}
+              disabled={loading}
+            >
+              재생성 큐 적재
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }
