@@ -573,6 +573,9 @@ const SeoDraftsClient = ({
             pending: {total}건
           </Badge>
           <Button asChild variant="outline" size="sm">
+            <Link href="/admin/seo-drafts/bulk">일괄 검수</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
             <Link href="/admin/seo-drafts/backfill">
               <Settings2 className="h-4 w-4 mr-1.5" />
               Backfill
