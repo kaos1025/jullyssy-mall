@@ -470,6 +470,9 @@ const AdminProductsPage = () => {
           <Button variant="outline" onClick={openRefitPreview} disabled={refitLoading}>
             핏 자동 재매핑
           </Button>
+          <Button asChild variant="outline">
+            <Link href="/admin/products/material-backfill">소재 채움</Link>
+          </Button>
           <NaverImportButton onClose={fetchProducts} />
           <Button asChild>
             <Link href="/admin/products/new">
@@ -819,7 +822,7 @@ const AdminProductsPage = () => {
           if (!o) setRefitPreview(null)
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>핏 자동 재매핑 (의류 한정)</DialogTitle>
             <DialogDescription>
