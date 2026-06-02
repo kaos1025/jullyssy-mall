@@ -12,6 +12,7 @@ import {
   lookupFitFromProductAttributes,
 } from "@/lib/seo/naver-attribute-dict"
 import type { FitType } from "@/lib/product/fit-type"
+import { isApparelTopSlug } from "@/lib/product/category"
 
 interface ImportItem {
   productNo: string
@@ -194,7 +195,30 @@ const importSingleProduct = async (
   }
 
   // fit_type 결정 (신규 상품만 — skip된 기존 상품은 위에서 early return)
-  const fitType = await resolveFitType(op, naverCategoryId, token)
+  // Track G: 비의류(가방/신발/악세서리)는 fit 무의미 → NULL (의류만 추출)
+  let isApparelProduct = false
+  if (categoryId) {
+    const { data: cat } = await admin
+      .from("categories")
+      .select("slug, parent_id")
+      .eq("id", categoryId)
+      .maybeSingle()
+    if (cat) {
+      if (cat.parent_id) {
+        const { data: pcat } = await admin
+          .from("categories")
+          .select("slug")
+          .eq("id", cat.parent_id)
+          .maybeSingle()
+        isApparelProduct = isApparelTopSlug(pcat?.slug)
+      } else {
+        isApparelProduct = isApparelTopSlug(cat.slug)
+      }
+    }
+  }
+  const fitType: FitType | null = isApparelProduct
+    ? await resolveFitType(op, naverCategoryId, token)
+    : null
 
   // slug 생성 (NOT NULL + UNIQUE 제약 사전 충돌 방지)
   // toSlug는 빈 결과 시 throw → 상위 try/catch에서 errors[]로 기록됨

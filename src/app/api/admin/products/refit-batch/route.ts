@@ -9,6 +9,7 @@ import {
   extractFitFromTags,
   extractFitFromDescription,
 } from "@/lib/seo/description-parser"
+import { isApparelTopSlug } from "@/lib/product/category"
 
 // v0.8 Track 1-C D5 — fit_type 자동 재매핑 (의류 카테고리 한정).
 //
@@ -22,8 +23,6 @@ import {
 // body: { apply?: boolean (default false=preview), enqueue?: boolean (default true) }
 //   - apply=false: 변경 예정 목록만 반환 (write 없음)
 //   - apply=true : products.fit_type UPDATE + (enqueue) seo_generation_queue replace
-
-const APPAREL_TOP_SLUGS = ["top", "bottom", "outer", "dress"]
 
 interface CatRow {
   id: string
@@ -58,7 +57,7 @@ const postHandler = async (request: Request) => {
     const c = catMap.get(catId)
     if (!c) return false
     const topSlug = c.parent_id ? catMap.get(c.parent_id)?.slug : c.slug
-    return !!topSlug && APPAREL_TOP_SLUGS.includes(topSlug)
+    return isApparelTopSlug(topSlug)
   }
 
   // ACTIVE + REGULAR 만 후보 (이미 non-REGULAR인 건 운영자/속성매핑 권위 → 휴리스틱으로 덮지 않음)
