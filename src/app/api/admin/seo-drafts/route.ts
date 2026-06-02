@@ -4,7 +4,9 @@ import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { getSeoDraftsPendingPaginatedAdmin } from "@/lib/seo/drafts"
 
-const MAX_LIMIT = 50
+// 일괄 검수 뷰가 전 pending을 한 번에 fetch (Track 2-A). default는 20 유지.
+// payload 주의: list item에 product_description(HTML)/spec_metadata 포함 — 100건 상한.
+const MAX_LIMIT = 100
 const DEFAULT_LIMIT = 20
 
 const getHandler = async (request: NextRequest) => {
