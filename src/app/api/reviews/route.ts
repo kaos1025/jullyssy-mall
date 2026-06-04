@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { revalidateTag } from "next/cache"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { reviewsLimiter } from "@/lib/rate-limit/limiters"
 import { createClient } from "@/lib/supabase/server"
@@ -176,6 +177,9 @@ const postHandler = async (request: Request) => {
       reason: hasPhotos ? "포토리뷰 적립" : "리뷰 적립",
     })
   }
+
+  // 신규 리뷰 → PDP 캐시(product-detail, tags ["products"]) 무효화 (리뷰/평점 반영)
+  revalidateTag("products")
 
   return NextResponse.json({
     success: true,

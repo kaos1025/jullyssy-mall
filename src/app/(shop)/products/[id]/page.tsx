@@ -3,6 +3,12 @@ import Link from "next/link"
 import { PackageOpen, MessageSquare, HelpCircle, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getCategoryById } from "@/lib/categories"
+import {
+  getProductDetail,
+  getProductReviews,
+  getProductTagSummary,
+  getRelatedProducts,
+} from "@/lib/product-detail"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Accordion,
@@ -41,17 +47,9 @@ export const generateMetadata = async ({
   params,
 }: ProductDetailPageProps): Promise<Metadata> => {
   try {
-    const supabase = await createClient()
-    // params.id는 Next.js App Router에서 percent-encoded 상태로 전달될 수 있음
-    // (한글 slug URL — decode 안 하면 DB 매치 0건)
+    // params.id는 percent-encoded 가능(한글 slug) → decode 후 캐시 fetcher 공유(page와 dedupe)
     const id = decodeURIComponent(params.id)
-    const isUuid = UUID_RE.test(id)
-    const { data: product } = await supabase
-      .from("products")
-      .select("id, slug, name, description, meta_description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
-      .eq(isUuid ? "id" : "slug", id)
-      .eq("status", "ACTIVE")
-      .single()
+    const product = await getProductDetail(id)
 
     if (!product) return { title: "상품 상세" }
 
@@ -92,43 +90,28 @@ export const generateMetadata = async ({
 }
 
 const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  // params.id는 Next.js App Router에서 percent-encoded 상태로 전달될 수 있음
-  // (한글 slug URL — decode 안 하면 DB 매치 0건)
+  // 상품 본체 — 캐시 격리 fetcher(createAdminClient + unstable_cache). page↔metadata dedupe.
+  // params.id는 percent-encoded 가능(한글 slug) → decode 후 fetcher 공유.
   const id = decodeURIComponent(params.id)
-  const isUuid = UUID_RE.test(id)
-  const { data: product } = await supabase
-    .from("products")
-    .select(
-      `
-      *,
-      category:categories(id, name, slug, parent_id),
-      product_images(*),
-      product_options(*)
-    `
-    )
-    .eq(isUuid ? "id" : "slug", id)
-    .eq("status", "ACTIVE")
-    .single()
+  const product = await getProductDetail(id)
 
   if (!product) notFound()
 
   // UUID 접근이면서 slug 보유 시 → slug URL로 308 영구 리다이렉트
   // (어드민 즐겨찾기 / 외부 공유 링크 / 검색엔진 색인 자동 갱신)
   // permanentRedirect는 throw 기반이라 이후 코드는 실행되지 않음
-  // NOTE: Next.js 14.2 RSC streaming context에서는 308 status 대신 meta refresh 폴백으로
-  // 응답될 수 있음 (Sentry 영향 아닌 known design — P1-13, Phase 1~5 격리 진단 완료).
-  if (isUuid && product.slug) {
+  // NOTE: Next.js 14.2 RSC streaming context에서는 308 status 대신 meta refresh 폴백 가능
+  // (Sentry 영향 아닌 known design — P1-13).
+  if (UUID_RE.test(id) && product.slug) {
     permanentRedirect(`/products/${product.slug}`)
   }
 
-  // 작성 가능 order_item 사전 조회 (로그인 + 현재 상품 × CONFIRMED + 미작성)
-  // 보유 시에만 PDP 리뷰 탭에 "이 상품 리뷰 쓰기" 링크 노출
+  // 사용자별(동적): auth + 작성 가능 order_item만 page에 유지 (공개 데이터만 캐시).
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  // 작성 가능 order_item (로그인 + 현재 상품 × CONFIRMED + 미작성) → "리뷰 쓰기" 링크
   let writableOrderItem: { id: string } | null = null
   if (user) {
     const { data } = await supabase
@@ -144,7 +127,7 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     writableOrderItem = data as { id: string } | null
   }
 
-  // 부모 카테고리 조회
+  // 부모 카테고리 (캐시된 lib/categories)
   let parentCategory: { name: string; slug: string } | null = null
   if (product.category?.parent_id) {
     const parent = await getCategoryById(product.category.parent_id)
@@ -153,38 +136,17 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
       : null
   }
 
-  // 리뷰 + 태그 집계 조회 (PDP SSR 시 함께 prefetch)
-  const [{ data: reviews }, { data: tagSummaryData }] = await Promise.all([
-    supabase
-      .from("reviews")
-      .select(
-        `
-      *,
-      images:review_images(*),
-      user:profiles(name, height, weight)
-    `
-      )
-      .eq("product_id", product.id)
-      .order("created_at", { ascending: false }),
-    supabase.rpc("get_product_review_tag_summary", {
-      p_product_id: product.id,
-    }),
+  // 공개 데이터 — 캐시 격리 fetcher (리뷰 / 태그집계 / 관련상품)
+  const [reviews, tagSummaryData] = await Promise.all([
+    getProductReviews(product.id),
+    getProductTagSummary(product.id),
   ])
   const tagSummaryRows =
     ((tagSummaryData as unknown) as ReviewTagSummaryRow[] | null) ?? []
 
-  // 관련상품 조회 (같은 카테고리, 현재 상품 제외)
-  let relatedProducts: typeof product[] = []
-  if (product.category_id) {
-    const { data: related } = await supabase
-      .from("products")
-      .select("*, product_images(url, is_thumbnail, sort_order), product_options(color)")
-      .eq("category_id", product.category_id)
-      .eq("status", "ACTIVE")
-      .neq("id", product.id)
-      .limit(8)
-    relatedProducts = related || []
-  }
+  const relatedProducts = product.category_id
+    ? await getRelatedProducts(product.category_id, product.id)
+    : []
 
   const typedReviews = (reviews || []) as unknown as ReviewWithImages[]
   const averageRating =
