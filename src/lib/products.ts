@@ -12,6 +12,7 @@
 
 import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { escapePostgrestLikeValue } from "@/lib/supabase/search"
 
 export type ProductSort = "price_asc" | "price_desc" | "popular" | "latest"
 
@@ -49,6 +50,36 @@ const LIST_SELECT = `
   reviews(count)
 `
 
+// 정렬 적용 (목록·검색 공유). supabase 빌더 .order()는 mutate 후 self 반환 → 미타입 admin
+// client 캐스팅으로 체이닝. ProductSort 외 값은 default(latest)로 수렴.
+interface Orderable {
+  order(
+    column: string,
+    options?: { ascending?: boolean; nullsFirst?: boolean },
+  ): Orderable
+}
+const applySort = <T>(query: T, sort: ProductSort): T => {
+  const b = query as unknown as Orderable
+  switch (sort) {
+    case "price_asc":
+      b.order("sale_price", { ascending: true, nullsFirst: false }).order("price", {
+        ascending: true,
+      })
+      break
+    case "price_desc":
+      b.order("sale_price", { ascending: false, nullsFirst: true }).order("price", {
+        ascending: false,
+      })
+      break
+    case "popular":
+      b.order("sell_count", { ascending: false })
+      break
+    default:
+      b.order("created_at", { ascending: false })
+  }
+  return query
+}
+
 const fetchProductsFromDb = async (
   categoryIds: string[],
   sort: ProductSort,
@@ -67,23 +98,7 @@ const fetchProductsFromDb = async (
     query = query.in("category_id", categoryIds)
   }
 
-  switch (sort) {
-    case "price_asc":
-      query = query
-        .order("sale_price", { ascending: true, nullsFirst: false })
-        .order("price", { ascending: true })
-      break
-    case "price_desc":
-      query = query
-        .order("sale_price", { ascending: false, nullsFirst: true })
-        .order("price", { ascending: false })
-      break
-    case "popular":
-      query = query.order("sell_count", { ascending: false })
-      break
-    default:
-      query = query.order("created_at", { ascending: false })
-  }
+  query = applySort(query, sort)
 
   const { data, count, error } = await query.range(offset, offset + pageSize - 1)
   if (error) throw new Error(error.message)
@@ -112,4 +127,54 @@ export const getProductsList = async (
 ): Promise<ProductListResult> => {
   const sortedIds = [...categoryIds].sort()
   return fetchProductsCached(sortedIds, sort, offset, pageSize)
+}
+
+// ── 검색 (name ILIKE) ─────────────────────────────────────────────────────
+// 목록과 동일 보안/캐시 격리: createAdminClient + status=ACTIVE + 화이트리스트 +
+// unstable_cache(tags ["products"]). /search prefetch 폭주에도 DB offload (PREFETCH-504 동형).
+const fetchSearchFromDb = async (
+  q: string,
+  sort: ProductSort,
+  offset: number,
+  pageSize: number,
+): Promise<ProductListResult> => {
+  const supabase = createAdminClient()
+
+  // escapePostgrestLikeValue로 ,()*\ 제거 — % _ 는 fuzzy 유지. ilike 빌더라 파라미터화됨.
+  const pattern = `%${escapePostgrestLikeValue(q)}%`
+  let query = supabase
+    .from("products")
+    .select(LIST_SELECT, { count: "exact" })
+    .eq("status", "ACTIVE")
+    .ilike("name", pattern)
+
+  query = applySort(query, sort)
+
+  const { data, count, error } = await query.range(offset, offset + pageSize - 1)
+  if (error) throw new Error(error.message)
+
+  return {
+    products: (data ?? []) as unknown as ProductListItem[],
+    totalCount: count ?? 0,
+  }
+}
+
+const fetchSearchCached = unstable_cache(fetchSearchFromDb, ["products:search"], {
+  revalidate: 300,
+  tags: ["products"],
+})
+
+/**
+ * 상품명 검색 + 총개수 (캐시 격리). 무효화: revalidateTag("products") / 300s TTL.
+ * q는 trim+lowercase로 정규화 — 캐시 키 안정화(빈 q는 호출 측에서 사전 차단 권장).
+ */
+export const getSearchResults = async (
+  rawQuery: string,
+  sort: ProductSort,
+  offset: number,
+  pageSize: number,
+): Promise<ProductListResult> => {
+  const q = rawQuery.trim().toLowerCase()
+  if (!q) return { products: [], totalCount: 0 }
+  return fetchSearchCached(q, sort, offset, pageSize)
 }
