@@ -9,10 +9,8 @@ import {
   isTerminalOrderStatus,
 } from "@/lib/order/status-transitions"
 import { buildTrackingUrl } from "@/lib/order/tracking-url"
-import {
-  sendShippingDelivered,
-  sendShippingStarted,
-} from "@/lib/email/send"
+import { sendShippingStarted } from "@/lib/email/send"
+import { markOrderDelivered } from "@/lib/order/markOrderDelivered"
 import {
   formatKST,
   getOrderDetailUrl,
@@ -82,19 +80,43 @@ const patchHandler = async (
   // body.status를 무검증 update하면 어드민 실수/내부자 위협으로 PAID→RETURNED 등
   // status만 전이되어 cancelOrder를 우회한 결제 환불 누락이 가능 → 화이트리스트 강제.
   // CANCELLED는 화이트리스트에 없어 자동으로 거부 (전용 cancel 라우트로 유도).
-  const updateData: Record<string, string> = {}
-
-  if (body.status !== undefined) {
-    if (!isAdminOrderStatusAllowed(body.status)) {
-      return NextResponse.json(
-        { error: "허용되지 않은 상태값입니다" },
-        { status: 400 }
-      )
-    }
-    updateData.status = body.status
+  if (body.status !== undefined && !isAdminOrderStatusAllowed(body.status)) {
+    return NextResponse.json(
+      { error: "허용되지 않은 상태값입니다" },
+      { status: 400 }
+    )
   }
+
+  const updateData: Record<string, string> = {}
   if (body.courier) updateData.courier = body.courier
   if (body.tracking_no) updateData.tracking_no = body.tracking_no
+
+  // DELIVERED는 부수효과 SSOT(markOrderDelivered) 경유 — status/delivered_at/delivered_via +
+  // 배송완료 메일을 일괄 처리한다. 직접 무인 UPDATE로 메일을 누락하던 결함을 차단하고
+  // cron 자동완료와 단일 경로를 공유한다(actor='ADMIN').
+  if (body.status === "DELIVERED") {
+    // 동반된 송장/택배사 변경분이 있으면 먼저 반영.
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await admin
+        .from("orders")
+        .update(updateData)
+        .eq("id", orderId)
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    }
+    const result = await markOrderDelivered(admin, orderId, { via: "ADMIN" })
+    if (result.status === "error") {
+      return NextResponse.json({ error: result.error }, { status: 500 })
+    }
+    return NextResponse.json({ success: true })
+  }
+
+  if (body.status !== undefined) updateData.status = body.status
+  // SHIPPING 전환 시각 기록 — 폴링 윈도우/배송기간 분석 기반(delivered_at과 대칭).
+  if (body.status === "SHIPPING") {
+    updateData.shipped_at = new Date().toISOString()
+  }
 
   const { error } = await admin
     .from("orders")
@@ -105,8 +127,9 @@ const patchHandler = async (
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // 배송 시작/완료 메일 — UPDATE 성공 후, fire-and-forget
-  if (body.status === "SHIPPING" || body.status === "DELIVERED") {
+  // 배송 시작 메일 — UPDATE 성공 후, fire-and-forget.
+  // (배송완료 메일은 markOrderDelivered로 이관 — 수동/자동 단일화.)
+  if (body.status === "SHIPPING") {
     const { data: orderFull } = await admin
       .from("orders")
       .select("*, order_items(*)")
@@ -118,16 +141,10 @@ const patchHandler = async (
       if (!userEmail) {
         Sentry.captureMessage("Email recipient missing", {
           level: "info",
-          tags: {
-            type: "email",
-            event:
-              body.status === "SHIPPING"
-                ? "shipping_started_skip"
-                : "shipping_delivered_skip",
-          },
+          tags: { type: "email", event: "shipping_started_skip" },
           extra: { orderId: orderFull.id, userId: orderFull.user_id },
         })
-      } else if (body.status === "SHIPPING") {
+      } else {
         const trackingUrl = buildTrackingUrl(
           orderFull.courier,
           orderFull.tracking_no
@@ -152,27 +169,6 @@ const patchHandler = async (
             context: { orderId: orderFull.id, userId: orderFull.user_id },
           })
         }
-      } else {
-        sendShippingDelivered({
-          to: userEmail,
-          customerName: orderFull.recipient,
-          orderNo: orderFull.order_no,
-          deliveredDate: formatKST(orderFull.updated_at),
-          items: (orderFull.order_items ?? []).map(
-            (i: {
-              product_name: string
-              color: string
-              size: string
-              quantity: number
-            }) => ({
-              productName: i.product_name,
-              optionName: `${i.color} / ${i.size}`,
-              quantity: i.quantity,
-            })
-          ),
-          orderDetailUrl: getOrderDetailUrl(orderFull.id),
-          context: { orderId: orderFull.id, userId: orderFull.user_id },
-        })
       }
     }
   }
