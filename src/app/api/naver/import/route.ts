@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidateTag } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
@@ -433,6 +434,11 @@ const postHandler = async (request: NextRequest) => {
       fail_count: failCount,
       error_details: errors.length > 0 ? { errors } : null,
     })
+
+    // 신규 상품 임포트 시 목록 캐시(lib/products) 무효화
+    if (successCount > 0) {
+      revalidateTag("products")
+    }
 
     return NextResponse.json({
       total: totalCount,
