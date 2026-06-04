@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Plus, Search, Trash2, ImageIcon, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react"
@@ -25,11 +25,13 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { FIT_TYPE_VALUES, FIT_TYPE_LABELS } from "@/lib/product/fit-type"
+import { isApparelCategory, type CategoryNode } from "@/lib/product/category"
 
 interface CategoryItem {
   id: string
   name: string
   parent_id: string | null
+  slug: string | null
 }
 
 interface ProductRow {
@@ -43,7 +45,7 @@ interface ProductRow {
   thumbnail_url: string | null
   category_id: string | null
   category_name: string | null
-  fit_type: string
+  fit_type: string | null
 }
 
 interface RefitChange {
@@ -211,6 +213,16 @@ const AdminProductsPage = () => {
   const [refitLoading, setRefitLoading] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
+
+  // fit tri-state(GRID-NONAPPAREL-FIT-UI-1) — isApparelCategory SSOT(PR #55) 그대로 재사용.
+  // category 존재 + 비의류만 fit 비활성. 의류·무카테고리는 편집 유지(form tri-state 일치).
+  const catById = useMemo(() => {
+    const m = new Map<string, CategoryNode>()
+    for (const c of categories) m.set(c.id, { slug: c.slug, parent_id: c.parent_id })
+    return m
+  }, [categories])
+  const isRowNonApparel = (categoryId: string | null): boolean =>
+    !!categoryId && !isApparelCategory(categoryId, catById)
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -383,9 +395,19 @@ const AdminProductsPage = () => {
   }
 
   const bulkChangeFitType = async (newFit: string) => {
-    const ids = Array.from(selectedIds)
+    const allIds = Array.from(selectedIds)
+    // 비의류만 skip (서버가 NULL 강제 → "설정했는데 NULL" 혼란 방지). 의류·무카테고리는 적용.
+    const productById = new Map(products.map((p) => [p.id, p]))
+    const targetIds = allIds.filter(
+      (id) => !isRowNonApparel(productById.get(id)?.category_id ?? null)
+    )
+    const skipped = allIds.length - targetIds.length
+    if (targetIds.length === 0) {
+      toast({ title: `적용 대상 없음 (비의류 ${skipped}건 제외)` })
+      return
+    }
     const results = await Promise.all(
-      ids.map((id) =>
+      targetIds.map((id) =>
         fetch(`/api/admin/products/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -394,7 +416,12 @@ const AdminProductsPage = () => {
       )
     )
     const successCount = results.filter((r) => r.ok).length
-    toast({ title: `${successCount}건 핏 적용 완료` })
+    toast({
+      title:
+        skipped > 0
+          ? `${successCount}건 핏 적용 (비의류 ${skipped}건 제외)`
+          : `${successCount}건 핏 적용 완료`,
+    })
     setSelectedIds(new Set())
     fetchProducts()
   }
@@ -713,23 +740,32 @@ const AdminProductsPage = () => {
                     </Select>
                   </td>
 
-                  {/* 핏 (드롭다운) */}
+                  {/* 핏 (드롭다운) — 비의류는 비활성("—"), 의류·무카테고리는 편집 (tri-state, form 일치) */}
                   <td className="p-3 text-center">
-                    <Select
-                      value={product.fit_type}
-                      onValueChange={(v) => handleFitTypeChange(product.id, v)}
-                    >
-                      <SelectTrigger className="w-[110px] h-8 mx-auto">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FIT_TYPE_VALUES.map((ft) => (
-                          <SelectItem key={ft} value={ft}>
-                            {FIT_TYPE_LABELS[ft]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {isRowNonApparel(product.category_id) ? (
+                      <span
+                        className="inline-flex items-center justify-center w-[110px] h-8 mx-auto text-sm text-muted-foreground"
+                        title="비의류 — 핏 미지정"
+                      >
+                        —
+                      </span>
+                    ) : (
+                      <Select
+                        value={product.fit_type ?? undefined}
+                        onValueChange={(v) => handleFitTypeChange(product.id, v)}
+                      >
+                        <SelectTrigger className="w-[110px] h-8 mx-auto">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FIT_TYPE_VALUES.map((ft) => (
+                            <SelectItem key={ft} value={ft}>
+                              {FIT_TYPE_LABELS[ft]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </td>
 
                   {/* 재고 */}

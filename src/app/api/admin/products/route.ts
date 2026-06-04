@@ -20,9 +20,10 @@ const getHandler = async (request: NextRequest) => {
   const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get("per_page") || "20")))
 
   // 카테고리 전체 조회 (self-join 대신 별도 쿼리)
+  // slug: 그리드 fit tri-state(GRID-NONAPPAREL-FIT-UI-1) 의류 판정용 — additive read-only
   const { data: allCategories } = await admin
     .from("categories")
-    .select("id, name, parent_id")
+    .select("id, name, parent_id, slug")
 
   const categoryMap = new Map<string, { name: string; parent_id: string | null }>()
   if (allCategories) {
