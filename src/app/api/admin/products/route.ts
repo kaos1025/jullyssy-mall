@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -203,6 +203,7 @@ const postHandler = async (request: Request) => {
 
     revalidatePath("/admin/products")
     revalidatePath("/products/[id]", "page")
+    revalidateTag("products") // 목록 캐시(lib/products) 무효화
 
     return NextResponse.json({
       id: product.id,

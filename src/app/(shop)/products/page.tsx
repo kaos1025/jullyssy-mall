@@ -1,11 +1,11 @@
 import Link from "next/link"
 import { PackageOpen, ChevronRight } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
 import {
   getCategoryBySlug,
   getChildrenOf,
   getRootCategories,
 } from "@/lib/categories"
+import { getProductsList, PRODUCT_SORTS, type ProductSort } from "@/lib/products"
 import ProductCard from "@/components/product/ProductCard"
 import ProductListFilter from "@/components/product/ProductListFilter"
 import { Button } from "@/components/ui/button"
@@ -50,7 +50,6 @@ export const generateMetadata = async ({
 }
 
 const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
-  const supabase = await createClient()
   const page = Number(searchParams.page) || 1
   const pageSize = 20
   const offset = (page - 1) * pageSize
@@ -83,50 +82,31 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
     }
   }
 
-  // 상품 쿼리 빌드
-  let query = supabase
-    .from("products")
-    .select(
-      `
-      *,
-      product_images(url, is_thumbnail, sort_order),
-      product_options(color),
-      reviews(id)
-    `,
-      { count: "exact" }
-    )
-    .eq("status", "ACTIVE")
-
-  // 카테고리 필터
+  // 카테고리 필터 대상 id (선택 카테고리 + 하위). 미선택 시 전체.
+  let categoryIds: string[] = []
   if (searchParams.category) {
     const cat = await getCategoryBySlug(searchParams.category)
     if (cat) {
       const childCats = await getChildrenOf(cat.id)
-      const categoryIds = [cat.id, ...childCats.map((c) => c.id)]
-      query = query.in("category_id", categoryIds)
+      categoryIds = [cat.id, ...childCats.map((c) => c.id)]
     }
   }
 
-  // 정렬
-  switch (searchParams.sort) {
-    case "price_asc":
-      query = query.order("sale_price", { ascending: true, nullsFirst: false })
-                   .order("price", { ascending: true })
-      break
-    case "price_desc":
-      query = query.order("sale_price", { ascending: false, nullsFirst: true })
-                   .order("price", { ascending: false })
-      break
-    case "popular":
-      query = query.order("sell_count", { ascending: false })
-      break
-    default:
-      query = query.order("created_at", { ascending: false })
-  }
+  // sort 정규화 (무효/미지정 → latest) — 캐시 키 안정화.
+  const sort: ProductSort = PRODUCT_SORTS.includes(
+    searchParams.sort as ProductSort,
+  )
+    ? (searchParams.sort as ProductSort)
+    : "latest"
 
-  const { data: products, count } = await query.range(offset, offset + pageSize - 1)
+  // 상품 목록 — 캐시 격리 fetcher (createAdminClient + unstable_cache로 DB offload)
+  const { products, totalCount } = await getProductsList(
+    categoryIds,
+    sort,
+    offset,
+    pageSize,
+  )
 
-  const totalCount = count || 0
   const hasNextPage = offset + pageSize < totalCount
 
   // 다음 페이지 URL 생성
@@ -175,7 +155,7 @@ const ProductsPage = async ({ searchParams }: ProductsPageProps) => {
                     .map((img: { url: string }) => img.url)
                 }
                 colors={Array.from(new Set((product.product_options ?? []).map((o: { color: string }) => o.color)))}
-                review_count={product.reviews?.length || 0}
+                review_count={product.reviews?.[0]?.count ?? 0}
                 status={product.status}
                 created_at={product.created_at}
                 free_shipping={product.free_shipping}
