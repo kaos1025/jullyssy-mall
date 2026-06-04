@@ -4,7 +4,7 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { parseFitType } from "@/lib/product/fit-type"
+import { buildApparelResolver, resolveWriteFitType } from "@/lib/product/category-server"
 
 const getHandler = async (request: NextRequest) => {
   const user = await verifyAdmin()
@@ -109,6 +109,14 @@ const postHandler = async (request: Request) => {
       (formData.get("existing_image_ids") as string) || "[]"
     )
 
+    // fit_type tri-state: category 존재+비의류만 NULL 강제, 무카테고리는 보존 (#2)
+    const isApparel = await buildApparelResolver(admin)
+    const fitType = resolveWriteFitType(
+      productData.category_id || null,
+      productData.fit_type,
+      isApparel
+    )
+
     // 1. 상품 등록
     const { data: product, error } = await admin
       .from("products")
@@ -122,7 +130,7 @@ const postHandler = async (request: Request) => {
         material: productData.material || null,
         care_info: productData.care_info || null,
         origin: productData.origin || null,
-        fit_type: parseFitType(productData.fit_type) ?? "REGULAR",
+        fit_type: fitType,
         status: productData.status || "ACTIVE",
         free_shipping: productData.free_shipping === true,
         search_tags: productData.search_tags || [],

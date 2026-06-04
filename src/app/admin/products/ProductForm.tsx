@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Plus, Trash2, Upload, X } from "lucide-react"
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { FIT_TYPE_VALUES, FIT_TYPE_LABELS } from "@/lib/product/fit-type"
+import { isApparelCategory, type CategoryNode } from "@/lib/product/category"
 import type { Category, Product, ProductOption, ProductImage } from "@/types"
 
 interface OptionRow {
@@ -49,12 +50,17 @@ const ProductForm = ({ product }: ProductFormProps) => {
   const router = useRouter()
   const { toast } = useToast()
   const isEdit = !!product
-  const initialFitType = product?.fit_type || "REGULAR"
+  // 비의류는 fit_type NULL(Track G) — || 대신 ??로 null 보존(REGULAR 강제 금지)
+  const initialFitType = product?.fit_type ?? null
 
   const [categories, setCategories] = useState<Category[]>([])
   const [parentCategories, setParentCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [showFitModal, setShowFitModal] = useState(false)
+  // 비의류로 전환 시 마지막 의류 fit을 기억 → 의류 복귀 시 복원(category 토글 중 fit 손실 방지)
+  const [lastApparelFit, setLastApparelFit] = useState<string>(
+    product?.fit_type ?? "REGULAR"
+  )
 
   const [form, setForm] = useState({
     name: product?.name || "",
@@ -66,7 +72,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
     material: product?.material || "",
     care_info: product?.care_info || "",
     origin: product?.origin || "",
-    fit_type: product?.fit_type || "REGULAR",
+    fit_type: (product?.fit_type ?? null) as string | null,
     status: product?.status || "ACTIVE",
     free_shipping: product?.free_shipping === true,
   })
@@ -110,8 +116,29 @@ const ProductForm = ({ product }: ProductFormProps) => {
 
   const childCategories = categories.filter((c) => c.parent_id)
 
+  // 카테고리 의류 판정 — leaf SSOT(isApparelCategory)를 import·refit-batch와 동일하게 재사용
+  const catById = useMemo(() => {
+    const m = new Map<string, CategoryNode>()
+    for (const c of categories) m.set(c.id, { slug: c.slug, parent_id: c.parent_id })
+    return m
+  }, [categories])
+
+  const isApparel = isApparelCategory(form.category_id, catById)
+  // tri-state: category 존재 + 비의류만 NULL 강제. 무카테고리(unknown)는 fit 보존 (#2)
+  const nonApparel = !!form.category_id && !isApparel
+
   const updateForm = (field: string, value: string | number | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // 카테고리 변경(토글 매트릭스): 비의류 진입만 null+기억, 의류/무카테고리는 직전 fit 복원·보존(클리어 금지)
+  const handleCategoryChange = (categoryId: string) => {
+    const nextNonApparel = !!categoryId && !isApparelCategory(categoryId, catById)
+    setForm((prev) => ({
+      ...prev,
+      category_id: categoryId,
+      fit_type: nextNonApparel ? null : prev.fit_type ?? lastApparelFit,
+    }))
   }
 
   const addOption = () => {
@@ -188,8 +215,9 @@ const ProductForm = ({ product }: ProductFormProps) => {
       return
     }
 
-    // 수정 모드에서 fit_type이 변경된 경우에만 SEO 재생성 권고 모달 (B-2)
-    if (isEdit && form.fit_type !== initialFitType) {
+    // 수정 모드 + 의류에서 fit_type이 변경된 경우에만 SEO 재생성 권고 모달 (B-2)
+    // 비의류는 fit이 SEO에 미반영 → 모달 불필요
+    if (isEdit && isApparel && form.fit_type !== initialFitType) {
       setShowFitModal(true)
       return
     }
@@ -228,7 +256,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
             <Label>카테고리</Label>
             <Select
               value={form.category_id}
-              onValueChange={(v) => updateForm("category_id", v)}
+              onValueChange={handleCategoryChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="카테고리 선택" />
@@ -377,24 +405,37 @@ const ProductForm = ({ product }: ProductFormProps) => {
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">추가 정보</h2>
         <div>
-          <Label>핏 *</Label>
-          <Select
-            value={form.fit_type}
-            onValueChange={(v) => updateForm("fit_type", v)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FIT_TYPE_VALUES.map((ft) => (
-                <SelectItem key={ft} value={ft}>
-                  {FIT_TYPE_LABELS[ft]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>핏 {isApparel ? "*" : ""}</Label>
+          {nonApparel ? (
+            <div className="flex h-10 items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground">
+              해당 없음 (비의류)
+            </div>
+          ) : (
+            <Select
+              value={form.fit_type ?? (isApparel ? "REGULAR" : "")}
+              onValueChange={(v) => {
+                updateForm("fit_type", v)
+                setLastApparelFit(v)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="핏 선택 (선택)" />
+              </SelectTrigger>
+              <SelectContent>
+                {FIT_TYPE_VALUES.map((ft) => (
+                  <SelectItem key={ft} value={ft}>
+                    {FIT_TYPE_LABELS[ft]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <p className="text-xs text-muted-foreground mt-1">
-            상품 핏. SEO 상세설명 자동 생성에 사용됩니다.
+            {nonApparel
+              ? "비의류는 핏 정보가 없습니다 (미지정으로 저장)."
+              : isApparel
+                ? "상품 핏. SEO 상세설명 자동 생성에 사용됩니다."
+                : "카테고리 미선택 — 핏은 현재 값으로 보존됩니다."}
           </p>
         </div>
         <div className="grid grid-cols-3 gap-4">
