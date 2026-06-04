@@ -23,6 +23,7 @@ import { SHOPPING_GUIDE } from "@/constants/shopping-guide"
 import { BUSINESS_INFO } from "@/constants/business"
 import { SHIPPING_CONFIG } from "@/constants/shipping"
 import { FIT_TYPE_LABELS, parseFitType } from "@/lib/product/fit-type"
+import { getProductLdDescription } from "@/lib/seo/product-ld-description"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
 import type { ReviewTagSummaryRow } from "@/types/review"
@@ -47,7 +48,7 @@ export const generateMetadata = async ({
     const isUuid = UUID_RE.test(id)
     const { data: product } = await supabase
       .from("products")
-      .select("id, slug, name, description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
+      .select("id, slug, name, description, meta_description, price, sale_price, search_tags, product_images(url, is_thumbnail)")
       .eq(isUuid ? "id" : "slug", id)
       .eq("status", "ACTIVE")
       .single()
@@ -65,7 +66,8 @@ export const generateMetadata = async ({
       description: `${product.name} | ${displayPrice.toLocaleString()}원 | 쥴리씨`,
       openGraph: {
         title: product.name,
-        description: product.description?.slice(0, 160) || product.name,
+        // PDP-LD-DESC-1: 안내문 오염 제거 — meta_description(AI) → body strip → name
+        description: getProductLdDescription(product, 160),
         ...(thumbnail && {
           images: [{ url: thumbnail, width: 800, height: 1067, alt: product.name }],
         }),
@@ -224,15 +226,8 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     "@type": "Product",
     name: product.name,
     image: thumbnail ? [thumbnail] : [],
-    description: product.description
-      ? product.description
-          .replace(/<[^>]*>/g, "")
-          .replace(/\|/g, "")
-          .replace(/[\n\r\t]+/g, " ")
-          .replace(/\s{2,}/g, " ")
-          .trim()
-          .slice(0, 200)
-      : "",
+    // PDP-LD-DESC-1: 상품 묘사 소스 — meta_description(AI) → body 안내문 strip → name
+    description: getProductLdDescription(product, 200),
     brand: { "@type": "Brand", name: "쥴리씨" },
     sku: product.id,
     offers: {
