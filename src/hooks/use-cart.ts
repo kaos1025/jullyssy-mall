@@ -14,23 +14,36 @@ interface CartState {
   getItemCount: () => number
 }
 
+// fetchCart single-flight 가드: 다중 useUser mount(Header·MobileNav 등)이 동시에
+// fetchCart를 호출해도 진행 중인 요청 1건을 공유하도록 in-flight Promise를 보관.
+// 완료/실패 모두 finally에서 클리어(영구 잠김 방지). store 모듈 싱글턴 스코프.
+let inflightFetch: Promise<void> | null = null
+
 export const useCart = create<CartState>()((set, get) => ({
   items: [],
   isLoading: false,
 
   fetchCart: async () => {
+    // 진행 중 요청이 있으면 그것을 공유 (중복 /api/cart 호출 제거)
+    if (inflightFetch) return inflightFetch
+
     set({ isLoading: true })
-    try {
-      const res = await fetch("/api/cart")
-      if (!res.ok) {
+    inflightFetch = (async () => {
+      try {
+        const res = await fetch("/api/cart")
+        if (!res.ok) {
+          set({ items: [], isLoading: false })
+          return
+        }
+        const items = await res.json()
+        set({ items, isLoading: false })
+      } catch {
         set({ items: [], isLoading: false })
-        return
+      } finally {
+        inflightFetch = null
       }
-      const items = await res.json()
-      set({ items, isLoading: false })
-    } catch {
-      set({ items: [], isLoading: false })
-    }
+    })()
+    return inflightFetch
   },
 
   addItem: async (item) => {
