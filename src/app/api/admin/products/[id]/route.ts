@@ -5,7 +5,7 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { parseFitType } from "@/lib/product/fit-type"
+import { buildApparelResolver, resolveWriteFitType } from "@/lib/product/category-server"
 
 const putHandler = async (
   request: Request,
@@ -33,6 +33,14 @@ const putHandler = async (
     // fit_type 변경 모달에서 [재생성 큐 적재] 선택 시에만 true (B-2 / G2)
     const enqueueSeo = formData.get("enqueue_seo") === "true"
 
+    // fit_type tri-state: category 존재+비의류만 NULL 강제, 무카테고리는 보존 (#2)
+    const isApparel = await buildApparelResolver(admin)
+    const fitType = resolveWriteFitType(
+      productData.category_id || null,
+      productData.fit_type,
+      isApparel
+    )
+
     // 1. 상품 수정
     const { error } = await admin
       .from("products")
@@ -46,7 +54,7 @@ const putHandler = async (
         material: productData.material || null,
         care_info: productData.care_info || null,
         origin: productData.origin || null,
-        fit_type: parseFitType(productData.fit_type) ?? "REGULAR",
+        fit_type: fitType,
         status: productData.status || "ACTIVE",
         free_shipping: productData.free_shipping === true,
         search_tags: productData.search_tags || [],
@@ -222,9 +230,21 @@ const patchHandler = async (
       }
     }
 
-    // fit_type: SSOT 검증 후에만 허용 (잘못된 값 → REGULAR fallback)
+    // fit_type tri-state: category 존재+비의류만 NULL 강제, 무카테고리/의류는 보존·default (#2).
+    // effective category = payload.category_id ?? DB 현재값 (인라인 fit 편집은 category_id 미포함).
     if ("fit_type" in body) {
-      updates.fit_type = parseFitType(body.fit_type) ?? "REGULAR"
+      let categoryId: string | null =
+        "category_id" in body ? body.category_id ?? null : null
+      if (categoryId === null) {
+        const { data: existing } = await admin
+          .from("products")
+          .select("category_id")
+          .eq("id", productId)
+          .maybeSingle()
+        categoryId = existing?.category_id ?? null
+      }
+      const isApparel = await buildApparelResolver(admin)
+      updates.fit_type = resolveWriteFitType(categoryId, body.fit_type, isApparel)
     }
 
     if (Object.keys(updates).length === 0) {
