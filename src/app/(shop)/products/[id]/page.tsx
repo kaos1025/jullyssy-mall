@@ -63,7 +63,11 @@ export const generateMetadata = async ({
 
     return {
       title: product.name,
-      description: `${product.name} | ${displayPrice.toLocaleString()}원 | 쥴리씨`,
+      // META-DESC-AI-UPGRADE-1: AI meta_description 우선, null이면 현행 name|price 템플릿.
+      // (c) strip/getProductLdDescription 미사용 — 1차 스니펫 surface는 보일러플레이트 0 보장.
+      description:
+        product.meta_description?.trim() ||
+        `${product.name} | ${displayPrice.toLocaleString()}원 | 쥴리씨`,
       openGraph: {
         title: product.name,
         // PDP-LD-DESC-1: 안내문 오염 제거 — meta_description(AI) → body strip → name
