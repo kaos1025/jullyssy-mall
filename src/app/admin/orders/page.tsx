@@ -32,6 +32,7 @@ import {
   type CancellationReason,
 } from "@/lib/order/cancellation"
 import { COURIER_SUGGESTIONS } from "@/lib/order/courier-suggestions"
+import { DELIVERED_VIA_LABEL, type DeliveredVia } from "@/lib/order/delivery"
 import { InlineTrackingCell } from "@/components/admin/inline-tracking-cell"
 import dayjs from "dayjs"
 
@@ -57,6 +58,7 @@ interface OrderRow {
   cancellation_actor: CancellationActor | null
   cancellation_reason: CancellationReason | null
   cancellation_note: string | null
+  delivered_via: DeliveredVia | null
   order_items: { product_name: string; quantity: number }[]
 }
 
@@ -381,6 +383,11 @@ const AdminOrdersPage = () => {
                         {CANCELLATION_REASON_LABEL[order.cancellation_reason]}
                         {order.cancellation_actor === "ADMIN" && " · 판매자"}
                         {order.cancellation_actor === "SYSTEM" && " · 시스템"}
+                      </p>
+                    )}
+                    {order.status === "DELIVERED" && order.delivered_via && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {DELIVERED_VIA_LABEL[order.delivered_via]} 완료
                       </p>
                     )}
                   </td>
