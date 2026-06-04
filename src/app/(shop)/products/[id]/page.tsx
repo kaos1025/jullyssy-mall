@@ -289,13 +289,27 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     }
   }
 
-  // v0.8 Track 1-A A-5 — fit_type을 additionalProperty로 노출 (SSOT: fit-type.ts)
+  // v0.8 Track 1-A A-5 / 마무리 M-2 — fit·material을 additionalProperty로 노출
+  // (SSOT: fit-type.ts). 비의류 fit_type NULL(Track G)·material 빈값이면 해당 항목 미emit.
   const fitType = parseFitType(product.fit_type)
   const fitLabel = fitType ? FIT_TYPE_LABELS[fitType] : null
+  const additionalProperty: Array<{
+    "@type": "PropertyValue"
+    name: string
+    value: string
+  }> = []
   if (fitLabel) {
-    jsonLd.additionalProperty = [
-      { "@type": "PropertyValue", name: "fit", value: fitLabel },
-    ]
+    additionalProperty.push({ "@type": "PropertyValue", name: "fit", value: fitLabel })
+  }
+  if (product.material) {
+    additionalProperty.push({
+      "@type": "PropertyValue",
+      name: "material",
+      value: product.material,
+    })
+  }
+  if (additionalProperty.length > 0) {
+    jsonLd.additionalProperty = additionalProperty
   }
 
   return (
