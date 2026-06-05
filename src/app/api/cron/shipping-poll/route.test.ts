@@ -41,9 +41,10 @@ function makeAdminClient(targets: unknown[]) {
   return { from: vi.fn(() => b) }
 }
 
-const makeReq = (auth?: string) =>
+const makeReq = (auth?: string, dryRun = false) =>
   ({
     headers: { get: (k: string) => (k === "authorization" ? auth ?? null : null) },
+    nextUrl: { searchParams: new URLSearchParams(dryRun ? "dryRun=1" : "") },
   }) as unknown as NextRequest
 
 const TARGET = { id: "o1", courier: "CJ대한통운", tracking_no: "509604734075" }
@@ -118,5 +119,21 @@ describe("POST /api/cron/shipping-poll", () => {
     const body = await res.json()
     expect(body.failed).toBe(1)
     expect(captureException).toHaveBeenCalled()
+  })
+
+  it("dryRun=1 → 전환/메일 없이 wouldTransition 프리뷰 (markOrderDelivered 미호출)", async () => {
+    createAdminClient.mockReturnValue(makeAdminClient([TARGET]))
+    fetchStatus.mockResolvedValue({
+      delivered: true,
+      deliveredAt: new Date("2026-06-05T05:30:00Z"),
+    })
+
+    const res = await POST(makeReq("Bearer secret", true))
+    const body = await res.json()
+    expect(body.dryRun).toBe(true)
+    expect(body.wouldTransition).toHaveLength(1)
+    expect(body.wouldTransition[0].id).toBe("o1")
+    expect(body.wouldTransition[0].deliveredAt).toBe("2026-06-05T05:30:00.000Z")
+    expect(markOrderDelivered).not.toHaveBeenCalled()
   })
 })

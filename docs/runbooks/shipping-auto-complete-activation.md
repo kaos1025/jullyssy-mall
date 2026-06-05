@@ -63,8 +63,26 @@ curl "https://info.sweettracker.co.kr/api/v1/trackingInfo?t_key=<KEY>&t_code=04&
 
 ---
 
-### 3단계 — cron 라우트 controlled 수동 invoke 1회 (= 실 송장 e2e)
-스케줄을 켜지 않은 채, 라우트를 **딱 1회 수동 호출**해 현재 SHIPPING 주문들에 대한 판정·전환을 관찰한다.
+### 3-pre단계 — dryRun 전건 프리뷰 (필수 게이트 · 0 고객영향)
+스케줄·전환·메일 없이 현재 SHIPPING **전건**의 판정을 미리 본다. step 2는 운영자가 고른 2건 샘플만 검증하지만 실 invoke(3단계)는 전건을 친다 — step 2가 못 본 택배사/응답 변형이 전건엔 섞일 수 있고, 거기서 오판정이 나면 **불가역 오발송**(잘못된 배송완료 메일)이 된다. 그래서 전건 무영향 프리뷰가 실 invoke의 **필수 선행 게이트**다. (배포 후 상시 디버그 도구로도 사용 — 언제든 현재 판정 재확인.)
+
+```bash
+curl -X POST "https://<PROD_DOMAIN>/api/cron/shipping-poll?dryRun=1" -H "Authorization: Bearer <CRON_SECRET>"
+# {"ok":true,"dryRun":true,"polled":7,
+#  "wouldTransition":[{"id":"...","courier":"CJ대한통운","deliveredAt":"2026-..."}],
+#  "skipped":4,"unsupported":1,"failed":0}
+```
+
+**합격 기준 (전부 충족해야 3단계 진행)**
+- `failed = 0` (>0이면 Sentry `shipping.auto_complete` 확인 → 원인 수정 후 재실행)
+- `wouldTransition` **전건을 실제 배송완료 여부와 수기 대조 → 전부 일치(오판정 0)**. 1건이라도 실제 미배송이면 실 invoke 금지, 어댑터 판정 점검.
+- `unsupported`/`skipped` 분포가 상식적인지 확인.
+- dryRun은 DB·메일을 전혀 건드리지 않으므로 몇 번이든 반복 가능.
+
+---
+
+### 3단계 — 실 invoke 1회 (= 실 송장 e2e · 3-pre 통과 후 고신뢰)
+3-pre가 깨끗할 때만. 스케줄을 켜지 않은 채 **딱 1회 수동 호출**해 실제 전환·메일을 발생시키고, wouldTransition 프리뷰와 결과가 일치하는지 관찰한다.
 
 ```bash
 curl -X POST "https://<PROD_DOMAIN>/api/cron/shipping-poll" -H "Authorization: Bearer <CRON_SECRET>"
@@ -85,9 +103,6 @@ curl -X POST "https://<PROD_DOMAIN>/api/cron/shipping-poll" -H "Authorization: B
 
 > 참고: 한 번에 최대 `BATCH_CAP=40`건(오래된 SHIPPING 우선). SHIPPING이 많으면 수동 invoke를 관찰하며 반복.
 > ⚠️ 이 단계가 **첫 실 전환 + 첫 실 메일**이다. 응답을 보며 1회씩, 결과 확인 후 다음 호출.
-
-#### (선택) 3-pre — dry-run 하드닝
-3단계의 첫 실행이 곧 첫 고객 메일이라(회수 불가), 더 보수적으로 가려면 라우트에 `?dryRun=1`(판정·로깅만, 전환·메일 skip)을 추가해 **0 고객영향으로 관찰** 후 실 호출하는 방법이 있다. 약 10줄 코드 추가(fast-follow PR). 필요 시 요청 바람.
 
 ---
 
@@ -145,6 +160,7 @@ select jobname, schedule, active from cron.job where jobname='shipping-poll-hour
 | 항목 | 값 |
 |---|---|
 | 라우트 | `POST /api/cron/shipping-poll` (Bearer `CRON_SECRET`) |
+| dryRun | `?dryRun=1` — 판정·집계만(전환/메일 skip), `wouldTransition` 반환. 활성화 전 필수 게이트 + 상시 디버그 |
 | 스케줄 | `0 * * * *` (매시 정각), job=`shipping-poll-hourly` |
 | 배치/동시성 | `BATCH_CAP=40`, `CONCURRENCY=8`, fetch timeout 8s |
 | 완료 판정 | `completeYN='Y'` ‖ `level≥6` ‖ `complete=true` |
