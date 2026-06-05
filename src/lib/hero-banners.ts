@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { validateImageFile } from "@/lib/image-upload-validation"
 import type { Database } from "@/types/supabase"
 
 export type HeroBanner = Database["public"]["Tables"]["hero_banners"]["Row"]
@@ -128,6 +129,9 @@ export const uploadHeroBannerImage = async (
   file: File,
   variant: "pc" | "mobile"
 ): Promise<string> => {
+  const validation = validateImageFile(file)
+  if (!validation.ok) throw new Error(validation.message)
+
   const admin = createAdminClient()
   const ext = file.name.split(".").pop() || "jpg"
   const path = `banners/${Date.now()}_${variant}.${ext}`
