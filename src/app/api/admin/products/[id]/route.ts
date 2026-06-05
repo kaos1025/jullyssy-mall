@@ -6,6 +6,7 @@ import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { buildApparelResolver, resolveWriteFitType } from "@/lib/product/category-server"
+import { validateImageFile } from "@/lib/image-upload-validation"
 
 const putHandler = async (
   request: Request,
@@ -157,6 +158,13 @@ const putHandler = async (
     }
 
     // 4. 새 이미지 업로드
+    for (const file of imageFiles) {
+      const validation = validateImageFile(file)
+      if (!validation.ok) {
+        return NextResponse.json({ error: validation.message }, { status: 400 })
+      }
+    }
+
     const existingCount = existingImageIds.length
     const uploadErrors: string[] = []
     for (let i = 0; i < imageFiles.length; i++) {
