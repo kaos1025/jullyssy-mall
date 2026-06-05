@@ -7,7 +7,16 @@ const STATE_CHANGING_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 //
 // /api/dev/* — preview 환경 자동화 검증 (이메일 발송 테스트 등). production에서는
 // VERCEL_ENV === "production" 차단으로 라우트 자체가 404, 별도 헤더 인증(x-resend-key 등)으로 보호.
-const CSRF_EXEMPT_PATHS = ["/api/payments/webhook", "/api/dev/"]
+//
+// /api/cron/shipping-poll — pg_cron + pg_net이 Origin 헤더 없이 POST 호출 → webhook과 동일하게 CSRF 면제.
+// 라우트는 Bearer CRON_SECRET으로 보호되고 쿠키/세션을 쓰지 않는다(ambient-credential 부재) →
+// CSRF(브라우저 위조 방지)는 구조적으로 무관하므로 면제가 보호를 약화시키지 않는다.
+// 면제 범위 최소화: prefix가 아니라 경로별 명시 추가(신규 cron 라우트는 개별 등록).
+const CSRF_EXEMPT_PATHS = [
+  "/api/payments/webhook",
+  "/api/dev/",
+  "/api/cron/shipping-poll",
+]
 
 const PRODUCTION_ORIGINS = [
   "https://jullyssy.shop",
