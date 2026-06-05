@@ -6,14 +6,15 @@
 -- 027_seo_cron(pg_cron + pg_net → HTTP) 패턴 미러. 차이: 대상이 Supabase Edge가 아니라
 -- Vercel Node 라우트(Sentry/이메일/status SSOT 재사용 목적).
 --
--- ⚠️ 적용 순서 (배포 후 1회):
---   1. /api/cron/shipping-poll 라우트가 운영에 배포되어 있을 것.
---   2. Vercel env에 CRON_SECRET 설정(라우트 인바운드 인증).
---   3. vault.secrets에 'shipping_poll_auth' = 'Bearer <CRON_SECRET 동일값>' 등록
+-- ✅ 적용 완료 2026-06-05 (도메인 jullyssy.shop, schedule active). pg_net→라우트 auth 200 확인 후 ON.
+--
+-- 적용 전제 (활성화 절차서 docs/runbooks/shipping-auto-complete-activation.md 참조):
+--   1. /api/cron/shipping-poll 라우트 운영 배포 + CSRF 면제(PR #66).
+--   2. Vercel env CRON_SECRET 설정(라우트 인바운드 인증).
+--   3. vault.secrets 'shipping_poll_auth' = 'Bearer <CRON_SECRET 동일값>' 등록
 --      (vault 평문은 마이그레이션에 금지 → 외부에서 1회. 027 seo_worker_auth와 동일 패턴).
 --      예) select vault.create_secret('Bearer xxxxx', 'shipping_poll_auth');
---   4. 아래 __PROD_DOMAIN__ 을 운영 도메인(NEXT_PUBLIC_SITE_URL 값)으로 치환.
--- 위 1~4 미충족 상태로 적용하면 cron은 등록되나 호출이 401/실패한다(건별 격리·Sentry로 안전).
+-- 위 미충족 상태로 적용하면 cron은 등록되나 호출이 401/실패한다(건별 격리·Sentry로 안전).
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
@@ -29,7 +30,7 @@ SELECT cron.schedule(
   '0 * * * *',
   $cron$
   SELECT net.http_post(
-    url := 'https://__PROD_DOMAIN__/api/cron/shipping-poll',
+    url := 'https://jullyssy.shop/api/cron/shipping-poll',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'shipping_poll_auth' LIMIT 1)
