@@ -274,6 +274,54 @@ export type Database = {
           },
         ]
       }
+      hero_banners: {
+        Row: {
+          created_at: string
+          cta_link: string | null
+          cta_text: string | null
+          ends_at: string | null
+          id: string
+          image_url_mobile: string
+          image_url_pc: string
+          is_active: boolean
+          sort_order: number
+          starts_at: string | null
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cta_link?: string | null
+          cta_text?: string | null
+          ends_at?: string | null
+          id?: string
+          image_url_mobile: string
+          image_url_pc: string
+          is_active?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cta_link?: string | null
+          cta_text?: string | null
+          ends_at?: string | null
+          id?: string
+          image_url_mobile?: string
+          image_url_pc?: string
+          is_active?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       naver_category_mappings: {
         Row: {
           category_id: string | null
