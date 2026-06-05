@@ -153,6 +153,6 @@ const handler = async (request: NextRequest) => {
   return NextResponse.json({ ok: true, polled: targets.length, ...tally })
 }
 
-// pg_net은 POST. 수동 점검 편의를 위해 GET도 동일 핸들러로 허용(인증 동일).
-export const GET = handler
+// pg_net 및 수동 점검 모두 POST. 이 경로는 CSRF 면제이므로 상태 변경 액션을 GET으로 노출하지 않는다
+// (안전 메서드만 허용 — 면제 경로의 부작용 GET 방지). 인증은 Bearer CRON_SECRET.
 export const POST = handler
