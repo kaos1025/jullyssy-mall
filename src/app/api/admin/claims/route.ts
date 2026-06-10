@@ -16,7 +16,7 @@ const getHandler = async (request: NextRequest) => {
 
   let query = admin
     .from("order_claims")
-    .select("*, orders(order_no, recipient)")
+    .select("*, orders(order_no, recipient, paid_amount)")
     .order("created_at", { ascending: false })
     .limit(100)
 
