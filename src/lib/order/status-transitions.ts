@@ -62,3 +62,28 @@ export const isTerminalOrderStatus = (
 ): status is TerminalOrderStatus =>
   typeof status === "string" &&
   (TERMINAL_ORDER_STATUSES as readonly string[]).includes(status)
+
+// =============================================
+// P1-16: claim(반품/교환) 구동 orders.status 전이
+// =============================================
+// 어드민 직접 전이(ADMIN_ORDER_STATUS_ALLOWED)와 분리 — 반품/교환 4종 status는
+// claim 함수/오케스트레이션 경유로만 설정(status만 바꾸는 PATCH 진입로는 여전히 닫힘).
+// 거절/철회 시 orders.status는 claim.prev_order_status로 원복(오케스트레이션 책임).
+export type ClaimType = "RETURN" | "EXCHANGE"
+
+// claim 이벤트 → orders.status 매핑 (SSOT, vitest 대상)
+export const CLAIM_DRIVEN_TRANSITIONS = {
+  RETURN: { requested: "RETURN_REQUESTED", terminal: "RETURNED" },
+  EXCHANGE: { requested: "EXCHANGE_REQUESTED", terminal: "EXCHANGED" },
+} as const satisfies Record<
+  ClaimType,
+  { requested: OrderStatus; terminal: OrderStatus }
+>
+
+// claim 신청(REQUESTED) 시 진입할 orders.status
+export const claimRequestedOrderStatus = (type: ClaimType): OrderStatus =>
+  CLAIM_DRIVEN_TRANSITIONS[type].requested
+
+// claim 종결(환불완료 REFUNDED / 교환완료 COMPLETED) orders.status (terminal)
+export const claimTerminalOrderStatus = (type: ClaimType): OrderStatus =>
+  CLAIM_DRIVEN_TRANSITIONS[type].terminal

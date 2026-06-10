@@ -8,6 +8,14 @@ import {
   type OrderConfirmationProps,
 } from "@/lib/email/templates/OrderConfirmation"
 import {
+  ClaimApproved,
+  type ClaimApprovedProps,
+} from "@/lib/email/templates/ClaimApproved"
+import {
+  ClaimRejected,
+  type ClaimRejectedProps,
+} from "@/lib/email/templates/ClaimRejected"
+import {
   RefundCompleted,
   type RefundCompletedProps,
 } from "@/lib/email/templates/RefundCompleted"
@@ -106,6 +114,8 @@ const PRODUCTION_SUBJECTS = {
   shippingStarted: "[쥴리씨] 상품 출고 안내",
   shippingDelivered: "[쥴리씨] 배송 완료 안내",
   refundCompleted: "[쥴리씨] 환불 완료 안내",
+  claimApproved: "[쥴리씨] 반품/교환 승인 안내",
+  claimRejected: "[쥴리씨] 반품/교환 반려 안내",
 } as const
 
 export type SendContext = { context?: Record<string, unknown> }
@@ -158,6 +168,32 @@ export const sendRefundCompleted = (
     to,
     subject: PRODUCTION_SUBJECTS.refundCompleted,
     react: createElement(RefundCompleted, props),
+    context,
+  })
+}
+
+export const sendClaimApproved = (
+  params: { to: string | string[] } & ClaimApprovedProps & SendContext
+): void => {
+  const { to, context, ...props } = params
+  sendAsync({
+    event: "claim_approved",
+    to,
+    subject: PRODUCTION_SUBJECTS.claimApproved,
+    react: createElement(ClaimApproved, props),
+    context,
+  })
+}
+
+export const sendClaimRejected = (
+  params: { to: string | string[] } & ClaimRejectedProps & SendContext
+): void => {
+  const { to, context, ...props } = params
+  sendAsync({
+    event: "claim_rejected",
+    to,
+    subject: PRODUCTION_SUBJECTS.claimRejected,
+    react: createElement(ClaimRejected, props),
     context,
   })
 }

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { CancellationContext } from "@/lib/order/cancellation"
+import { tossCancel } from "@/lib/payment/toss-cancel"
 
 interface CancelResult {
   success: true
@@ -51,27 +52,12 @@ export const cancelOrder = async (
     .single()
 
   if (payment?.payment_key) {
-    const secretKey = process.env.TOSS_SECRET_KEY || ""
-    const basicAuth = Buffer.from(`${secretKey}:`).toString("base64")
-
-    const tossRes = await fetch(
-      `https://api.tosspayments.com/v1/payments/${payment.payment_key}/cancel`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ cancelReason: "고객 주문 취소" }),
-      }
-    )
-
-    if (!tossRes.ok) {
-      const tossError = await tossRes.json()
-      return {
-        error: tossError.message || "결제 취소에 실패했습니다",
-        status: 502,
-      }
+    // P1-16: 인라인 Toss 호출을 tossCancel primitive로 교체 (전액 — 거동 동일 + 멱등키/검증 인프라 공유).
+    const cancelRes = await tossCancel(payment.payment_key, {
+      cancelReason: "고객 주문 취소",
+    })
+    if (!cancelRes.ok) {
+      return { error: cancelRes.error, status: 502 }
     }
   }
 
