@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/server"
 import CartSyncer from "./CartSyncer"
+import type { Metadata } from "next"
+
+// 주문 완료(개인·일회성) 페이지 — 색인 제외
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 interface OrderCompletePageProps {
   searchParams: { order_id?: string }
