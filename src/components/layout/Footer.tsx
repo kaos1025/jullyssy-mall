@@ -89,6 +89,12 @@ const Footer = () => {
             <h4 className="text-sm font-semibold mb-3">이용안내</h4>
             <nav aria-label="이용안내" className="flex flex-col gap-2">
               <Link
+                href="/guide"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                쇼핑가이드
+              </Link>
+              <Link
                 href="/terms"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
