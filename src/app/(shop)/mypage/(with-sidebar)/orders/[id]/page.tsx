@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -25,11 +25,31 @@ import {
   type CancellationActor,
   type CancellationReason,
 } from "@/lib/order/cancellation"
+import {
+  ACTIVE_CLAIM_STATUSES,
+  CLAIM_STATUS_LABEL,
+  CLAIM_TYPE_LABEL,
+  type ClaimStatus,
+  type ClaimType,
+} from "@/lib/order/claim"
+import { RETURN_CONFIG } from "@/constants/shipping"
+import ClaimRequestDialog from "./ClaimRequestDialog"
+
+type OrderClaim = {
+  id: string
+  type: ClaimType
+  status: ClaimStatus
+  reason_detail: string | null
+  rejected_reason: string | null
+}
 
 type OrderWithCancellation = OrderWithItems & {
   cancellation_actor: CancellationActor | null
   cancellation_reason: CancellationReason | null
   cancellation_note: string | null
+  delivered_at: string | null
+  updated_at: string
+  claims: OrderClaim[]
 }
 
 const OrderDetailPage = () => {
@@ -40,27 +60,31 @@ const OrderDetailPage = () => {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false)
+
+  const fetchOrder = useCallback(async () => {
+    const supabase = createClient()
+    // claims는 order_claims RLS(order_claims_select_own = auth.uid()=user_id) 경유로 본인 것만 반환.
+    const { data } = await supabase
+      .from("orders")
+      .select("*, items:order_items(*), payment:payments(*), claims:order_claims(*)")
+      .eq("id", params.id)
+      .single()
+
+    if (data) {
+      setOrder({
+        ...data,
+        items: data.items || [],
+        payment: data.payment?.[0] || null,
+        claims: data.claims || [],
+      } as unknown as OrderWithCancellation)
+    }
+    setLoading(false)
+  }, [params.id])
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("orders")
-        .select("*, items:order_items(*), payment:payments(*)")
-        .eq("id", params.id)
-        .single()
-
-      if (data) {
-        setOrder({
-          ...data,
-          items: data.items || [],
-          payment: data.payment?.[0] || null,
-        } as unknown as OrderWithCancellation)
-      }
-      setLoading(false)
-    }
     fetchOrder()
-  }, [params.id])
+  }, [fetchOrder])
 
   const handleAction = async (action: "cancel" | "confirm") => {
     if (!order) return
@@ -79,20 +103,7 @@ const OrderDetailPage = () => {
             : "취소가 처리됩니다.",
       })
       router.refresh()
-      // 새로고침
-      const supabase = createClient()
-      const { data } = await supabase
-        .from("orders")
-        .select("*, items:order_items(*), payment:payments(*)")
-        .eq("id", order.id)
-        .single()
-      if (data) {
-        setOrder({
-          ...data,
-          items: data.items || [],
-          payment: data.payment?.[0] || null,
-        } as unknown as OrderWithCancellation)
-      }
+      await fetchOrder()
     } else {
       const err = await res.json()
       toast({
@@ -103,6 +114,26 @@ const OrderDetailPage = () => {
     }
 
     setActionLoading(false)
+  }
+
+  const handleWithdraw = async (claimId: string) => {
+    setActionLoading(true)
+    const res = await fetch(`/api/claims/${claimId}/withdraw`, {
+      method: "POST",
+    })
+    setActionLoading(false)
+    if (res.ok) {
+      toast({ title: "신청이 철회되었습니다" })
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast({
+        variant: "destructive",
+        title: "철회 실패",
+        description: err.error,
+      })
+    }
+    // 성공/실패 무관 재조회 — 동시 어드민 처리(409 등) 시 화면을 서버 상태와 동기화.
+    await fetchOrder()
   }
 
   if (loading) {
@@ -119,7 +150,20 @@ const OrderDetailPage = () => {
 
   const canCancel = ["PAID", "PREPARING"].includes(order.status)
   const canConfirm = order.status === "DELIVERED"
-  const canReturn = order.status === "DELIVERED"
+
+  // 진행 중(비종결) claim 1건. 활성 claim이 있으면 신규 신청 불가.
+  const activeClaim = order.claims?.find((c) =>
+    ACTIVE_CLAIM_STATUSES.includes(c.status)
+  )
+  // 신청 기한: COALESCE(delivered_at, updated_at) + 7일 (043 이전 주문 delivered_at NULL 대비).
+  const returnDeadline =
+    new Date(order.delivered_at ?? order.updated_at).getTime() +
+    RETURN_CONFIG.windowDays * 86_400_000
+  const withinReturnWindow = Date.now() <= returnDeadline
+  const canReturn =
+    ["DELIVERED", "CONFIRMED"].includes(order.status) &&
+    withinReturnWindow &&
+    !activeClaim
 
   return (
     <div className="space-y-6">
@@ -129,9 +173,7 @@ const OrderDetailPage = () => {
           <h2 className="text-lg font-bold">주문 상세</h2>
           <p className="text-sm text-muted-foreground">{order.order_no}</p>
         </div>
-        <Badge>
-          {ORDER_STATUS_LABEL[order.status] || order.status}
-        </Badge>
+        <Badge>{ORDER_STATUS_LABEL[order.status] || order.status}</Badge>
       </div>
 
       {/* 취소 사유 — status='CANCELLED'이고 메타데이터가 있을 때만 노출 */}
@@ -148,6 +190,35 @@ const OrderDetailPage = () => {
             <p className="text-xs text-muted-foreground whitespace-pre-line">
               {order.cancellation_note}
             </p>
+          )}
+        </div>
+      )}
+
+      {/* 진행 중 반품/교환 신청 상태 + 철회(REQUESTED 한정) */}
+      {activeClaim && (
+        <div className="border rounded-lg p-4 bg-muted/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-sm">
+              {CLAIM_TYPE_LABEL[activeClaim.type]} 신청
+            </h3>
+            <Badge variant="secondary">
+              {CLAIM_STATUS_LABEL[activeClaim.status]}
+            </Badge>
+          </div>
+          {activeClaim.reason_detail && (
+            <p className="text-xs text-muted-foreground whitespace-pre-line">
+              {activeClaim.reason_detail}
+            </p>
+          )}
+          {activeClaim.status === "REQUESTED" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleWithdraw(activeClaim.id)}
+              disabled={actionLoading}
+            >
+              신청 철회
+            </Button>
           )}
         </div>
       )}
@@ -214,8 +285,6 @@ const OrderDetailPage = () => {
             메모: {order.delivery_memo}
           </p>
         )}
-        {/* 송장 정보 — courier 또는 tracking_no 중 하나라도 있을 때만 노출.
-            둘 다 NULL이면 hide (발송 준비 단계는 별도 안내 불필요 — status badge가 역할). */}
         {(order.courier || order.tracking_no) && (
           <div className="pt-2">
             <Separator className="mb-2" />
@@ -305,7 +374,11 @@ const OrderDetailPage = () => {
             </Button>
           )}
           {canReturn && (
-            <Button variant="outline" disabled={actionLoading}>
+            <Button
+              variant="outline"
+              onClick={() => setClaimDialogOpen(true)}
+              disabled={actionLoading}
+            >
               교환/반품 신청
             </Button>
           )}
@@ -342,6 +415,16 @@ const OrderDetailPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 반품/교환 신청 Dialog */}
+      <ClaimRequestDialog
+        open={claimDialogOpen}
+        onOpenChange={setClaimDialogOpen}
+        orderId={order.id}
+        orderShippingFee={order.shipping_fee}
+        items={order.items}
+        onSuccess={fetchOrder}
+      />
     </div>
   )
 }
