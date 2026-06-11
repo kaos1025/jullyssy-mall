@@ -6,13 +6,23 @@
 //   ANTHROPIC_API_KEY (manual: supabase secrets set, live 모드만)
 //   SEO_AI_MODE = "mock" | "live" (default: "mock")
 //
-// 처리 흐름:
-//   1. seo_generation_queue WHERE status='pending' ORDER BY scheduled_at LIMIT 10
-//   2. status='processing' 갱신
-//   3. 각 row: products + categories + product_images 상위 3장 URL 조회
-//      → Anthropic Vision API에 URL 직접 전달 (서버 사이드 fetch + resize)
-//      → seo_metadata_drafts insert (status='pending_review')
-//   4. queue status='completed' 또는 'failed'(retry_count >= 3) 갱신
+// 처리 흐름 (SEO-QUEUE-FIX-1 — item 단위 정합):
+//   1. seo_generation_queue WHERE status='pending' ORDER BY scheduled_at LIMIT BATCH_SIZE
+//   2. 각 row를 개별적으로 순회:
+//      a. wall-clock 예산(SAFE_BUDGET_MS) 초과 시 중단 — 미claim row는 pending 유지
+//         (다음 1분 tick이 소화). 진행 중 row만 영향.
+//      b. race-safe claim: status pending→processing (.select로 확인,
+//         그 사이 다른 invoke가 전이한 row는 0행 → skip).
+//      c. 멱등성: 이 큐 사이클(created_at >= scheduled_at)에 동일 product+description_mode
+//         draft가 이미 있으면 completed 처리 후 생성 skip (retry 중복 draft 방지).
+//      d. products + categories + product_images 상위 3장 조회 → Anthropic Vision →
+//         seo_metadata_drafts insert (status='pending_review').
+//      e. 즉시 queue status='completed' 또는 'failed'/'pending'(retry) 갱신.
+//
+// 과거 결함(H1): 10건을 일괄 processing 표시 후 배치 말미에 일괄 상태갱신 →
+// live 배치가 Edge/pg_net(60s) 시간한계 초과 시 함수 종료로 상태갱신이 통째로 유실 →
+// draft는 insert됐으나 queue가 processing에 영구 잔존 + stuck-recover 재처리로 중복 draft.
+// → item 단위 claim+즉시 갱신 + 시간가드 + 멱등성으로 근본 차단. stuck-recover는 안전망 유지.
 //
 // Phase 1 B-2 학습: @jsquash WASM은 Supabase Edge resource limit 초과.
 // Anthropic Vision API source.type="url"이 네이버 pstatic 직접 처리 가능 확인.
@@ -27,6 +37,11 @@ import { FIT_TYPE_LABELS, type FitType } from "../_shared/seo/fit-type.ts";
 const BATCH_SIZE = 10;
 const MAX_RETRY = 3;
 const TOP_IMAGES = 3;
+// 단일 invoke wall-clock 예산. pg_net timeout(60s)/Edge 한계 이전에 자발적으로 멈춰
+// 진행 중 row만 영향받도록 함 (나머지는 pending 유지 → 다음 1분 tick이 소화).
+const SAFE_BUDGET_MS = 45_000;
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 interface QueueRow {
   id: string;
@@ -35,6 +50,8 @@ interface QueueRow {
   trigger_source: string;
   /** D3 PoC — 큐 row의 description 정책. DB default 'preserve' (회귀 0). */
   description_mode: DescriptionMode;
+  /** 큐 적재 시각. 멱등성 검사(이 사이클 draft 존재 여부)의 기준 시각. */
+  scheduled_at: string;
 }
 
 interface ProductRow {
@@ -154,7 +171,75 @@ async function processQueueRow(
   return { ok: true };
 }
 
+// queue row를 완료 처리 (item 단위 즉시 갱신).
+async function markCompleted(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase
+    .from("seo_generation_queue")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      error_message: null,
+    })
+    .eq("id", id);
+  if (error) {
+    console.error(`[seo-worker] mark completed failed ${id}:`, error.message);
+  }
+}
+
+// queue row 실패 처리 — MAX_RETRY 미만이면 pending 복귀(retry), 이상이면 failed(dead-letter).
+// error_message는 worker 실패 사유(029 마이그레이션 컨벤션). last_error는 stuck-recover 도메인.
+async function markFailure(
+  supabase: SupabaseClient,
+  id: string,
+  retryCount: number,
+  errorMsg: string,
+): Promise<void> {
+  const nextRetry = retryCount + 1;
+  const finalStatus = nextRetry >= MAX_RETRY ? "failed" : "pending";
+  const patch: Record<string, unknown> = {
+    status: finalStatus,
+    retry_count: nextRetry,
+    error_message: errorMsg,
+  };
+  if (finalStatus === "failed") {
+    patch.failed_at = new Date().toISOString();
+  } else {
+    // pending 복귀: started_at 초기화 (다음 claim/stuck-recover 정합).
+    patch.started_at = null;
+  }
+  const { error } = await supabase
+    .from("seo_generation_queue")
+    .update(patch)
+    .eq("id", id);
+  if (error) {
+    console.error(`[seo-worker] mark failure failed ${id}:`, error.message);
+  }
+}
+
+// 이 큐 사이클에서 이미 draft가 생성됐는지 검사 (retry 시 중복 draft 방지).
+// scheduled_at 이후 생성된 동일 product+description_mode draft가 있으면 true.
+async function draftAlreadyExists(
+  supabase: SupabaseClient,
+  row: QueueRow,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("seo_metadata_drafts")
+    .select("id")
+    .eq("product_id", row.product_id)
+    .eq("description_mode", row.description_mode)
+    .gte("created_at", row.scheduled_at)
+    .limit(1);
+  if (error) {
+    // 멱등성 검사 실패는 비치명적: 생성 진행 (차단보다 안전).
+    console.error(`[seo-worker] idempotency check failed ${row.id}:`, error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
 async function handle(): Promise<Response> {
+  const startMs = Date.now();
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) {
@@ -178,7 +263,7 @@ async function handle(): Promise<Response> {
 
   const { data: pending, error: qErr } = await supabase
     .from("seo_generation_queue")
-    .select("id, product_id, retry_count, trigger_source, description_mode")
+    .select("id, product_id, retry_count, trigger_source, description_mode, scheduled_at")
     .eq("status", "pending")
     .order("scheduled_at", { ascending: true })
     .limit(BATCH_SIZE)
@@ -190,59 +275,71 @@ async function handle(): Promise<Response> {
     return Response.json({ ok: true, picked: 0, mode });
   }
 
-  const ids = pending.map((r) => r.id);
-  await supabase
-    .from("seo_generation_queue")
-    .update({ status: "processing", started_at: new Date().toISOString() })
-    .in("id", ids);
+  let claimed = 0;
+  let succeeded = 0;
+  let failed = 0;
+  let skippedIdempotent = 0;
+  let stoppedEarly = false;
 
-  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
   for (const row of pending) {
+    // (a) 시간가드: 남은 예산이 없으면 미claim row는 pending으로 남겨 다음 tick에 위임.
+    if (Date.now() - startMs > SAFE_BUDGET_MS) {
+      stoppedEarly = true;
+      break;
+    }
+
+    // (b) race-safe claim: pending → processing. 그 사이 전이됐으면 0행 → skip.
+    const { data: claimRows, error: claimErr } = await supabase
+      .from("seo_generation_queue")
+      .update({ status: "processing", started_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .eq("status", "pending")
+      .select("id");
+    if (claimErr) {
+      console.error(`[seo-worker] claim failed ${row.id}:`, claimErr.message);
+      continue;
+    }
+    if (!claimRows || claimRows.length === 0) {
+      continue; // 다른 invoke가 이미 claim
+    }
+    claimed += 1;
+
+    // (c) 멱등성: 이미 이 사이클 draft가 있으면 생성 skip + 완료 처리.
+    if (await draftAlreadyExists(supabase, row)) {
+      await markCompleted(supabase, row.id);
+      skippedIdempotent += 1;
+      continue;
+    }
+
+    // (d)(e) 생성 + 즉시 상태 갱신.
+    let result: { ok: boolean; error?: string };
     try {
-      const r = await processQueueRow(supabase, row, mode, apiKey);
-      results.push({ id: row.id, ...r });
+      result = await processQueueRow(supabase, row, mode, apiKey);
     } catch (err) {
-      results.push({
-        id: row.id,
+      result = {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
-      });
+      };
     }
-  }
 
-  for (const r of results) {
-    const row = pending.find((p) => p.id === r.id)!;
-    if (r.ok) {
-      await supabase
-        .from("seo_generation_queue")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          error_message: null,
-        })
-        .eq("id", r.id);
+    if (result.ok) {
+      await markCompleted(supabase, row.id);
+      succeeded += 1;
     } else {
-      const nextRetry = row.retry_count + 1;
-      const finalStatus = nextRetry >= MAX_RETRY ? "failed" : "pending";
-      await supabase
-        .from("seo_generation_queue")
-        .update({
-          status: finalStatus,
-          retry_count: nextRetry,
-          error_message: r.error ?? "unknown error",
-        })
-        .eq("id", r.id);
+      await markFailure(supabase, row.id, row.retry_count, result.error ?? "unknown error");
+      failed += 1;
     }
   }
 
-  const okCount = results.filter((r) => r.ok).length;
   return Response.json({
     ok: true,
     mode,
     picked: pending.length,
-    succeeded: okCount,
-    failed: results.length - okCount,
-    results,
+    claimed,
+    succeeded,
+    failed,
+    skipped_idempotent: skippedIdempotent,
+    stopped_early: stoppedEarly,
   });
 }
 
