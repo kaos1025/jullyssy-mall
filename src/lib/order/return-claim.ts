@@ -385,6 +385,11 @@ export const executeReturnRefund = async (
   const refundAmount = Math.max(0, order.paid_amount - deduction)
 
   // ② Toss 부분취소 (멱등키 미존재 시에만 — 재시도 시 중복 취소 방지)
+  // ⚠️ 경합 주의(reorder 금지): Toss 취소(②)가 RPC의 payments.status 기록(③)보다 먼저 일어난다.
+  //   이 sub-second 윈도우에 CANCEL_STATUS_CHANGED webhook이 도착하면 payments.status가 아직 DONE이라
+  //   webhook이 외부발로 분기한다(부분→partial_manual warning, 전액→cancelOrder 400→500→Toss 재시도).
+  //   ③ RPC가 payments.status를 CANCELLED/PARTIAL_CANCELLED로 기록한 뒤 재시도는 webhook 시나리오1 no-op으로 self-heal.
+  //   ②③ 순서를 바꾸면 Toss 성공 후 DB 미기록 gap(회계 불일치)이 생기므로 이 순서를 유지할 것.
   if (!claim.toss_cancel_idempotency_key) {
     const { data: payment } = await admin
       .from("payments")
