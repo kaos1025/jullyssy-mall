@@ -14,9 +14,12 @@ interface CancelError {
 // PAID/PREPARING 주문 취소 — 토스 환불 + 재고/포인트/쿠폰 원복 + status='CANCELLED' 전이.
 // PENDING은 cleanupPendingOrder() 경로 사용.
 // ctx.actor/reason은 orders 테이블에 함께 저장하여 사용자 마이페이지 사유 노출과 운영 분석에 활용.
+// opts.skipTossCancel: 토스 콘솔에서 이미 전액 취소된 건의 webhook 동기화 경로 — 토스 재호출(이중 취소)만
+//   생략하고 DB 원복(재고/포인트/쿠폰/상태)은 동일 수행. DB부 거동은 일반 경로와 완전히 같다.
 export const cancelOrder = async (
   orderId: string,
-  ctx: CancellationContext
+  ctx: CancellationContext,
+  opts?: { skipTossCancel?: boolean }
 ): Promise<CancelResult | CancelError> => {
   const admin = createAdminClient()
 
@@ -44,20 +47,24 @@ export const cancelOrder = async (
   }
 
   // 3. 토스페이먼츠 결제 취소 (DB 변경 전에 먼저 실행)
-  const { data: payment } = await admin
-    .from("payments")
-    .select("payment_key")
-    .eq("order_id", orderId)
-    .eq("status", "DONE")
-    .single()
+  // skipTossCancel: 토스 콘솔 선취소 webhook 동기화 — 이미 취소된 결제를 재호출하면 이중취소/에러이므로
+  // 이 블록 전체를 생략한다. 이후 4~8단계 DB 원복은 일반 경로와 동일하게 수행.
+  if (!opts?.skipTossCancel) {
+    const { data: payment } = await admin
+      .from("payments")
+      .select("payment_key")
+      .eq("order_id", orderId)
+      .eq("status", "DONE")
+      .single()
 
-  if (payment?.payment_key) {
-    // P1-16: 인라인 Toss 호출을 tossCancel primitive로 교체 (전액 — 거동 동일 + 멱등키/검증 인프라 공유).
-    const cancelRes = await tossCancel(payment.payment_key, {
-      cancelReason: "고객 주문 취소",
-    })
-    if (!cancelRes.ok) {
-      return { error: cancelRes.error, status: 502 }
+    if (payment?.payment_key) {
+      // P1-16: 인라인 Toss 호출을 tossCancel primitive로 교체 (전액 — 거동 동일 + 멱등키/검증 인프라 공유).
+      const cancelRes = await tossCancel(payment.payment_key, {
+        cancelReason: "고객 주문 취소",
+      })
+      if (!cancelRes.ok) {
+        return { error: cancelRes.error, status: 502 }
+      }
     }
   }
 
