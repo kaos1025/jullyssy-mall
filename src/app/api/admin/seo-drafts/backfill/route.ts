@@ -17,6 +17,10 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  computeExcludedProductIds,
+  type QueueDedupRow,
+} from "@/lib/seo/queue-dedup"
 
 // spec v0.6 §4 비용 가정 (Phase 1 live 검증 $0.0095/상품).
 const COST_PER_PRODUCT_USD = 0.0095
@@ -32,6 +36,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // 1회 호출 비용 임계 가드: 50건 × $0.01523 ≈ $0.76 (cap $20 대비 3.8%).
 // 412 cap 사전 검증은 별도 layer로 유지.
 const MAX_PRODUCT_IDS = 50
+
+// 30분 이상 processing에 잔존한 row는 stuck으로 간주해 dedup에서 제외(재적재 허용).
+// worker 종료로 영구 processing 잔존 시 backfill이 막히는 것을 방지 — SEO-QUEUE-FIX-1 #3.
+const STALE_PROCESSING_MS = 30 * 60 * 1000
 
 interface BackfillBody {
   scope?: BackfillScope
@@ -288,10 +296,11 @@ const postHandler = async (request: NextRequest) => {
     })
   }
 
-  // 기존 pending/processing 큐 row 제외
+  // 기존 pending/processing 큐 row 제외 — 단, 30분 이상 stuck된 processing은
+  // dedup에서 제외하여 재적재를 허용한다 (stuck-recover와 별개 방어선, SEO-QUEUE-FIX-1 #3).
   const { data: existingData, error: existingErr } = await supabase
     .from("seo_generation_queue")
-    .select("product_id")
+    .select("product_id, status, started_at")
     .in("product_id", productIds)
     .in("status", ["pending", "processing"])
   if (existingErr) {
@@ -300,8 +309,10 @@ const postHandler = async (request: NextRequest) => {
     })
     return NextResponse.json({ error: existingErr.message }, { status: 500 })
   }
-  const excludeIds = new Set(
-    (existingData ?? []).map((r) => r.product_id as string),
+  const excludeIds = computeExcludedProductIds(
+    (existingData ?? []) as QueueDedupRow[],
+    STALE_PROCESSING_MS,
+    Date.now(),
   )
   const insertIds = productIds.filter((id) => !excludeIds.has(id))
 
