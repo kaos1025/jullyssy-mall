@@ -13,6 +13,7 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
     { url: `${SITE_URL}/login`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/signup`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/welcome`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/guide`, changeFrequency: "monthly", priority: 0.5 },
   ]
 
   try {

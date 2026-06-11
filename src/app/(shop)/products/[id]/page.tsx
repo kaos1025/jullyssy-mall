@@ -30,6 +30,7 @@ import { BUSINESS_INFO } from "@/constants/business"
 import { SHIPPING_CONFIG } from "@/constants/shipping"
 import { FIT_TYPE_LABELS, parseFitType } from "@/lib/product/fit-type"
 import { getProductLdDescription } from "@/lib/seo/product-ld-description"
+import { buildProductBreadcrumb } from "@/lib/seo/breadcrumb"
 import type { Metadata } from "next"
 import type { ReviewWithImages } from "@/types"
 import type { ReviewTagSummaryRow } from "@/types/review"
@@ -273,11 +274,26 @@ const ProductDetailPage = async ({ params }: ProductDetailPageProps) => {
     jsonLd.additionalProperty = additionalProperty
   }
 
+  // BreadcrumbList JSON-LD — 홈 > [부모 카테고리] > 카테고리 > 상품명 (SEO-SCHEMA-BUNDLE-1)
+  const breadcrumbJsonLd = buildProductBreadcrumb({
+    siteUrl: SITE_URL,
+    productName: product.name,
+    productSlug: product.slug || product.id,
+    category: product.category
+      ? { name: product.category.name, slug: product.category.slug }
+      : null,
+    parentCategory,
+  })
+
   return (
     <div className="container py-4 md:py-8">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
         {/* 좌측: 이미지 갤러리 */}
