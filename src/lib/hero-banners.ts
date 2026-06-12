@@ -1,6 +1,8 @@
 import { unstable_cache } from "next/cache"
+import * as Sentry from "@sentry/nextjs"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { validateImageFile } from "@/lib/image-upload-validation"
+import { deriveBannerStoragePath } from "@/lib/hero-banner-storage"
 import type { Database } from "@/types/supabase"
 
 export type HeroBanner = Database["public"]["Tables"]["hero_banners"]["Row"]
@@ -143,4 +145,62 @@ export const uploadHeroBannerImage = async (
   if (error) throw new Error(`이미지 업로드 실패(${variant}): ${error.message}`)
 
   return admin.storage.from("product-images").getPublicUrl(path).data.publicUrl
+}
+
+// =============================================
+// 이미지 정리 (orphan 방지) — best-effort, 비블로킹
+// =============================================
+// 방향 주의(헷갈림 방지):
+//  - removeOldBannerObjectsByUrl: 교체/삭제 "성공 후" 더 이상 참조되지 않는 OLD 객체 제거
+//    (순서: DB 갱신 → storage 삭제). DB url에서 path 역산 + banners/ prefix 가드.
+//  - removeNewBannerObjectsByPath: 업로드~DB커밋 "실패 시" 이번 요청 신규 객체만 제거(path 직접).
+//  공통 불변식: DB가 가리키는 객체는 절대 제거하지 않는다.
+
+// 내부 공통: path 배열 best-effort remove (실패해도 throw 안 함 — Sentry hygiene 로깅만).
+const removeBannerStorageObjects = async (
+  paths: string[],
+  reason: string
+): Promise<void> => {
+  if (paths.length === 0) return
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.storage.from("product-images").remove(paths)
+    if (error) {
+      Sentry.captureMessage("hero_banner_object_remove_failed", {
+        level: "warning",
+        tags: { kind: "hygiene", reason },
+        extra: { paths, error: error.message },
+      })
+    }
+  } catch (e) {
+    Sentry.captureMessage("hero_banner_object_remove_threw", {
+      level: "warning",
+      tags: { kind: "hygiene", reason },
+      extra: { paths, error: e instanceof Error ? e.message : String(e) },
+    })
+  }
+}
+
+/**
+ * 교체/삭제 성공 후 더 이상 참조되지 않는 OLD 배너 객체를 best-effort 제거.
+ * DB image_url에서 path 역산(banners/ prefix 가드). 역산 실패/prefix 밖이면 스킵 + Sentry.
+ */
+export const removeOldBannerObjectsByUrl = async (
+  imageUrls: (string | null | undefined)[]
+): Promise<void> => {
+  const paths: string[] = []
+  for (const url of imageUrls) {
+    if (!url) continue
+    const path = deriveBannerStoragePath(url)
+    if (!path) {
+      Sentry.captureMessage("hero_banner_orphan_path_guard", {
+        level: "warning",
+        tags: { kind: "hygiene" },
+        extra: { url },
+      })
+      continue
+    }
+    paths.push(path)
+  }
+  await removeBannerStorageObjects(paths, "replace_or_delete_old")
 }

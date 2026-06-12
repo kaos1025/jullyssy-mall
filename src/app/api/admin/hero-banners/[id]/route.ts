@@ -9,6 +9,7 @@ import {
   updateHeroBannerAdmin,
   deleteHeroBannerAdmin,
   uploadHeroBannerImage,
+  removeOldBannerObjectsByUrl,
   type HeroBannerUpdate,
 } from "@/lib/hero-banners"
 
@@ -147,6 +148,17 @@ const patchHandler = async (
   }
 
   try {
+    // 교체 대상이면 기존 객체 URL 포착 (DB 갱신 성공 후 OLD 제거 — 순서: DB→storage)
+    const oldUrls: (string | null)[] = []
+    if (pcFile || mobileFile) {
+      const existing = await getHeroBannerByIdAdmin(params.id)
+      if (!existing) {
+        return NextResponse.json({ error: "배너를 찾을 수 없습니다" }, { status: 404 })
+      }
+      if (pcFile) oldUrls.push(existing.image_url_pc)
+      if (mobileFile) oldUrls.push(existing.image_url_mobile)
+    }
+
     // 이미지 교체 (File 있을 때만 업로드, NOT NULL 컬럼이라 빈 값 미할당)
     if (pcFile) {
       updateData.image_url_pc = await uploadHeroBannerImage(pcFile, "pc")
@@ -164,6 +176,8 @@ const patchHandler = async (
     revalidatePath("/admin/hero-banners")
     revalidatePath(`/admin/hero-banners/${params.id}`)
     revalidatePath("/", "layout")
+    // DB 갱신 성공 후: 교체된 변종의 OLD 객체 best-effort 제거
+    if (oldUrls.length > 0) await removeOldBannerObjectsByUrl(oldUrls)
     return NextResponse.json(banner)
   } catch (e) {
     const msg = e instanceof Error ? e.message : "배너 수정 실패"
@@ -181,10 +195,17 @@ const deleteHandler = async (
   }
 
   try {
+    // 삭제 전 객체 URL 포착 (DB 삭제 성공 후 제거 — 순서: DB→storage)
+    const existing = await getHeroBannerByIdAdmin(params.id)
+    if (!existing) {
+      return NextResponse.json({ error: "배너를 찾을 수 없습니다" }, { status: 404 })
+    }
     await deleteHeroBannerAdmin(params.id)
     revalidateTag("hero-banners")
     revalidatePath("/admin/hero-banners")
     revalidatePath("/", "layout")
+    // DB 삭제 성공 후: 객체 best-effort 제거
+    await removeOldBannerObjectsByUrl([existing.image_url_pc, existing.image_url_mobile])
     return NextResponse.json({ ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "배너 삭제 실패"
