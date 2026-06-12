@@ -3,6 +3,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
+import { validateImageFile } from "@/lib/image-upload-validation"
 import {
   getAllHeroBannersAdmin,
   createHeroBannerAdmin,
@@ -92,6 +93,17 @@ const postHandler = async (request: NextRequest) => {
   }
   if (!(imageMobile instanceof File) || imageMobile.size === 0) {
     return NextResponse.json({ error: "모바일 이미지를 업로드하세요" }, { status: 400 })
+  }
+
+  // 이미지 검증 (비이미지 MIME / 8MB 초과 = 클라이언트 입력 오류 → 400. 상품 업로드 경로와 동일 패턴)
+  for (const [file, label] of [
+    [imagePc, "PC"],
+    [imageMobile, "모바일"],
+  ] as const) {
+    const validation = validateImageFile(file)
+    if (!validation.ok) {
+      return NextResponse.json({ error: `${label} ${validation.message}` }, { status: 400 })
+    }
   }
 
   try {
