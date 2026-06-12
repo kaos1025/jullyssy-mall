@@ -135,7 +135,9 @@ export const uploadHeroBannerImage = async (
   if (!validation.ok) throw new Error(validation.message)
 
   const admin = createAdminClient()
-  const ext = file.name.split(".").pop() || "jpg"
+  // 확장자는 영숫자만 — 파일명의 #/?/공백 등이 object key·public URL에 섞여
+  // orphan 정리 시 path 역산을 깨뜨리는 것 방지(getPublicUrl은 #/? 미인코딩).
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg"
   const path = `${BANNERS_PREFIX}${Date.now()}_${variant}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 

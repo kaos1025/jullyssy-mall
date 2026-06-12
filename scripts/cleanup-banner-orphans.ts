@@ -48,10 +48,10 @@ async function main() {
     console.error("storage list 실패:", listErr.message)
     process.exit(1)
   }
-  const files = (objects ?? []).filter((o) => o.id !== null) // 디렉토리(id=null) 제외
-  if (files.length >= LIST_LIMIT) {
+  if ((objects ?? []).length >= LIST_LIMIT) {
     console.warn(`⚠️ list가 limit(${LIST_LIMIT}) 도달 — 일부 누락 가능. 페이지네이션 필요.`)
   }
+  const files = (objects ?? []).filter((o) => o.id !== null) // 디렉토리(id=null) 제외
   const storageKeys = files.map((o) => `${BANNERS_PREFIX}${o.name}`)
 
   // 2) hero_banners 참조 path 집합 (라우트와 동일한 역산 유틸 재사용)

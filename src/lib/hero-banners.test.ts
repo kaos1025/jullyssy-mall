@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 // 배너 이미지 best-effort 제거기 단위 테스트 — storage/Sentry 경계만 모킹.
-const { createAdminClient, captureMessage, remove } = vi.hoisted(() => {
+const { createAdminClient, captureMessage, remove, upload, getPublicUrl } = vi.hoisted(() => {
   const remove = vi.fn()
+  const upload = vi.fn()
+  const getPublicUrl = vi.fn(() => ({ data: { publicUrl: "https://x/p" } }))
   return {
     remove,
-    createAdminClient: vi.fn(() => ({ storage: { from: () => ({ remove }) } })),
+    upload,
+    getPublicUrl,
+    createAdminClient: vi.fn(() => ({
+      storage: { from: () => ({ remove, upload, getPublicUrl }) },
+    })),
     captureMessage: vi.fn(),
   }
 })
@@ -19,6 +25,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient }))
 vi.mock("@sentry/nextjs", () => ({ captureMessage, captureException: vi.fn() }))
 
 import {
+  uploadHeroBannerImage,
   removeOldBannerObjectsByUrl,
   removeNewBannerObjectsByPath,
 } from "./hero-banners"
@@ -102,5 +109,34 @@ describe("removeNewBannerObjectsByPath (업로드~DB커밋 실패 시 신규 제
   it("빈 배열은 remove 미호출", async () => {
     await removeNewBannerObjectsByPath([])
     expect(remove).not.toHaveBeenCalled()
+  })
+})
+
+describe("uploadHeroBannerImage — object key 위생", () => {
+  it("파일명 확장자의 특수문자(#/?/대문자)를 제거해 깨끗한 banners/ key 생성", async () => {
+    let captured = ""
+    upload.mockImplementation((path: string) => {
+      captured = path
+      return Promise.resolve({ error: null })
+    })
+    getPublicUrl.mockReturnValue({
+      data: {
+        publicUrl:
+          "https://x/storage/v1/object/public/product-images/banners/k.png",
+      },
+    })
+    const file = {
+      name: "photo.PNG#foo?bar",
+      type: "image/png",
+      size: 100,
+      arrayBuffer: async () => new ArrayBuffer(100),
+    } as unknown as File
+
+    const res = await uploadHeroBannerImage(file, "pc")
+
+    expect(captured).toMatch(/^banners\/\d+_pc\.[a-z0-9]+$/) // 영숫자 ext만
+    expect(captured).not.toContain("#")
+    expect(captured).not.toContain("?")
+    expect(res.path).toBe(captured) // 반환 path = 실제 업로드 key (역산 없이 정리 가능)
   })
 })
