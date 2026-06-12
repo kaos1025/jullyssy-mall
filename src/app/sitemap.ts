@@ -31,7 +31,7 @@ const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
     // 상품 상세 페이지
     const { data: products } = await supabase
       .from("products")
-      .select("id, slug, updated_at")
+      .select("slug, updated_at")
       .eq("status", "ACTIVE")
 
     // 024 마이그레이션 적용 후 slug는 NOT NULL이지만, apply 전 빌드 안전망으로 필터링
