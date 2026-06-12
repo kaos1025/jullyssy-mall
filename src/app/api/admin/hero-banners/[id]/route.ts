@@ -131,19 +131,28 @@ const patchHandler = async (
     updateData.sort_order = s
   }
 
+  // 이미지 교체 대상 추출 + 선검증 (양 파일 선검증 후 업로드 — 한쪽 업로드 성공 후
+  // 다른쪽 검증 실패 시 방금 올라간 객체가 orphan 되는 것을 방지)
+  const imagePc = formData.get("image_pc")
+  const imageMobile = formData.get("image_mobile")
+  const pcFile = imagePc instanceof File && imagePc.size > 0 ? imagePc : null
+  const mobileFile = imageMobile instanceof File && imageMobile.size > 0 ? imageMobile : null
+  if (pcFile) {
+    const v = validateImageFile(pcFile)
+    if (!v.ok) return NextResponse.json({ error: `PC ${v.message}` }, { status: 400 })
+  }
+  if (mobileFile) {
+    const v = validateImageFile(mobileFile)
+    if (!v.ok) return NextResponse.json({ error: `모바일 ${v.message}` }, { status: 400 })
+  }
+
   try {
-    // 이미지 교체 (선택 — File 있을 때만 새로 업로드, NOT NULL 컬럼이라 빈 값 미할당)
-    const imagePc = formData.get("image_pc")
-    if (imagePc instanceof File && imagePc.size > 0) {
-      const v = validateImageFile(imagePc)
-      if (!v.ok) return NextResponse.json({ error: `PC ${v.message}` }, { status: 400 })
-      updateData.image_url_pc = await uploadHeroBannerImage(imagePc, "pc")
+    // 이미지 교체 (File 있을 때만 업로드, NOT NULL 컬럼이라 빈 값 미할당)
+    if (pcFile) {
+      updateData.image_url_pc = await uploadHeroBannerImage(pcFile, "pc")
     }
-    const imageMobile = formData.get("image_mobile")
-    if (imageMobile instanceof File && imageMobile.size > 0) {
-      const v = validateImageFile(imageMobile)
-      if (!v.ok) return NextResponse.json({ error: `모바일 ${v.message}` }, { status: 400 })
-      updateData.image_url_mobile = await uploadHeroBannerImage(imageMobile, "mobile")
+    if (mobileFile) {
+      updateData.image_url_mobile = await uploadHeroBannerImage(mobileFile, "mobile")
     }
 
     if (Object.keys(updateData).length === 0) {
