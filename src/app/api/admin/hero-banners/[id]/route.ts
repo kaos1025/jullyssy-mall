@@ -3,6 +3,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
+import { validateImageFile } from "@/lib/image-upload-validation"
 import {
   getHeroBannerByIdAdmin,
   updateHeroBannerAdmin,
@@ -134,10 +135,14 @@ const patchHandler = async (
     // 이미지 교체 (선택 — File 있을 때만 새로 업로드, NOT NULL 컬럼이라 빈 값 미할당)
     const imagePc = formData.get("image_pc")
     if (imagePc instanceof File && imagePc.size > 0) {
+      const v = validateImageFile(imagePc)
+      if (!v.ok) return NextResponse.json({ error: `PC ${v.message}` }, { status: 400 })
       updateData.image_url_pc = await uploadHeroBannerImage(imagePc, "pc")
     }
     const imageMobile = formData.get("image_mobile")
     if (imageMobile instanceof File && imageMobile.size > 0) {
+      const v = validateImageFile(imageMobile)
+      if (!v.ok) return NextResponse.json({ error: `모바일 ${v.message}` }, { status: 400 })
       updateData.image_url_mobile = await uploadHeroBannerImage(imageMobile, "mobile")
     }
 
