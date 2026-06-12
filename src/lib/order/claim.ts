@@ -53,17 +53,30 @@ export const ACTIVE_CLAIM_STATUSES: readonly ClaimStatus[] = [
   "RESHIPPED",
 ] as const
 
+// 종결(비활성) claim status — WITHDRAWN 제외. 마이페이지 환불/교환 결과 표시 소스.
+// ACTIVE_CLAIM_STATUSES와 disjoint (UI 이중 렌더 방지).
+export const TERMINAL_CLAIM_STATUSES: readonly ClaimStatus[] = [
+  "REFUNDED",
+  "COMPLETED",
+  "REJECTED",
+] as const
+
 // 판매자 귀책(차감 0) 사유 — 하자/오배송.
 const ZERO_DEDUCTION_REASONS: readonly ReasonCategory[] = ["DEFECT", "WRONG_ITEM"]
 
 // 차감액 제안 (서버 권위, 비구속). 운영자가 승인 시 confirmed_deduction으로 확정.
-// 하자/오배송 = 0. 그 외(단순변심 등) = 초도 무료배송(shipping_fee 0) → 왕복 7,000 / 유료 → 편도 3,500.
-// 초도 무료배송 판정 = orders.shipping_fee 0 여부 (Phase0 실측: 컬럼 존재 확인).
+// 하자/오배송 = type 무관 0 (판매자 귀책).
+// 그 외(단순변심/사이즈 등):
+//   - 교환(EXCHANGE) = 회수 + 재발송 왕복이므로 초도 배송비 무관 항상 roundTripShippingFee(7,000).
+//   - 반품(RETURN)   = 초도 무료배송(shipping_fee 0) → 왕복 7,000 / 유료 → 편도 3,500.
+// (G3 정정: 기존엔 type 미반영으로 유료배송 교환이 편도 3,500 오산정 → 교환은 항상 왕복.)
 export const computeProposedDeduction = (
+  type: ClaimType,
   reason: ReasonCategory,
   orderShippingFee: number
 ): number => {
   if (ZERO_DEDUCTION_REASONS.includes(reason)) return 0
+  if (type === "EXCHANGE") return RETURN_CONFIG.roundTripShippingFee
   return orderShippingFee === 0
     ? RETURN_CONFIG.roundTripShippingFee
     : RETURN_CONFIG.returnShippingFee

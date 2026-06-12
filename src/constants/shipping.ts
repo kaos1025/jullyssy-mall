@@ -38,3 +38,16 @@ export const RETURN_CONFIG = {
     "서울특별시 중구 장충단로13길 20 (현대시티타워) 12층 B-10/1,3호",
   windowDays: 7, // 신청 기한 — COALESCE(delivered_at, updated_at) 기준
 } as const
+
+// 교환 단순변심 왕복 배송비(roundTripShippingFee 7,000) 무통장 입금 계좌 (G2).
+// 교환은 환불이 없어 환불 차감 원천이 없으므로 고객에게 별도로 입금받는다.
+// ⚠️ 운영자 확정 필요: 아래 placeholder를 실제 계좌로 교체한 뒤 머지할 것 (배포 전 필수).
+export const DEPOSIT_ACCOUNT = {
+  bank: "[은행명]",
+  accountNumber: "[계좌번호]",
+  holder: "[예금주]",
+} as const
+
+// placeholder 미설정 여부. 미설정 시 고객 UI는 계좌 노출 대신 "별도 안내" fallback,
+// 어드민은 미설정 경고를 표시한다 (placeholder가 사용자에게 노출되는 사고 방지).
+export const DEPOSIT_ACCOUNT_CONFIGURED = !DEPOSIT_ACCOUNT.bank.startsWith("[")

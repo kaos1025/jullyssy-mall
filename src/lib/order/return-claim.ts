@@ -147,7 +147,11 @@ export const createClaim = async (params: {
     }
   }
 
-  const proposed = computeProposedDeduction(params.reasonCategory, order.shipping_fee)
+  const proposed = computeProposedDeduction(
+    params.type,
+    params.reasonCategory,
+    order.shipping_fee
+  )
 
   const { data: claim, error: insErr } = await admin
     .from("order_claims")
