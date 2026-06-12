@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { validateImageFile } from "@/lib/image-upload-validation"
-import { deriveBannerStoragePath } from "@/lib/hero-banner-storage"
+import { BANNERS_PREFIX, deriveBannerStoragePath } from "@/lib/hero-banner-storage"
 import type { Database } from "@/types/supabase"
 
 export type HeroBanner = Database["public"]["Tables"]["hero_banners"]["Row"]
@@ -130,13 +130,13 @@ export const deleteHeroBannerAdmin = async (id: string): Promise<void> => {
 export const uploadHeroBannerImage = async (
   file: File,
   variant: "pc" | "mobile"
-): Promise<string> => {
+): Promise<{ path: string; url: string }> => {
   const validation = validateImageFile(file)
   if (!validation.ok) throw new Error(validation.message)
 
   const admin = createAdminClient()
   const ext = file.name.split(".").pop() || "jpg"
-  const path = `banners/${Date.now()}_${variant}.${ext}`
+  const path = `${BANNERS_PREFIX}${Date.now()}_${variant}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { error } = await admin.storage
@@ -144,7 +144,9 @@ export const uploadHeroBannerImage = async (
     .upload(path, buffer, { contentType: file.type })
   if (error) throw new Error(`이미지 업로드 실패(${variant}): ${error.message}`)
 
-  return admin.storage.from("product-images").getPublicUrl(path).data.publicUrl
+  // path도 반환 — 업로드 실패 정리 시 URL 역산 없이 바로 제거 가능(신규 객체)
+  const url = admin.storage.from("product-images").getPublicUrl(path).data.publicUrl
+  return { path, url }
 }
 
 // =============================================
@@ -204,3 +206,10 @@ export const removeOldBannerObjectsByUrl = async (
   }
   await removeBannerStorageObjects(paths, "replace_or_delete_old")
 }
+
+/**
+ * 업로드~DB커밋 실패 시 이번 요청에서 새로 올린 객체만 best-effort 제거.
+ * path를 이미 알고 있으므로 URL 역산 불요. 호출자는 DB가 가리키는 객체를 절대 넘기지 않는다(불변식).
+ */
+export const removeNewBannerObjectsByPath = async (paths: string[]): Promise<void> =>
+  removeBannerStorageObjects(paths, "upload_or_commit_failed")

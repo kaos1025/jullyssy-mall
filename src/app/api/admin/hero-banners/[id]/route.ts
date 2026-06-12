@@ -10,6 +10,7 @@ import {
   deleteHeroBannerAdmin,
   uploadHeroBannerImage,
   removeOldBannerObjectsByUrl,
+  removeNewBannerObjectsByPath,
   type HeroBannerUpdate,
 } from "@/lib/hero-banners"
 
@@ -147,6 +148,8 @@ const patchHandler = async (
     if (!v.ok) return NextResponse.json({ error: `모바일 ${v.message}` }, { status: 400 })
   }
 
+  const uploadedPaths: string[] = []
+  let committed = false
   try {
     // 교체 대상이면 기존 객체 URL 포착 (DB 갱신 성공 후 OLD 제거 — 순서: DB→storage)
     const oldUrls: (string | null)[] = []
@@ -159,12 +162,16 @@ const patchHandler = async (
       if (mobileFile) oldUrls.push(existing.image_url_mobile)
     }
 
-    // 이미지 교체 (File 있을 때만 업로드, NOT NULL 컬럼이라 빈 값 미할당)
+    // 이미지 교체 (File 있을 때만 업로드, 신규 path는 실패 정리용으로 추적)
     if (pcFile) {
-      updateData.image_url_pc = await uploadHeroBannerImage(pcFile, "pc")
+      const up = await uploadHeroBannerImage(pcFile, "pc")
+      uploadedPaths.push(up.path)
+      updateData.image_url_pc = up.url
     }
     if (mobileFile) {
-      updateData.image_url_mobile = await uploadHeroBannerImage(mobileFile, "mobile")
+      const up = await uploadHeroBannerImage(mobileFile, "mobile")
+      uploadedPaths.push(up.path)
+      updateData.image_url_mobile = up.url
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -172,6 +179,7 @@ const patchHandler = async (
     }
 
     const banner = await updateHeroBannerAdmin(params.id, updateData)
+    committed = true // DB가 신규 객체를 가리킴 — 이후 제거 금지(불변식)
     revalidateTag("hero-banners")
     revalidatePath("/admin/hero-banners")
     revalidatePath(`/admin/hero-banners/${params.id}`)
@@ -180,6 +188,8 @@ const patchHandler = async (
     if (oldUrls.length > 0) await removeOldBannerObjectsByUrl(oldUrls)
     return NextResponse.json(banner)
   } catch (e) {
+    // 업로드~DB커밋 사이 실패: 이번 요청 신규 객체만 제거(불변식, OLD는 보존 — DB가 아직 OLD를 가리킴)
+    if (!committed) await removeNewBannerObjectsByPath(uploadedPaths)
     const msg = e instanceof Error ? e.message : "배너 수정 실패"
     return NextResponse.json({ error: msg }, { status: 500 })
   }
