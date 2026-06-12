@@ -22,6 +22,10 @@ import {
   type ReasonCategory,
 } from "@/lib/order/claim"
 import { COURIER_SUGGESTIONS } from "@/lib/order/courier-suggestions"
+import {
+  DEPOSIT_ACCOUNT,
+  DEPOSIT_ACCOUNT_CONFIGURED,
+} from "@/constants/shipping"
 import dayjs from "dayjs"
 
 const STATUS_TABS: { value: string; label: string }[] = [
@@ -245,6 +249,7 @@ const AdminClaimsPage = () => {
     const { claim, action } = actionTarget
 
     if (action === "approve") {
+      const isExchange = claim.type === "EXCHANGE"
       return (
         <div className="space-y-3">
           <div>
@@ -256,9 +261,24 @@ const AdminClaimsPage = () => {
               onChange={(e) => setConfirmedDeduction(e.target.value)}
               className="mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              환불액 = 결제액 − 차감액
-            </p>
+            {isExchange ? (
+              <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                <p>
+                  교환은 환불이 없습니다. 위 금액은 고객에게{" "}
+                  <span className="font-medium">무통장 입금</span>받을 왕복
+                  배송비이며, 입금 확인 후 재발송하세요.
+                </p>
+                <p>
+                  {DEPOSIT_ACCOUNT_CONFIGURED
+                    ? `입금 계좌: ${DEPOSIT_ACCOUNT.bank} ${DEPOSIT_ACCOUNT.accountNumber} (예금주 ${DEPOSIT_ACCOUNT.holder})`
+                    : "⚠️ 입금 계좌 미설정 — 운영자: DEPOSIT_ACCOUNT 상수에 실제 계좌를 입력하세요."}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">
+                환불액 = 결제액 − 차감액
+              </p>
+            )}
           </div>
         </div>
       )

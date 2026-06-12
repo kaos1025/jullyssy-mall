@@ -27,20 +27,32 @@ import {
 } from "@/lib/order/cancellation"
 import {
   ACTIVE_CLAIM_STATUSES,
+  TERMINAL_CLAIM_STATUSES,
   CLAIM_STATUS_LABEL,
   CLAIM_TYPE_LABEL,
+  REASON_CATEGORY_LABEL,
   type ClaimStatus,
   type ClaimType,
+  type ReasonCategory,
 } from "@/lib/order/claim"
 import { RETURN_CONFIG } from "@/constants/shipping"
+import dayjs from "dayjs"
 import ClaimRequestDialog from "./ClaimRequestDialog"
 
 type OrderClaim = {
   id: string
   type: ClaimType
   status: ClaimStatus
+  reason_category: ReasonCategory
   reason_detail: string | null
   rejected_reason: string | null
+  confirmed_deduction: number | null
+  refund_amount: number | null
+  reship_tracking_number: string | null
+  reship_courier: string | null
+  completed_at: string | null
+  created_at: string
+  exchange_option: { color: string; size: string } | null
 }
 
 type OrderWithCancellation = OrderWithItems & {
@@ -67,7 +79,9 @@ const OrderDetailPage = () => {
     // claims는 order_claims RLS(order_claims_select_own = auth.uid()=user_id) 경유로 본인 것만 반환.
     const { data } = await supabase
       .from("orders")
-      .select("*, items:order_items(*), payment:payments(*), claims:order_claims(*)")
+      .select(
+        "*, items:order_items(*), payment:payments(*), claims:order_claims(id, type, status, reason_category, reason_detail, rejected_reason, confirmed_deduction, refund_amount, reship_tracking_number, reship_courier, completed_at, created_at, exchange_option:product_options(color, size))"
+      )
       .eq("id", params.id)
       .single()
 
@@ -155,6 +169,14 @@ const OrderDetailPage = () => {
   const activeClaim = order.claims?.find((c) =>
     ACTIVE_CLAIM_STATUSES.includes(c.status)
   )
+  // 종결 claim(WITHDRAWN 제외)의 최신 1건 — 환불/교환 결과 블록 소스.
+  const terminalClaim =
+    [...(order.claims ?? [])]
+      .filter((c) => TERMINAL_CLAIM_STATUSES.includes(c.status))
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0] ?? null
   // 신청 기한: COALESCE(delivered_at, updated_at) + 7일 (043 이전 주문 delivered_at NULL 대비).
   const returnDeadline =
     new Date(order.delivered_at ?? order.updated_at).getTime() +
@@ -352,6 +374,97 @@ const OrderDetailPage = () => {
           <span>{order.paid_amount.toLocaleString()}원</span>
         </div>
       </div>
+
+      {/* 환불/교환 정보 (종결 claim — REFUNDED/COMPLETED/REJECTED) */}
+      {terminalClaim && (
+        <div className="border rounded-lg p-4 space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">
+              {CLAIM_TYPE_LABEL[terminalClaim.type]} 정보
+            </h3>
+            <Badge
+              variant={
+                terminalClaim.status === "REJECTED" ? "destructive" : "secondary"
+              }
+            >
+              {CLAIM_STATUS_LABEL[terminalClaim.status]}
+            </Badge>
+          </div>
+
+          {terminalClaim.status === "REFUNDED" && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">환불 금액</span>
+                <span className="font-semibold">
+                  {(terminalClaim.refund_amount ?? 0).toLocaleString()}원
+                </span>
+              </div>
+              {(terminalClaim.confirmed_deduction ?? 0) > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>
+                    차감 배송비 (
+                    {REASON_CATEGORY_LABEL[terminalClaim.reason_category]})
+                  </span>
+                  <span>
+                    -{(terminalClaim.confirmed_deduction ?? 0).toLocaleString()}원
+                  </span>
+                </div>
+              )}
+              {terminalClaim.completed_at && (
+                <p className="text-xs text-muted-foreground">
+                  환불 완료:{" "}
+                  {dayjs(terminalClaim.completed_at).format("YYYY.MM.DD HH:mm")}
+                </p>
+              )}
+            </>
+          )}
+
+          {terminalClaim.status === "COMPLETED" && (
+            <>
+              <p className="text-muted-foreground">
+                교환이 완료되었습니다. (환불 없음)
+              </p>
+              {terminalClaim.exchange_option && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">교환 옵션</span>
+                  <span>
+                    {terminalClaim.exchange_option.color}/
+                    {terminalClaim.exchange_option.size}
+                  </span>
+                </div>
+              )}
+              {terminalClaim.reship_tracking_number && (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-muted-foreground">재발송 송장:</span>{" "}
+                    {terminalClaim.reship_courier}{" "}
+                    {terminalClaim.reship_tracking_number}
+                  </div>
+                  {(() => {
+                    const url = buildTrackingUrl(
+                      terminalClaim.reship_courier,
+                      terminalClaim.reship_tracking_number
+                    )
+                    return url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm">
+                          배송 조회
+                        </Button>
+                      </a>
+                    ) : null
+                  })()}
+                </div>
+              )}
+            </>
+          )}
+
+          {terminalClaim.status === "REJECTED" && terminalClaim.rejected_reason && (
+            <p className="text-muted-foreground whitespace-pre-line">
+              거절 사유: {terminalClaim.rejected_reason}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* 액션 버튼 */}
       {(canCancel || canConfirm || canReturn) && (

@@ -25,6 +25,10 @@ import {
   type ReasonCategory,
 } from "@/lib/order/claim"
 import { createClient } from "@/lib/supabase/client"
+import {
+  DEPOSIT_ACCOUNT,
+  DEPOSIT_ACCOUNT_CONFIGURED,
+} from "@/constants/shipping"
 
 interface ProductOptionRow {
   id: string
@@ -123,7 +127,7 @@ const ClaimRequestDialog = ({
 
   const proposedDeduction =
     reasonCategory !== ""
-      ? computeProposedDeduction(reasonCategory, orderShippingFee)
+      ? computeProposedDeduction(type, reasonCategory, orderShippingFee)
       : null
 
   const handleSubmit = async () => {
@@ -265,18 +269,47 @@ const ClaimRequestDialog = ({
             </div>
           )}
 
-          {/* 예상 차감액 고지 */}
+          {/* 예상 차감액 / 교환 입금 안내 */}
           {proposedDeduction !== null && (
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-1">
-              <p>
-                예상 차감 배송비:{" "}
-                <span className="font-semibold">
-                  {proposedDeduction.toLocaleString()}원
-                </span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                ※ 운영자 승인 시 확정되며 변동될 수 있습니다.
-              </p>
+              {type === "EXCHANGE" && proposedDeduction > 0 ? (
+                <>
+                  <p>
+                    교환 왕복 배송비:{" "}
+                    <span className="font-semibold">
+                      {proposedDeduction.toLocaleString()}원
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    교환은 환불이 없어 배송비를 무통장 입금으로 안내드립니다.
+                  </p>
+                  {DEPOSIT_ACCOUNT_CONFIGURED ? (
+                    <p className="text-xs">
+                      {DEPOSIT_ACCOUNT.bank} {DEPOSIT_ACCOUNT.accountNumber} (예금주{" "}
+                      {DEPOSIT_ACCOUNT.holder})
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      입금 계좌는 승인 후 별도로 안내드립니다.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    ※ 운영자 승인 후 확정·안내되며, 입금 확인 후 재발송됩니다.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    예상 차감 배송비:{" "}
+                    <span className="font-semibold">
+                      {proposedDeduction.toLocaleString()}원
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ※ 운영자 승인 시 확정되며 변동될 수 있습니다.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
