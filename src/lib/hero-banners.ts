@@ -1,6 +1,8 @@
 import { unstable_cache } from "next/cache"
+import * as Sentry from "@sentry/nextjs"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { validateImageFile } from "@/lib/image-upload-validation"
+import { BANNERS_PREFIX, deriveBannerStoragePath } from "@/lib/hero-banner-storage"
 import type { Database } from "@/types/supabase"
 
 export type HeroBanner = Database["public"]["Tables"]["hero_banners"]["Row"]
@@ -128,13 +130,15 @@ export const deleteHeroBannerAdmin = async (id: string): Promise<void> => {
 export const uploadHeroBannerImage = async (
   file: File,
   variant: "pc" | "mobile"
-): Promise<string> => {
+): Promise<{ path: string; url: string }> => {
   const validation = validateImageFile(file)
   if (!validation.ok) throw new Error(validation.message)
 
   const admin = createAdminClient()
-  const ext = file.name.split(".").pop() || "jpg"
-  const path = `banners/${Date.now()}_${variant}.${ext}`
+  // 확장자는 영숫자만 — 파일명의 #/?/공백 등이 object key·public URL에 섞여
+  // orphan 정리 시 path 역산을 깨뜨리는 것 방지(getPublicUrl은 #/? 미인코딩).
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg"
+  const path = `${BANNERS_PREFIX}${Date.now()}_${variant}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { error } = await admin.storage
@@ -142,5 +146,72 @@ export const uploadHeroBannerImage = async (
     .upload(path, buffer, { contentType: file.type })
   if (error) throw new Error(`이미지 업로드 실패(${variant}): ${error.message}`)
 
-  return admin.storage.from("product-images").getPublicUrl(path).data.publicUrl
+  // path도 반환 — 업로드 실패 정리 시 URL 역산 없이 바로 제거 가능(신규 객체)
+  const url = admin.storage.from("product-images").getPublicUrl(path).data.publicUrl
+  return { path, url }
 }
+
+// =============================================
+// 이미지 정리 (orphan 방지) — best-effort, 비블로킹
+// =============================================
+// 방향 주의(헷갈림 방지):
+//  - removeOldBannerObjectsByUrl: 교체/삭제 "성공 후" 더 이상 참조되지 않는 OLD 객체 제거
+//    (순서: DB 갱신 → storage 삭제). DB url에서 path 역산 + banners/ prefix 가드.
+//  - removeNewBannerObjectsByPath: 업로드~DB커밋 "실패 시" 이번 요청 신규 객체만 제거(path 직접).
+//  공통 불변식: DB가 가리키는 객체는 절대 제거하지 않는다.
+
+// 내부 공통: path 배열 best-effort remove (실패해도 throw 안 함 — Sentry hygiene 로깅만).
+const removeBannerStorageObjects = async (
+  paths: string[],
+  reason: string
+): Promise<void> => {
+  if (paths.length === 0) return
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.storage.from("product-images").remove(paths)
+    if (error) {
+      Sentry.captureMessage("hero_banner_object_remove_failed", {
+        level: "warning",
+        tags: { kind: "hygiene", reason },
+        extra: { paths, error: error.message },
+      })
+    }
+  } catch (e) {
+    Sentry.captureMessage("hero_banner_object_remove_threw", {
+      level: "warning",
+      tags: { kind: "hygiene", reason },
+      extra: { paths, error: e instanceof Error ? e.message : String(e) },
+    })
+  }
+}
+
+/**
+ * 교체/삭제 성공 후 더 이상 참조되지 않는 OLD 배너 객체를 best-effort 제거.
+ * DB image_url에서 path 역산(banners/ prefix 가드). 역산 실패/prefix 밖이면 스킵 + Sentry.
+ */
+export const removeOldBannerObjectsByUrl = async (
+  imageUrls: (string | null | undefined)[]
+): Promise<void> => {
+  const paths: string[] = []
+  for (const url of imageUrls) {
+    if (!url) continue
+    const path = deriveBannerStoragePath(url)
+    if (!path) {
+      Sentry.captureMessage("hero_banner_orphan_path_guard", {
+        level: "warning",
+        tags: { kind: "hygiene" },
+        extra: { url },
+      })
+      continue
+    }
+    paths.push(path)
+  }
+  await removeBannerStorageObjects(paths, "replace_or_delete_old")
+}
+
+/**
+ * 업로드~DB커밋 실패 시 이번 요청에서 새로 올린 객체만 best-effort 제거.
+ * path를 이미 알고 있으므로 URL 역산 불요. 호출자는 DB가 가리키는 객체를 절대 넘기지 않는다(불변식).
+ */
+export const removeNewBannerObjectsByPath = async (paths: string[]): Promise<void> =>
+  removeBannerStorageObjects(paths, "upload_or_commit_failed")

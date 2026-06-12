@@ -9,6 +9,8 @@ import {
   updateHeroBannerAdmin,
   deleteHeroBannerAdmin,
   uploadHeroBannerImage,
+  removeOldBannerObjectsByUrl,
+  removeNewBannerObjectsByPath,
   type HeroBannerUpdate,
 } from "@/lib/hero-banners"
 
@@ -131,19 +133,45 @@ const patchHandler = async (
     updateData.sort_order = s
   }
 
+  // 이미지 교체 대상 추출 + 선검증 (양 파일 선검증 후 업로드 — 한쪽 업로드 성공 후
+  // 다른쪽 검증 실패 시 방금 올라간 객체가 orphan 되는 것을 방지)
+  const imagePc = formData.get("image_pc")
+  const imageMobile = formData.get("image_mobile")
+  const pcFile = imagePc instanceof File && imagePc.size > 0 ? imagePc : null
+  const mobileFile = imageMobile instanceof File && imageMobile.size > 0 ? imageMobile : null
+  if (pcFile) {
+    const v = validateImageFile(pcFile)
+    if (!v.ok) return NextResponse.json({ error: `PC ${v.message}` }, { status: 400 })
+  }
+  if (mobileFile) {
+    const v = validateImageFile(mobileFile)
+    if (!v.ok) return NextResponse.json({ error: `모바일 ${v.message}` }, { status: 400 })
+  }
+
+  const uploadedPaths: string[] = []
+  let committed = false
   try {
-    // 이미지 교체 (선택 — File 있을 때만 새로 업로드, NOT NULL 컬럼이라 빈 값 미할당)
-    const imagePc = formData.get("image_pc")
-    if (imagePc instanceof File && imagePc.size > 0) {
-      const v = validateImageFile(imagePc)
-      if (!v.ok) return NextResponse.json({ error: `PC ${v.message}` }, { status: 400 })
-      updateData.image_url_pc = await uploadHeroBannerImage(imagePc, "pc")
+    // 교체 대상이면 기존 객체 URL 포착 (DB 갱신 성공 후 OLD 제거 — 순서: DB→storage)
+    const oldUrls: (string | null)[] = []
+    if (pcFile || mobileFile) {
+      const existing = await getHeroBannerByIdAdmin(params.id)
+      if (!existing) {
+        return NextResponse.json({ error: "배너를 찾을 수 없습니다" }, { status: 404 })
+      }
+      if (pcFile) oldUrls.push(existing.image_url_pc)
+      if (mobileFile) oldUrls.push(existing.image_url_mobile)
     }
-    const imageMobile = formData.get("image_mobile")
-    if (imageMobile instanceof File && imageMobile.size > 0) {
-      const v = validateImageFile(imageMobile)
-      if (!v.ok) return NextResponse.json({ error: `모바일 ${v.message}` }, { status: 400 })
-      updateData.image_url_mobile = await uploadHeroBannerImage(imageMobile, "mobile")
+
+    // 이미지 교체 (File 있을 때만 업로드, 신규 path는 실패 정리용으로 추적)
+    if (pcFile) {
+      const up = await uploadHeroBannerImage(pcFile, "pc")
+      uploadedPaths.push(up.path)
+      updateData.image_url_pc = up.url
+    }
+    if (mobileFile) {
+      const up = await uploadHeroBannerImage(mobileFile, "mobile")
+      uploadedPaths.push(up.path)
+      updateData.image_url_mobile = up.url
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -151,12 +179,17 @@ const patchHandler = async (
     }
 
     const banner = await updateHeroBannerAdmin(params.id, updateData)
+    committed = true // DB가 신규 객체를 가리킴 — 이후 제거 금지(불변식)
     revalidateTag("hero-banners")
     revalidatePath("/admin/hero-banners")
     revalidatePath(`/admin/hero-banners/${params.id}`)
     revalidatePath("/", "layout")
+    // DB 갱신 성공 후: 교체된 변종의 OLD 객체 best-effort 제거
+    if (oldUrls.length > 0) await removeOldBannerObjectsByUrl(oldUrls)
     return NextResponse.json(banner)
   } catch (e) {
+    // 업로드~DB커밋 사이 실패: 이번 요청 신규 객체만 제거(불변식, OLD는 보존 — DB가 아직 OLD를 가리킴)
+    if (!committed) await removeNewBannerObjectsByPath(uploadedPaths)
     const msg = e instanceof Error ? e.message : "배너 수정 실패"
     return NextResponse.json({ error: msg }, { status: 500 })
   }
@@ -172,10 +205,17 @@ const deleteHandler = async (
   }
 
   try {
+    // 삭제 전 객체 URL 포착 (DB 삭제 성공 후 제거 — 순서: DB→storage)
+    const existing = await getHeroBannerByIdAdmin(params.id)
+    if (!existing) {
+      return NextResponse.json({ error: "배너를 찾을 수 없습니다" }, { status: 404 })
+    }
     await deleteHeroBannerAdmin(params.id)
     revalidateTag("hero-banners")
     revalidatePath("/admin/hero-banners")
     revalidatePath("/", "layout")
+    // DB 삭제 성공 후: 객체 best-effort 제거
+    await removeOldBannerObjectsByUrl([existing.image_url_pc, existing.image_url_mobile])
     return NextResponse.json({ ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "배너 삭제 실패"

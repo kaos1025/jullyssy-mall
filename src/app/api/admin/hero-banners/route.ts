@@ -8,6 +8,7 @@ import {
   getAllHeroBannersAdmin,
   createHeroBannerAdmin,
   uploadHeroBannerImage,
+  removeNewBannerObjectsByPath,
   type HeroBannerInsert,
 } from "@/lib/hero-banners"
 
@@ -106,19 +107,33 @@ const postHandler = async (request: NextRequest) => {
     }
   }
 
+  const uploadedPaths: string[] = []
+  let committed = false
   try {
-    const [image_url_pc, image_url_mobile] = await Promise.all([
+    // 양쪽 업로드 모두 시도 (allSettled — 한쪽 실패해도 성공분 path를 포착해 정리)
+    const results = await Promise.allSettled([
       uploadHeroBannerImage(imagePc, "pc"),
       uploadHeroBannerImage(imageMobile, "mobile"),
     ])
+    for (const r of results) {
+      if (r.status === "fulfilled") uploadedPaths.push(r.value.path)
+    }
+    const rejected = results.find((r) => r.status === "rejected") as
+      | PromiseRejectedResult
+      | undefined
+    if (rejected) throw rejected.reason
+
+    const [pc, mobile] = results.map(
+      (r) => (r as PromiseFulfilledResult<{ path: string; url: string }>).value
+    )
 
     const input: HeroBannerInsert = {
       title: typeof title === "string" && title.trim() ? title.trim() : null,
       subtitle: typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null,
       cta_text: typeof cta_text === "string" && cta_text.trim() ? cta_text.trim() : null,
       cta_link: typeof cta_link === "string" && cta_link.trim() ? cta_link.trim() : null,
-      image_url_pc,
-      image_url_mobile,
+      image_url_pc: pc.url,
+      image_url_mobile: mobile.url,
       is_active: typeof is_active === "boolean" ? is_active : true,
       starts_at: (starts_at as string) || null,
       ends_at: (ends_at as string) || null,
@@ -126,11 +141,14 @@ const postHandler = async (request: NextRequest) => {
     }
 
     const banner = await createHeroBannerAdmin(input)
+    committed = true // DB가 신규 객체를 가리킴 — 이후 제거 금지(불변식)
     revalidateTag("hero-banners")
     revalidatePath("/admin/hero-banners")
     revalidatePath("/", "layout")
     return NextResponse.json(banner, { status: 201 })
   } catch (e) {
+    // 업로드~DB커밋 사이 실패: 이번 요청 신규 객체만 best-effort 제거(불변식)
+    if (!committed) await removeNewBannerObjectsByPath(uploadedPaths)
     const msg = e instanceof Error ? e.message : "배너 생성 실패"
     return NextResponse.json({ error: msg }, { status: 500 })
   }
