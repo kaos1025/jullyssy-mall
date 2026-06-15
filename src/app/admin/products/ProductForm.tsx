@@ -270,7 +270,7 @@ const ProductForm = ({ product }: ProductFormProps) => {
                     {childCategories
                       .filter((c) => c.parent_id === parent.id)
                       .map((child) => (
-                        <SelectItem key={child.id} value={child.id} className="pl-6">
+                        <SelectItem key={child.id} value={child.id} className="pl-12">
                           {child.name}
                         </SelectItem>
                       ))}
