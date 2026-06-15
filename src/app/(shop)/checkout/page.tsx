@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -29,8 +29,9 @@ const paymentMethods: { value: PaymentMethodType; label: string }[] = [
 const CheckoutPage = () => {
   const { toast } = useToast()
   const router = useRouter()
-  const { items, getTotal } = useCart()
+  const { items } = useCart()
   const [mounted, setMounted] = useState(false)
+  const [orderOptionIds, setOrderOptionIds] = useState<string[] | null>(null)
 
   const [showItems, setShowItems] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("CARD")
@@ -56,6 +57,10 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     setMounted(true)
+    try {
+      const raw = sessionStorage.getItem("checkout_option_ids")
+      if (raw) setOrderOptionIds(JSON.parse(raw))
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -86,8 +91,22 @@ const CheckoutPage = () => {
     window.history.replaceState({}, "", cleanUrl)
   }, [toast])
 
-  const subtotal = mounted ? getTotal() : 0
-  const hasFreeShippingItem = mounted && items.some((item) => item.free_shipping)
+  // orderOptionIds === null → 직접 진입 fallback(전체). 기존 동작과 동일해 회귀 없음
+  const orderItems = useMemo(
+    () =>
+      orderOptionIds
+        ? items.filter((i) => orderOptionIds.includes(i.product_option_id))
+        : items,
+    [items, orderOptionIds]
+  )
+
+  const subtotal = mounted
+    ? orderItems
+        .filter((i) => !i.soldout)
+        .reduce((s, i) => s + (i.price + i.extra_price) * i.quantity, 0)
+    : 0
+  const hasFreeShippingItem =
+    mounted && orderItems.some((item) => item.free_shipping)
   const shippingFee = calculateShippingFee(subtotal, { hasFreeShippingItem })
   const totalDiscount = couponDiscount + pointUsed
   const finalAmount = subtotal - totalDiscount + shippingFee
@@ -117,7 +136,7 @@ const CheckoutPage = () => {
       return
     }
 
-    if (items.length === 0) return
+    if (orderItems.length === 0) return
 
     setLoading(true)
 
@@ -135,7 +154,7 @@ const CheckoutPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: items.map((item) => ({
+          items: orderItems.map((item) => ({
             product_id: item.product_id,
             product_option_id: item.product_option_id,
             product_name: item.product_name,
@@ -179,9 +198,9 @@ const CheckoutPage = () => {
         amount: { currency: "KRW" as const, value: paid_amount },
         orderId: order_no,
         orderName:
-          items.length === 1
-            ? items[0].product_name
-            : `${items[0].product_name} 외 ${items.length - 1}건`,
+          orderItems.length === 1
+            ? orderItems[0].product_name
+            : `${orderItems[0].product_name} 외 ${orderItems.length - 1}건`,
         successUrl: `${window.location.origin}/api/payments/confirm?order_id=${order_id}`,
         failUrl: `${window.location.origin}/checkout?error=payment_failed`,
       }
@@ -265,7 +284,7 @@ const CheckoutPage = () => {
     )
   }
 
-  if (items.length === 0) {
+  if (orderItems.length === 0) {
     return (
       <div className="container py-8">
         <h1 className="text-xl font-bold mb-6">주문서</h1>
@@ -294,7 +313,7 @@ const CheckoutPage = () => {
               className="flex items-center justify-between w-full"
             >
               <h3 className="font-semibold">
-                주문 상품 ({items.length}개)
+                주문 상품 ({orderItems.length}개)
               </h3>
               {showItems ? (
                 <ChevronUp className="h-4 w-4" />
@@ -304,7 +323,7 @@ const CheckoutPage = () => {
             </button>
             {showItems && (
               <div className="mt-3 space-y-3">
-                {items.map((item) => (
+                {orderItems.map((item) => (
                   <div
                     key={item.product_option_id}
                     className="flex gap-3 py-2"
