@@ -202,6 +202,8 @@ const AdminProductsPage = () => {
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  // 입력값과 쿼리 트리거 분리 — search만 fetchProducts 의존성(제출 시 갱신)
+  const [searchInput, setSearchInput] = useState("")
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingCell, setEditingCell] = useState<EditingCell>(null)
@@ -253,6 +255,7 @@ const AdminProductsPage = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setSearch(searchInput)
     setPage(1)
   }
 
@@ -515,8 +518,8 @@ const AdminProductsPage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="상품명 검색"
             className="pl-9"
           />
