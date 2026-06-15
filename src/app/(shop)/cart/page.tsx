@@ -226,7 +226,13 @@ const CartPage = () => {
               className="w-full"
               size="lg"
               disabled={selectedItems.length === 0}
-              onClick={() => router.push("/checkout")}
+              onClick={() => {
+                sessionStorage.setItem(
+                  "checkout_option_ids",
+                  JSON.stringify(selectedIds)
+                )
+                router.push("/checkout")
+              }}
             >
               주문하기 ({selectedItems.length}개)
             </Button>
