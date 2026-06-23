@@ -8,6 +8,30 @@
 import { GoogleAuth } from "google-auth-library"
 import { restorePrivateKey } from "./helpers"
 
+// 단일 GSC HTTP 호출 wall-clock 상한. 초과 시 fetch가 AbortError throw →
+// URL 검사는 호출부에서 건별 격리, 검색성과는 핸들러 catch. 한 호출이 함수 전체를 멈추지 않게
+// (순차 URL 검사가 maxDuration 120s를 넘겨 504 나던 결함의 1차 방어선).
+const GSC_REQUEST_TIMEOUT_MS = 15_000
+// OAuth 토큰 발급 상한. google-auth-library는 AbortSignal 미지원이라 토큰 발급이 멈추면
+// fetch 타임아웃·예산 가드를 모두 우회한다 → 유일하게 남은 무제한 경로를 race로 차단.
+const GSC_AUTH_TIMEOUT_MS = 10_000
+
+// Promise에 wall-clock 상한 부여(AbortSignal 못 거는 경로용). 정상 완료 시 타이머 정리.
+const withTimeout = <T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} ${ms}ms 타임아웃 초과`)),
+      ms,
+    )
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 // ---------------------------------------------------------------------------
 // 공개 타입
 // ---------------------------------------------------------------------------
@@ -78,10 +102,17 @@ export const getAccessToken = async (): Promise<string> => {
     scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
   })
 
-  const client = await auth.getClient()
-  const tokenResponse = await client.getAccessToken()
+  // getClient + getAccessToken을 단일 10s 예산으로 race(무제한 OAuth 행 차단).
+  const token = await withTimeout(
+    (async () => {
+      const client = await auth.getClient()
+      const tokenResponse = await client.getAccessToken()
+      return tokenResponse.token
+    })(),
+    GSC_AUTH_TIMEOUT_MS,
+    "GSC access token 발급",
+  )
 
-  const token = tokenResponse.token
   if (!token) {
     throw new Error("GSC access token 발급 실패 — token이 null/undefined")
   }
@@ -163,6 +194,7 @@ export const searchAnalyticsQuery = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(GSC_REQUEST_TIMEOUT_MS),
     })
 
     if (!response.ok) {
@@ -234,6 +266,7 @@ export const urlInspect = async (
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ inspectionUrl, siteUrl }),
+    signal: AbortSignal.timeout(GSC_REQUEST_TIMEOUT_MS),
   })
 
   if (!response.ok) {
