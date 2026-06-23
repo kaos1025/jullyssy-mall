@@ -14,6 +14,7 @@ import {
   Sparkles,
   ArrowLeftRight,
   FileText,
+  BarChart2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -28,6 +29,7 @@ const menuItems = [
   { href: "/admin/banners", label: "띠배너", icon: Megaphone },
   { href: "/admin/event-categories", label: "이벤트 카테고리", icon: Sparkles },
   { href: "/admin/seo-drafts", label: "SEO Draft 검토", icon: FileText },
+  { href: "/admin/seo-performance", label: "검색 성과", icon: BarChart2 },
   { href: "/admin/settings/category-mapping", label: "카테고리 매핑", icon: ArrowLeftRight },
 ]
 

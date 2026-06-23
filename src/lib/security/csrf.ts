@@ -12,10 +12,16 @@ const STATE_CHANGING_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 // 라우트는 Bearer CRON_SECRET으로 보호되고 쿠키/세션을 쓰지 않는다(ambient-credential 부재) →
 // CSRF(브라우저 위조 방지)는 구조적으로 무관하므로 면제가 보호를 약화시키지 않는다.
 // 면제 범위 최소화: prefix가 아니라 경로별 명시 추가(신규 cron 라우트는 개별 등록).
+//
+// /api/cron/gsc-sync, /api/cron/gsc-backfill — 신규 GSC 동기화 cron 라우트.
+// shipping-poll과 동일: pg_net이 Origin 없이 POST 호출 + Bearer CRON_SECRET 보호 + 세션 미사용 →
+// 같은 근거로 CSRF 면제(개별 경로 명시).
 const CSRF_EXEMPT_PATHS = [
   "/api/payments/webhook",
   "/api/dev/",
   "/api/cron/shipping-poll",
+  "/api/cron/gsc-sync",
+  "/api/cron/gsc-backfill",
 ]
 
 const PRODUCTION_ORIGINS = [
