@@ -20,7 +20,14 @@ export const maxDuration = 120
 
 // 무료 쿼터 보호 — URL Inspection은 ~2000/day·600/min. 1회 실행 회전 cap.
 const TRAILING_DAYS = 5
-const INSPECTION_CAP = 20
+const INSPECTION_CAP = 12
+// URL Inspection 병렬 동시성 + 전체 wall-clock 예산. 순차 호출이 maxDuration(120s)을 넘겨
+// 504 나던 결함 수정 — 병렬 + 예산으로 pg_net(60s)·maxDuration 내로 바운드.
+// 예산 초과분은 다음 회전(inspected_at 오래된순)이 처리.
+const INSPECTION_CONCURRENCY = 5
+// deadline은 핸들러 진입 시각 기준(auth+analytics 소요도 예산에 포함) → 최악 ~48s로
+// pg_net(60s)·maxDuration(120s) 안에 바운드. 초과분 URL은 다음 회전이 처리.
+const WALLCLOCK_BUDGET_MS = 35_000
 // 동시성 락: 진행중 'daily' 행이 이 시간 내면 중복 invocation으로 보고 skip.
 const LOCK_WINDOW_MS = 10 * 60 * 1000
 // 정적 후보 경로(상품 PDP 외 핵심 인덱서블 URL).
@@ -71,6 +78,8 @@ const handler = async (request: NextRequest) => {
   let phase = "lock"
   // 실 모드에서 잡은 락 행 id. dryRun은 null 유지.
   let lockId: number | null = null
+  // URL 검사 단계 wall-clock 예산 기준점(핸들러 진입 시각 기준).
+  const deadlineMs = Date.now() + WALLCLOCK_BUDGET_MS
 
   try {
     // ── 동시성 락(soft) ──────────────────────────────────────────────────────
@@ -177,6 +186,7 @@ const handler = async (request: NextRequest) => {
       siteUrl,
       accessToken,
       dryRun,
+      deadlineMs,
     )
     totalUpserted += inspectionResult.upserted
     logs.push({
@@ -237,14 +247,15 @@ const handler = async (request: NextRequest) => {
   }
 }
 
-// ACTIVE 상품 PDP + 정적 경로 중 미검사/최오래된 ~20개를 inspect → upsert.
-// 한 건 실패가 전체를 중단시키지 않도록 건별 try/catch(격리).
+// ACTIVE 상품 PDP + 정적 경로 중 미검사/최오래된 URL을 동시성 병렬 + 예산 내로 inspect → upsert.
+// 한 건 실패가 전체를 중단시키지 않도록 건별 try/catch(격리). 예산 초과분은 다음 회전이 처리.
 const runUrlInspectionRotation = async (
   admin: Admin,
   siteOrigin: string,
   siteUrl: string,
   accessToken: string,
   dryRun: boolean,
+  deadlineMs: number,
 ): Promise<{ upserted: number; apiCalls: number }> => {
   // 후보 경로 수집: 정적 + ACTIVE 상품(slug || id).
   const { data: products, error: productsError } = await admin
@@ -285,16 +296,14 @@ const runUrlInspectionRotation = async (
 
   const targets = ordered.slice(0, INSPECTION_CAP)
 
-  let upserted = 0
-  let apiCalls = 0
-  for (const urlPath of targets) {
+  // 한 건 처리: 검사 + (비-dryRun) upsert. 건별 격리 → 성공 1 / 실패 0.
+  const inspectOne = async (urlPath: string): Promise<number> => {
     try {
       const result = await urlInspect({
         siteUrl,
         accessToken,
         inspectionUrl: `${siteOrigin}${urlPath}`,
       })
-      apiCalls += 1
       if (!dryRun) {
         const { error } = await admin.from("gsc_url_inspections").upsert(
           {
@@ -310,14 +319,26 @@ const runUrlInspectionRotation = async (
         )
         if (error) throw error
       }
-      upserted += 1
+      return 1
     } catch (err) {
-      // 건별 격리: 한 URL 실패가 회전 전체를 멈추지 않게. dead-letter로 Sentry(선택).
+      // 건별 격리: 한 URL 실패가 회전 전체를 멈추지 않게. dead-letter로 Sentry.
       Sentry.captureException(err, {
         tags: { type: "gsc.sync", phase: "url_inspection_item" },
         extra: { urlPath },
       })
+      return 0
     }
+  }
+
+  // 동시성 cap 단위 병렬 + wall-clock 예산. 예산 초과 시 break → 남은 URL은 다음 회전.
+  let upserted = 0
+  let apiCalls = 0
+  for (let i = 0; i < targets.length; i += INSPECTION_CONCURRENCY) {
+    if (Date.now() > deadlineMs) break
+    const chunk = targets.slice(i, i + INSPECTION_CONCURRENCY)
+    const results = await Promise.all(chunk.map(inspectOne))
+    apiCalls += chunk.length
+    upserted += results.reduce((sum, n) => sum + n, 0)
   }
 
   return { upserted, apiCalls }

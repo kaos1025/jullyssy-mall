@@ -21,6 +21,9 @@ export const maxDuration = 300
 const CHUNK_DAYS = 60
 // 1회 invocation 호출수 hard cap(쿼터·시간 보호). 도달 시 즉시 중단(다음 invocation이 이어받음).
 const API_CALL_CAP = 120
+// 전체 wall-clock 예산(maxDuration 300s 미만). per-call 타임아웃이 느린 호출을 끊어도
+// 다수 누적이 함수 강제종료를 넘기지 않게 하한선. 초과 시 중단 → 다음 invocation 이어받음.
+const WALLCLOCK_BUDGET_MS = 240_000
 const MS_PER_DAY = 86_400_000
 // 백필 하한 — 16개월 전. GSC 보존 한계.
 const FLOOR_MONTHS = 16
@@ -51,6 +54,7 @@ const handler = async (request: NextRequest) => {
 
   const admin = createAdminClient()
   let phase = "plan"
+  const deadlineMs = Date.now() + WALLCLOCK_BUDGET_MS
 
   try {
     const today = new Date()
@@ -141,9 +145,9 @@ const handler = async (request: NextRequest) => {
     let reachedFloor = false
 
     for (let dayMs = chunkEndMs; dayMs >= chunkFloorMs; dayMs -= MS_PER_DAY) {
-      // hard cap: 호출수 도달 시 중단(다음 invocation이 이어받음).
+      // hard cap: 호출수 또는 wall-clock 예산 도달 시 중단(다음 invocation이 이어받음).
       // 하루 = query + page 2콜 → cap 직전 여유(+2) 확보.
-      if (apiCalls + 2 > API_CALL_CAP) break
+      if (apiCalls + 2 > API_CALL_CAP || Date.now() > deadlineMs) break
 
       const day = toGscDate(new Date(dayMs))
       const fetchedAt = new Date().toISOString()
