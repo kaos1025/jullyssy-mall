@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
+import { NaverAnalytics } from "@/components/analytics/NaverAnalytics"
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -64,6 +65,7 @@ const RootLayout = ({
         {children}
         <Toaster />
         <Analytics />
+        <NaverAnalytics />
       </body>
     </html>
   )
