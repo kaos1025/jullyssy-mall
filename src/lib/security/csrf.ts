@@ -16,12 +16,16 @@ const STATE_CHANGING_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
 // /api/cron/gsc-sync, /api/cron/gsc-backfill — 신규 GSC 동기화 cron 라우트.
 // shipping-poll과 동일: pg_net이 Origin 없이 POST 호출 + Bearer CRON_SECRET 보호 + 세션 미사용 →
 // 같은 근거로 CSRF 면제(개별 경로 명시).
+//
+// /api/cron/naver-sync — 신규 네이버 재고/상태 동기화 cron 라우트. pg_net이 Origin 없이
+// POST 호출 + Bearer CRON_SECRET 보호 + 세션 미사용 → 같은 근거로 CSRF 면제(개별 경로 명시).
 const CSRF_EXEMPT_PATHS = [
   "/api/payments/webhook",
   "/api/dev/",
   "/api/cron/shipping-poll",
   "/api/cron/gsc-sync",
   "/api/cron/gsc-backfill",
+  "/api/cron/naver-sync",
 ]
 
 const PRODUCTION_ORIGINS = [
