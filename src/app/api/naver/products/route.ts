@@ -3,7 +3,7 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
+import { getNaverAccessToken, NAVER_API_BASE, naverFetch } from "@/lib/naver"
 
 interface NaverSearchItem {
   originProductNo: number
@@ -40,17 +40,18 @@ const getHandler = async (request: NextRequest) => {
       searchBody.channelProductNos = [Number(keyword)]
     }
 
-    const listRes = await fetch(`${NAVER_API_BASE}/v1/products/search`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const listRes = await naverFetch(
+      `${NAVER_API_BASE}/v1/products/search`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(searchBody),
       },
-      body: JSON.stringify(searchBody),
-    })
+      token
+    )
 
     if (!listRes.ok) throw new Error("상품 목록 조회 실패")
-    const listData = await listRes.json()
+    const listData = await listRes.json() as { contents?: NaverSearchItem[]; totalElements?: number }
     let naverProducts: NaverSearchItem[] = listData.contents || []
     const total = listData.totalElements || naverProducts.length
 

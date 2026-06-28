@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { revalidateTag } from "next/cache"
 import * as Sentry from "@sentry/nextjs"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
+import { getNaverAccessToken, NAVER_API_BASE, naverFetch } from "@/lib/naver"
 
 // Node 런타임 고정(default). createAdminClient(service role) + 네이버 커머스 REST(bcrypt 토큰) +
 // Sentry(Node)를 한 런타임에서. 캐시 금지(매 실행 신규 조회).
@@ -18,8 +18,6 @@ const SEARCH_CONCURRENCY = 5
 // 병렬 + 예산 + CAP으로 pg_net(60s)·maxDuration 내 바운드. 초과분은 다음 회전이 처리.
 const DETAIL_CONCURRENCY = 5
 const DETAIL_CAP = 80
-// per-call 타임아웃(단일 네이버 호출이 무한정 매달리지 않도록). gsc-sync와 동일 정책.
-const NAVER_CALL_TIMEOUT_MS = 15_000
 // 전체 wall-clock 예산. deadline은 핸들러 진입 시각 기준(auth+1단 소요도 예산에 포함) →
 // 최악도 pg_net(60s)·maxDuration(120s) 안에 바운드. 초과분 SALE 상세는 다음 회전이 처리.
 const WALLCLOCK_BUDGET_MS = 40_000
@@ -76,18 +74,6 @@ interface TargetProduct {
   naver_product_no: string
   options: TargetOption[]
 }
-
-// per-call 타임아웃을 입힌 네이버 fetch 래퍼. AbortSignal.timeout으로 단일 호출 상한.
-// 한 호출이 매달려도 전체 예산을 갉아먹지 않도록(gsc-sync per-call timeout 미러).
-const naverFetch = (url: string, init: RequestInit, token: string) =>
-  fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-    signal: AbortSignal.timeout(NAVER_CALL_TIMEOUT_MS),
-  })
 
 // 배열 청크 헬퍼.
 const chunk = <T>(arr: T[], size: number): T[][] => {

@@ -5,7 +5,7 @@ import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getNaverAccessToken, NAVER_API_BASE } from "@/lib/naver"
+import { getNaverAccessToken, NAVER_API_BASE, naverFetch } from "@/lib/naver"
 import { toSlug, dedupeSlug } from "@/lib/slug"
 import { extractFitFromDescription, extractFitFromTags } from "@/lib/seo/description-parser"
 import {
@@ -176,13 +176,14 @@ const importSingleProduct = async (
       let categoryName = naverCategoryName
       if (!categoryName) {
         try {
-          const catRes = await fetch(
+          const catRes = await naverFetch(
             `${NAVER_API_BASE}/v1/categories/${naverCategoryId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            {},
+            token
           )
           if (catRes.ok) {
             const catData = await catRes.json()
-            categoryName = catData.wholeCategoryName || null
+            categoryName = (catData as { wholeCategoryName?: string }).wholeCategoryName || null
           }
         } catch {
           // 카테고리명 조회 실패해도 임포트는 계속 진행
@@ -369,19 +370,20 @@ const postHandler = async (request: NextRequest) => {
 
         if (!channelNo) {
           // channelProductNo가 없으면 검색 API로 조회
-          const searchRes = await fetch(`${NAVER_API_BASE}/v1/products/search`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
+          const searchRes = await naverFetch(
+            `${NAVER_API_BASE}/v1/products/search`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                searchKeywordType: "PRODUCT_NO",
+                originProductNos: [Number(item.productNo)],
+                page: 1,
+                size: 1,
+              }),
             },
-            body: JSON.stringify({
-              searchKeywordType: "PRODUCT_NO",
-              originProductNos: [Number(item.productNo)],
-              page: 1,
-              size: 1,
-            }),
-          })
+            token
+          )
 
           if (!searchRes.ok) {
             failCount++
@@ -389,7 +391,7 @@ const postHandler = async (request: NextRequest) => {
             continue
           }
 
-          const searchData = await searchRes.json()
+          const searchData = await searchRes.json() as { contents?: { channelProducts?: { channelProductNo?: number }[] }[] }
           const found = searchData.contents?.[0]
           const foundChannelNo = found?.channelProducts?.[0]?.channelProductNo
 
@@ -403,9 +405,10 @@ const postHandler = async (request: NextRequest) => {
         }
 
         // 채널 상품 상세 조회
-        const detailRes = await fetch(
+        const detailRes = await naverFetch(
           `${NAVER_API_BASE}/v2/products/channel-products/${item.channelProductNo}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          {},
+          token
         )
 
         if (!detailRes.ok) {
@@ -414,7 +417,7 @@ const postHandler = async (request: NextRequest) => {
           continue
         }
 
-        const detail: ChannelProductDetail = await detailRes.json()
+        const detail = await detailRes.json() as ChannelProductDetail
         await importSingleProduct(admin, item.productNo, detail, token, existingSlugs)
         successCount++
         // 이미 존재하는 상품(skipped)도 성공으로 카운트
