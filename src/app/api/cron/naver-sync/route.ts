@@ -14,13 +14,20 @@ const SEARCH_CHUNK_SIZE = 100
 // 1단 검색 청크 동시성. 순차면 카탈로그 확대(645≈7청크×15s=105s) 시 pg_net 60s 초과 →
 // 병렬(5) + 예산 가드로 바운드(645도 ~2웨이브 ≈ 30s).
 const SEARCH_CONCURRENCY = 5
-// 2단(상세 조회) 동시성 + 1회 실행 회전 cap. 순차 호출이 maxDuration(120s)을 넘기지 않도록
-// 병렬 + 예산 + CAP으로 pg_net(60s)·maxDuration 내 바운드. 초과분은 다음 회전이 처리.
-const DETAIL_CONCURRENCY = 5
+// 2단(상세 조회) 동시성 + 1회 실행 회전 cap. 네이버 rate limit(429) 회피 위해 동시성 낮춤(5→2)
+// + 배치 간 throttle + 429/5xx 백오프 재시도. 초과분은 다음 회전이 처리.
+const DETAIL_CONCURRENCY = 2
 const DETAIL_CAP = 80
-// 전체 wall-clock 예산. deadline은 핸들러 진입 시각 기준(auth+1단 소요도 예산에 포함) →
-// 최악도 pg_net(60s)·maxDuration(120s) 안에 바운드. 초과분 SALE 상세는 다음 회전이 처리.
-const WALLCLOCK_BUDGET_MS = 40_000
+// 상세 429/5xx 재시도 횟수 — Retry-After 존중(cap), 없으면 지수 백오프. deadline 내에서만.
+const DETAIL_MAX_RETRIES = 3
+// 백오프 상한(초당 과도 대기 방지).
+const DETAIL_BACKOFF_CAP_MS = 5_000
+// 배치 간 throttle(rate 평탄화).
+const DETAIL_THROTTLE_MS = 250
+// 전체 wall-clock 예산. deadline은 핸들러 진입 시각 기준(auth+1단 소요도 예산에 포함).
+// 70s — 상세 throttle/재시도 여유. 마지막 배치 overrun 포함 최악 ~90s < maxDuration(120s).
+// (053 pg_net timeout도 90s로 상향해 이 함수 응답을 대기.)
+const WALLCLOCK_BUDGET_MS = 70_000
 
 // pg_cron + pg_net이 vault 'naver_sync_auth' Bearer로 호출. 인바운드 인증.
 // empty-secret 가드: CRON_SECRET 미설정 시 어떤 요청도 인증 실패(open-door 방지).
@@ -28,6 +35,42 @@ const isAuthorized = (request: NextRequest): boolean => {
   const secret = process.env.CRON_SECRET
   if (!secret) return false
   return request.headers.get("authorization") === `Bearer ${secret}`
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+// 상세 조회 + 429/5xx 백오프 재시도(deadline 내). Retry-After(초) 우선, 없으면 지수(1·2·4s) cap 5s.
+// 429(rate limit)는 일시적이라 재시도로 대부분 통과. deadline 초과 시 재시도 중단(throw → 다음 회전).
+const fetchNaverDetail = async (
+  channelProductNo: number,
+  token: string,
+  deadlineMs: number,
+): Promise<Awaited<ReturnType<typeof naverFetch>>> => {
+  let attempt = 0
+  for (;;) {
+    const res = await naverFetch(
+      `${NAVER_API_BASE}/v2/products/channel-products/${channelProductNo}`,
+      {},
+      token,
+    )
+    if (res.ok) return res
+    const retriable = res.status === 429 || res.status >= 500
+    if (!retriable || attempt >= DETAIL_MAX_RETRIES) {
+      throw new Error(`상세 조회 실패(${res.status})`)
+    }
+    const retryAfterSec = Number(res.headers.get("retry-after"))
+    const backoffMs = Math.min(
+      Number.isFinite(retryAfterSec) && retryAfterSec > 0
+        ? retryAfterSec * 1000
+        : 1000 * 2 ** attempt,
+      DETAIL_BACKOFF_CAP_MS,
+    )
+    if (Date.now() + backoffMs > deadlineMs) {
+      throw new Error(`상세 조회 실패(${res.status}, 예산 초과 재시도 중단)`)
+    }
+    await sleep(backoffMs)
+    attempt++
+  }
 }
 
 // 네이버 검색(/v1/products/search, searchKeywordType:PRODUCT_NO) 응답 형태.
@@ -299,14 +342,11 @@ const handler = async (request: NextRequest) => {
       channelProductNo: number
     }): Promise<number> => {
       try {
-        const detailRes = await naverFetch(
-          `${NAVER_API_BASE}/v2/products/channel-products/${entry.channelProductNo}`,
-          {},
+        const detailRes = await fetchNaverDetail(
+          entry.channelProductNo,
           token,
+          deadlineMs,
         )
-        if (!detailRes.ok) {
-          throw new Error(`상세 조회 실패(${detailRes.status})`)
-        }
         const detail = (await detailRes.json()) as NaverChannelProductDetail
         const op = detail.originProduct
         const optionInfo = op?.detailAttribute?.optionInfo
@@ -363,6 +403,7 @@ const handler = async (request: NextRequest) => {
 
     for (let i = 0; i < detailTargets.length; i += DETAIL_CONCURRENCY) {
       if (Date.now() > deadlineMs) break // 예산 초과 → 남은 SALE 상세는 다음 회전.
+      if (i > 0) await sleep(DETAIL_THROTTLE_MS) // 배치 간 throttle(429 회피).
       const slice = detailTargets.slice(i, i + DETAIL_CONCURRENCY)
       const results = await Promise.all(slice.map(syncOne))
       const ok = results.reduce((sum, n) => sum + n, 0)

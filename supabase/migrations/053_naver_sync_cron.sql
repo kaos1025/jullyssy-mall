@@ -35,7 +35,7 @@ SELECT cron.schedule(
       'Authorization', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'naver_sync_auth' LIMIT 1)
     ),
     body := '{}'::jsonb,
-    timeout_milliseconds := 60000
+    timeout_milliseconds := 90000  -- 라우트 wall-clock 예산 70s(상세 throttle/429 재시도) 응답 대기. maxDuration 120s 미만.
   );
   $cron$
 );

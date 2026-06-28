@@ -90,6 +90,14 @@ const makeFailResponse = (status = 500) => ({
   json: async () => ({ message: "error" }),
 })
 
+/** 429 Rate Limit 응답 — Retry-After 헤더 없음(지수 백오프 경로) */
+const makeRateLimitResponse = () => ({
+  ok: false,
+  status: 429,
+  headers: { get: () => null }, // no Retry-After → exponential backoff (1000ms)
+  json: async () => ({}),
+})
+
 // ---------------------------------------------------------------------------
 // Supabase admin mock builder
 // ---------------------------------------------------------------------------
@@ -468,6 +476,35 @@ describe("POST /api/cron/naver-sync", () => {
       const body = await res.json()
       expect(body.ok).toBe(true)
     })
+
+    it("상세 429 → 백오프 재시도 후 성공(stock 갱신)", async () => {
+      const products: ProductRow[] = [
+        {
+          id: "prod-retry",
+          naver_product_no: "750",
+          product_options: [
+            { id: "opt-retry-1", naver_option_id: "75001", stock: 0 },
+          ],
+        },
+      ]
+      const { client, spies } = makeAdminClient({ products })
+      createAdminClient.mockReturnValue(client)
+
+      // 1단 search → SALE, 2단 상세: 첫 호출 429, 두 번째 호출 200(재고 7)
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 750, statusType: "SALE", channelProductNo: 7501 }]),
+        )
+        .mockResolvedValueOnce(makeRateLimitResponse())
+        .mockResolvedValueOnce(makeDetailResponse([{ id: 75001, stockQuantity: 7 }]))
+
+      const res = await POST(makeReq("Bearer test-secret"))
+      const body = await res.json()
+
+      expect(body.ok).toBe(true)
+      // 429 후 재시도 성공 → 옵션 재고가 7로 갱신됨
+      expect(spies.productOptionsUpdateSpy).toHaveBeenCalledWith({ stock: 7 })
+    }, 10_000)
 
     it("non-dryRun 정상 경로 → naver_sync_logs.insert 호출됨", async () => {
       const products: ProductRow[] = [
