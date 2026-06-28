@@ -8,11 +8,13 @@ import type { NextRequest } from "next/server"
 const {
   createAdminClient,
   getNaverAccessToken,
+  naverFetch,
   captureException,
   revalidateTag,
 } = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   getNaverAccessToken: vi.fn(),
+  naverFetch: vi.fn(),
   captureException: vi.fn(),
   revalidateTag: vi.fn(),
 }))
@@ -20,6 +22,7 @@ const {
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient }))
 vi.mock("@/lib/naver", () => ({
   getNaverAccessToken,
+  naverFetch,
   NAVER_API_BASE: "https://naver-api.test",
 }))
 vi.mock("@sentry/nextjs", () => ({ captureException }))
@@ -28,15 +31,64 @@ vi.mock("next/cache", () => ({ revalidateTag }))
 import { POST } from "./route"
 
 // ---------------------------------------------------------------------------
-// Global fetch mock (네이버 API 호출)
+// naverFetch mock response builders
+// naverFetch returns undici-Response-like objects: { ok, status, json }
 // ---------------------------------------------------------------------------
 
-// 기본 Naver search 응답: 빈 contents
-const defaultSearchResponse = (): Response =>
-  new Response(JSON.stringify({ contents: [] }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  })
+/** 단일 상품 search 응답 빌더 */
+const makeSearchResponse = (
+  items: Array<{
+    originProductNo: number
+    statusType: string
+    channelProductNo?: number
+  }>,
+) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({
+    contents: items.map((item) => ({
+      originProductNo: item.originProductNo,
+      channelProducts: [
+        {
+          channelProductNo: item.channelProductNo ?? item.originProductNo + 1000,
+          statusType: item.statusType,
+        },
+      ],
+    })),
+  }),
+})
+
+/** 기본 Naver search 응답: 빈 contents */
+const defaultSearchResponse = () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ contents: [] }),
+})
+
+/** 상세 응답 빌더 (SALE stage2 용) */
+const makeDetailResponse = (
+  optionCombinations: Array<{ id: number; stockQuantity: number }>,
+) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({
+    originProduct: {
+      stockQuantity: optionCombinations[0]?.stockQuantity ?? 0,
+      detailAttribute: {
+        optionInfo: {
+          optionCombinations,
+        },
+      },
+    },
+  }),
+})
+
+/** 500 실패 응답 */
+const makeFailResponse = (status = 500) => ({
+  ok: false,
+  status,
+  json: async () => ({ message: "error" }),
+})
 
 // ---------------------------------------------------------------------------
 // Supabase admin mock builder
@@ -176,51 +228,6 @@ const makeReq = (auth?: string, search = "") =>
   }) as unknown as NextRequest
 
 // ---------------------------------------------------------------------------
-// Fetch mock helpers
-// ---------------------------------------------------------------------------
-
-/** 단일 상품 search 응답 빌더 */
-const makeSearchResponse = (
-  items: Array<{
-    originProductNo: number
-    statusType: string
-    channelProductNo?: number
-  }>,
-): Response =>
-  new Response(
-    JSON.stringify({
-      contents: items.map((item) => ({
-        originProductNo: item.originProductNo,
-        channelProducts: [
-          {
-            channelProductNo: item.channelProductNo ?? item.originProductNo + 1000,
-            statusType: item.statusType,
-          },
-        ],
-      })),
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  )
-
-/** 상세 응답 빌더 (SALE stage2 용) */
-const makeDetailResponse = (
-  optionCombinations: Array<{ id: number; stockQuantity: number }>,
-): Response =>
-  new Response(
-    JSON.stringify({
-      originProduct: {
-        stockQuantity: optionCombinations[0]?.stockQuantity ?? 0,
-        detailAttribute: {
-          optionInfo: {
-            optionCombinations,
-          },
-        },
-      },
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  )
-
-// ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
@@ -230,8 +237,8 @@ beforeEach(() => {
 
   getNaverAccessToken.mockResolvedValue("fake-naver-token")
 
-  // 기본 fetch: search → 빈 결과 (HIDDEN 처리 경로가 기본)
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(defaultSearchResponse()))
+  // 기본 naverFetch: search → 빈 결과 (HIDDEN 처리 경로가 기본)
+  naverFetch.mockResolvedValue(defaultSearchResponse())
 })
 
 // ---------------------------------------------------------------------------
@@ -291,11 +298,8 @@ describe("POST /api/cron/naver-sync", () => {
       createAdminClient.mockReturnValue(client)
 
       // search → OUTOFSTOCK
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
-          makeSearchResponse([{ originProductNo: 111, statusType: "OUTOFSTOCK", channelProductNo: 1111 }]),
-        ),
+      naverFetch.mockResolvedValue(
+        makeSearchResponse([{ originProductNo: 111, statusType: "OUTOFSTOCK", channelProductNo: 1111 }]),
       )
 
       await POST(makeReq("Bearer test-secret", "dryRun=1"))
@@ -315,10 +319,7 @@ describe("POST /api/cron/naver-sync", () => {
       createAdminClient.mockReturnValue(client)
 
       // search → 빈 contents (= 스토어 삭제 → HIDDEN 경로)
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(new Response(JSON.stringify({ contents: [] }), { status: 200 })),
-      )
+      naverFetch.mockResolvedValue(defaultSearchResponse())
 
       await POST(makeReq("Bearer test-secret", "dryRun=1"))
 
@@ -336,23 +337,12 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
+      // 1단 search → SALE, 2단 detail → stock 7
+      naverFetch
+        .mockResolvedValueOnce(
           makeSearchResponse([{ originProductNo: 333, statusType: "SALE", channelProductNo: 3333 }]),
-        ),
-      )
-      // stage2 detail 도 mock 해야 fetch가 두 번 호출됨
-      // 두 번째 호출(상세)도 간단한 응답 반환
-      vi.stubGlobal(
-        "fetch",
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            makeSearchResponse([{ originProductNo: 333, statusType: "SALE", channelProductNo: 3333 }]),
-          )
-          .mockResolvedValueOnce(makeDetailResponse([{ id: 999, stockQuantity: 7 }])),
-      )
+        )
+        .mockResolvedValueOnce(makeDetailResponse([{ id: 999, stockQuantity: 7 }]))
 
       await POST(makeReq("Bearer test-secret", "dryRun=1"))
 
@@ -376,11 +366,8 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
-          makeSearchResponse([{ originProductNo: 500, statusType: "OUTOFSTOCK", channelProductNo: 5001 }]),
-        ),
+      naverFetch.mockResolvedValue(
+        makeSearchResponse([{ originProductNo: 500, statusType: "OUTOFSTOCK", channelProductNo: 5001 }]),
       )
 
       await POST(makeReq("Bearer test-secret"))
@@ -399,11 +386,8 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
-          makeSearchResponse([{ originProductNo: 501, statusType: "SUSPENSION", channelProductNo: 5011 }]),
-        ),
+      naverFetch.mockResolvedValue(
+        makeSearchResponse([{ originProductNo: 501, statusType: "SUSPENSION", channelProductNo: 5011 }]),
       )
 
       await POST(makeReq("Bearer test-secret"))
@@ -423,12 +407,7 @@ describe("POST /api/cron/naver-sync", () => {
       createAdminClient.mockReturnValue(client)
 
       // search → 빈 contents (미반환 = 스토어 삭제)
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
-          new Response(JSON.stringify({ contents: [] }), { status: 200 }),
-        ),
-      )
+      naverFetch.mockResolvedValue(defaultSearchResponse())
 
       await POST(makeReq("Bearer test-secret"))
 
@@ -448,19 +427,14 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      // 1단 search → SALE
-      // 2단 detail → optionCombinations with matching naver_option_id=77001
-      vi.stubGlobal(
-        "fetch",
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            makeSearchResponse([{ originProductNo: 700, statusType: "SALE", channelProductNo: 7001 }]),
-          )
-          .mockResolvedValueOnce(
-            makeDetailResponse([{ id: 77001, stockQuantity: 15 }]),
-          ),
-      )
+      // 1단 search → SALE, 2단 detail → optionCombinations matching naver_option_id=77001
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 700, statusType: "SALE", channelProductNo: 7001 }]),
+        )
+        .mockResolvedValueOnce(
+          makeDetailResponse([{ id: 77001, stockQuantity: 15 }]),
+        )
 
       await POST(makeReq("Bearer test-secret"))
 
@@ -481,17 +455,13 @@ describe("POST /api/cron/naver-sync", () => {
       const { client } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            makeSearchResponse([{ originProductNo: 701, statusType: "SALE", channelProductNo: 7011 }]),
-          )
-          .mockResolvedValueOnce(
-            makeDetailResponse([{ id: 77002, stockQuantity: 8 }]),
-          ),
-      )
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 701, statusType: "SALE", channelProductNo: 7011 }]),
+        )
+        .mockResolvedValueOnce(
+          makeDetailResponse([{ id: 77002, stockQuantity: 8 }]),
+        )
 
       const res = await POST(makeReq("Bearer test-secret"))
       expect(res.status).toBe(200)
@@ -510,17 +480,13 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            makeSearchResponse([{ originProductNo: 800, statusType: "SALE", channelProductNo: 8001 }]),
-          )
-          .mockResolvedValueOnce(
-            makeDetailResponse([{ id: 88001, stockQuantity: 3 }]),
-          ),
-      )
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 800, statusType: "SALE", channelProductNo: 8001 }]),
+        )
+        .mockResolvedValueOnce(
+          makeDetailResponse([{ id: 88001, stockQuantity: 3 }]),
+        )
 
       await POST(makeReq("Bearer test-secret"))
 
@@ -560,11 +526,8 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
-          makeSearchResponse([{ originProductNo: 900, statusType: "OUTOFSTOCK", channelProductNo: 9001 }]),
-        ),
+      naverFetch.mockResolvedValue(
+        makeSearchResponse([{ originProductNo: 900, statusType: "OUTOFSTOCK", channelProductNo: 9001 }]),
       )
 
       await POST(makeReq("Bearer test-secret"))
@@ -590,12 +553,7 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(
-          new Response(JSON.stringify({ contents: [] }), { status: 200 }),
-        ),
-      )
+      naverFetch.mockResolvedValue(defaultSearchResponse())
 
       await POST(makeReq("Bearer test-secret"))
 
@@ -616,17 +574,13 @@ describe("POST /api/cron/naver-sync", () => {
       const { client, spies } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      vi.stubGlobal(
-        "fetch",
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            makeSearchResponse([{ originProductNo: 902, statusType: "SALE", channelProductNo: 9021 }]),
-          )
-          .mockResolvedValueOnce(
-            makeDetailResponse([{ id: parseInt("np3"), stockQuantity: 20 }]),
-          ),
-      )
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 902, statusType: "SALE", channelProductNo: 9021 }]),
+        )
+        .mockResolvedValueOnce(
+          makeDetailResponse([{ id: parseInt("np3"), stockQuantity: 20 }]),
+        )
 
       await POST(makeReq("Bearer test-secret"))
 
@@ -676,11 +630,8 @@ describe("POST /api/cron/naver-sync", () => {
       const { client } = makeAdminClient({ products })
       createAdminClient.mockReturnValue(client)
 
-      // search 실패 응답
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(new Response("Internal Server Error", { status: 500 })),
-      )
+      // naverFetch → search 실패 응답
+      naverFetch.mockResolvedValue(makeFailResponse(500))
 
       const res = await POST(makeReq("Bearer test-secret"))
       expect(res.status).toBe(200)

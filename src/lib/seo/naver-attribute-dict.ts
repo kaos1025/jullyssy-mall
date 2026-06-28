@@ -10,7 +10,7 @@
 //
 // Runtime: Vercel Node 전용 (네이버 import route). Edge worker에서 호출하지 않음.
 
-import { NAVER_API_BASE } from "@/lib/naver"
+import { NAVER_API_BASE, naverFetch } from "@/lib/naver"
 import type { FitType } from "@/lib/product/fit-type"
 
 // endpoint B 응답 항목 (실측 shape)
@@ -47,14 +47,11 @@ const fetchAttributeArray = async <T>(
   naverCategoryId: string,
   token: string,
 ): Promise<T[]> => {
-  const res = await fetch(
+  // naverFetch 경유 — 프록시(NAVER_PROXY_URL) 있으면 그쪽으로(고정IP). Authorization은 token 인자로 주입.
+  const res = await naverFetch(
     `${NAVER_API_BASE}${path}?categoryId=${encodeURIComponent(naverCategoryId)}`,
-    {
-      headers: {
-        Accept: "application/json;charset=UTF-8",
-        Authorization: `Bearer ${token}`,
-      },
-    },
+    { headers: { Accept: "application/json;charset=UTF-8" } },
+    token,
   )
   if (!res.ok) {
     throw new Error(`네이버 속성 조회 실패 (${path}): ${res.status}`)
