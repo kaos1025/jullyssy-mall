@@ -229,6 +229,96 @@
   text-transform: uppercase;
 }
 
+/* ============================================================
+   네이버 스마트스토어 SmartEditor ONE(se-*) 상세설명 렌더링 복원
+   ------------------------------------------------------------
+   임포트된 description은 SmartEditor ONE HTML(se-* 클래스)인데 자사몰에
+   SE 스타일시트가 없어 정렬·폰트위계·간격·이미지배치가 무너진다. 여기서
+   se-* 클래스를 .product-description 스코프로 재구현해 네이버에서 보이던
+   모습을 복원한다. 비파괴(DB 무변경) · 기존+미래 임포트 전수 적용.
+   ============================================================ */
+
+/* 컨테이너 기본값 — 자사 폰트(Pretendard) 상속, 한국어 줄바꿈, 모바일 오버플로 차단 */
+.product-description {
+  color: hsl(var(--foreground));
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.product-description * {
+  box-sizing: border-box;
+}
+
+/* --- 컴포넌트/섹션 레이아웃 --- */
+.product-description .se-component,
+.product-description .se-section,
+.product-description .se-module {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+/* 이미지 컴포넌트는 이음매(간격 0) — 슬라이스 상세컷 자연 연결 */
+.product-description .se-component {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+/* 텍스트 컴포넌트만 상하 여백으로 가독성 확보 */
+.product-description .se-component.se-text,
+.product-description .se-section-text {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* --- 텍스트/문단 정렬 --- */
+.product-description .se-text-paragraph {
+  margin: 0;
+}
+.product-description .se-text-paragraph-align-center,
+.product-description .se-section-align-center {
+  text-align: center;
+}
+.product-description .se-text-paragraph-align-justify {
+  text-align: justify;
+}
+/* se-text-paragraph-align- (빈 접미사) = 기본 좌측, 별도 선언 불필요 */
+
+/* --- 폰트 크기 (se-fs-fsNN = N px), 8개 샘플 전수에 등장하는 5종 --- */
+.product-description .se-fs-fs13 { font-size: 13px; }
+.product-description .se-fs-fs15 { font-size: 15px; }
+.product-description .se-fs-fs16 { font-size: 16px; }
+.product-description .se-fs-fs19 { font-size: 19px; }
+.product-description .se-fs-fs24 { font-size: 24px; }
+
+/* --- 이미지 (상세 본문 대부분) — block + 가운데 + 반응형 --- */
+.product-description .se-image,
+.product-description .se-section-image {
+  text-align: center;
+}
+.product-description .se-image-resource,
+.product-description img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* --- 리스트 --- */
+.product-description .se-text-list {
+  padding-left: 1.2em;
+  margin: 0.4em 0;
+}
+.product-description .se-text-list-type-bullet-disc { list-style: disc; }
+.product-description .se-text-list-item { margin: 0.2em 0; }
+
+/* --- 구분선 --- */
+.product-description .se-hr,
+.product-description hr {
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.2em auto;
+}
+
 /* 네이버 임포트 HTML의 인라인 빨강 스타일 중립화 */
 .product-description span[style*="color: rgb(231"],
 .product-description span[style*="color:#e74c3c"],
