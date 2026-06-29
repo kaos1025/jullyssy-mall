@@ -10,6 +10,7 @@ import { cache } from "react"
 import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { UUID_RE } from "@/lib/slug"
+import { sanitizeDescriptionHtml } from "@/lib/product/sanitize-description"
 import type { ProductImage, ProductOption } from "@/types"
 
 const REVALIDATE = 600
@@ -69,7 +70,10 @@ const fetchProductDetailFromDb = async (
     .eq("status", "ACTIVE")
     .maybeSingle() // 0건은 null(throw 금지) → page가 notFound() 처리
   if (error) throw new Error(error.message)
-  return (data as unknown as ProductDetail) ?? null
+  if (!data) return null // 0건은 null(throw 금지) → page가 notFound() 처리
+  const detail = data as unknown as ProductDetail
+  // 렌더 출력 경계 sanitize(XSS 하드닝). 캐시에 정화본 적재 → 요청당 재정화 없음. DB 원본 불변.
+  return { ...detail, description: sanitizeDescriptionHtml(detail.description) }
 }
 
 const fetchProductDetailCached = unstable_cache(

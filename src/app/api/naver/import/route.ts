@@ -234,6 +234,7 @@ const importSingleProduct = async (
       name,
       slug,
       description: detailContent,
+      description_raw: detailContent, // 네이버 원본 baseline 보존(이후 description은 SEO 변형 가능)
       price: originalPrice,
       sale_price: salePrice,
       category_id: categoryId,
