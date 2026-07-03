@@ -9,7 +9,12 @@ export const metadata: Metadata = {
   },
 }
 
-const scopes = ["mall.read_product", "mall.write_product", "mall.read_store"]
+const scopes = [
+  "mall.read_product",
+  "mall.write_product",
+  "mall.read_store",
+  "mall.read_category",
+]
 
 const buildAuthorizeUrl = () => {
   const mallId = process.env.CAFE24_MALL_ID
