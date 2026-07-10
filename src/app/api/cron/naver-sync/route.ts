@@ -115,6 +115,7 @@ interface TargetOption {
 interface TargetProduct {
   id: string
   naver_product_no: string
+  status: string
   options: TargetOption[]
 }
 
@@ -155,7 +156,7 @@ const handler = async (request: NextRequest) => {
     phase = "load_targets"
     const { data: productRows, error: productsError } = await admin
       .from("products")
-      .select("id, naver_product_no, product_options(id, naver_option_id, stock)")
+      .select("id, naver_product_no, status, product_options(id, naver_option_id, stock)")
       .not("naver_product_no", "is", null)
       .neq("status", "DELETED")
     if (productsError) throw productsError
@@ -164,12 +165,14 @@ const handler = async (request: NextRequest) => {
       (p: {
         id: string
         naver_product_no: string
+        status: string
         product_options:
           | { id: string; naver_option_id: string | null; stock: number | null }[]
           | null
       }) => ({
         id: p.id,
         naver_product_no: p.naver_product_no,
+        status: p.status,
         options: (p.product_options ?? []).map((o) => ({
           id: o.id,
           naver_option_id: o.naver_option_id,
@@ -274,8 +277,12 @@ const handler = async (request: NextRequest) => {
 
         // 비-SALE(OUTOFSTOCK/SUSPENSION 등) → 전 옵션 품절 처리(오버셀 차단). 상품 status 유지.
         try {
-          if (!dryRun && target.options.length > 0) {
-            const optionIds = target.options.map((o) => o.id)
+          // 미변경 skip: 이미 0인 옵션 재-쓰기는 no-op UPDATE(WAL·autovacuum churn +
+          // changeWritten 오염 → 매시 revalidateTag 캐시 파기)만 유발 — 변경분만 쓴다.
+          const optionIds = target.options
+            .filter((o) => o.stock !== 0)
+            .map((o) => o.id)
+          if (!dryRun && optionIds.length > 0) {
             const { error: stockErr } = await admin
               .from("product_options")
               .update({ stock: 0 })
@@ -311,6 +318,11 @@ const handler = async (request: NextRequest) => {
       if (returnedProductNos.has(target.naver_product_no)) continue
       // 청크 실패로 미반환된 상품은 삭제 오판 금지(검색 성공했으나 결과 미포함 = 진짜 삭제만 HIDDEN).
       if (chunkFailedProductNos.has(target.naver_product_no)) continue
+      // 이미 HIDDEN이면 재-쓰기 skip(매 회전 no-op UPDATE 방지). 판정 자체는 성공 집계.
+      if (target.status === "HIDDEN") {
+        successCount++
+        continue
+      }
       try {
         if (!dryRun) {
           const { error: hideErr } = await admin
@@ -364,6 +376,9 @@ const handler = async (request: NextRequest) => {
           for (const opt of entry.product.options) {
             if (!opt.naver_option_id) continue
             const newStock = stockByNaverId.get(opt.naver_option_id) ?? 0
+            // 미변경 skip: 무조건 쓰기가 하루 ~8천건 no-op UPDATE + 매시
+            // revalidateTag("products") 캐시 워밍 파기의 원인이었음(2026-07-10 실측).
+            if (newStock === opt.stock) continue
             if (!dryRun) {
               const { error: updErr } = await admin
                 .from("product_options")
@@ -376,8 +391,11 @@ const handler = async (request: NextRequest) => {
         } else {
           // 옵션 없음(단일 기본옵션) → originProduct.stockQuantity로 모든 옵션 갱신.
           const defaultStock = op?.stockQuantity ?? 0
-          if (!dryRun && entry.product.options.length > 0) {
-            const optionIds = entry.product.options.map((o) => o.id)
+          // 미변경 skip — combinations 분기와 동일 원칙(변경분만 쓰기).
+          const optionIds = entry.product.options
+            .filter((o) => o.stock !== defaultStock)
+            .map((o) => o.id)
+          if (!dryRun && optionIds.length > 0) {
             const { error: updErr } = await admin
               .from("product_options")
               .update({ stock: defaultStock })
