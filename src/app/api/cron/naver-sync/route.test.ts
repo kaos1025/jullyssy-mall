@@ -120,6 +120,7 @@ interface ProductOptionRow {
 interface ProductRow {
   id: string
   naver_product_no: string
+  status?: string
   product_options: ProductOptionRow[] | null
 }
 
@@ -530,6 +531,105 @@ describe("POST /api/cron/naver-sync", () => {
       expect(spies.naverSyncLogsInsertSpy).toHaveBeenCalledOnce()
       const insertArg = spies.naverSyncLogsInsertSpy.mock.calls[0][0] as Record<string, unknown>
       expect(insertArg).toMatchObject({ sync_type: "STOCK_SYNC" })
+    })
+  })
+
+  // ── 조건부 쓰기 (미변경 skip) ────────────────────────────────────────────
+  describe("조건부 쓰기 (미변경 skip)", () => {
+    it("SALE 상세 재고가 기존과 동일 → product_options.update·revalidateTag 미호출", async () => {
+      const products: ProductRow[] = [
+        {
+          id: "prod-same",
+          naver_product_no: "710",
+          product_options: [
+            { id: "opt-same-1", naver_option_id: "71001", stock: 15 },
+          ],
+        },
+      ]
+      const { client, spies } = makeAdminClient({ products })
+      createAdminClient.mockReturnValue(client)
+
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 710, statusType: "SALE", channelProductNo: 7101 }]),
+        )
+        .mockResolvedValueOnce(makeDetailResponse([{ id: 71001, stockQuantity: 15 }]))
+
+      const res = await POST(makeReq("Bearer test-secret"))
+      const body = await res.json()
+
+      expect(body.ok).toBe(true)
+      expect(spies.productOptionsUpdateSpy).not.toHaveBeenCalled()
+      expect(revalidateTag).not.toHaveBeenCalled()
+    })
+
+    it("SALE 상세 재고 변경 → update + revalidateTag('products') 호출", async () => {
+      const products: ProductRow[] = [
+        {
+          id: "prod-diff",
+          naver_product_no: "711",
+          product_options: [
+            { id: "opt-diff-1", naver_option_id: "71101", stock: 3 },
+          ],
+        },
+      ]
+      const { client, spies } = makeAdminClient({ products })
+      createAdminClient.mockReturnValue(client)
+
+      naverFetch
+        .mockResolvedValueOnce(
+          makeSearchResponse([{ originProductNo: 711, statusType: "SALE", channelProductNo: 7111 }]),
+        )
+        .mockResolvedValueOnce(makeDetailResponse([{ id: 71101, stockQuantity: 9 }]))
+
+      await POST(makeReq("Bearer test-secret"))
+
+      expect(spies.productOptionsUpdateSpy).toHaveBeenCalledWith({ stock: 9 })
+      expect(revalidateTag).toHaveBeenCalledWith("products")
+    })
+
+    it("OUTOFSTOCK인데 전 옵션 이미 stock 0 → product_options.update 미호출", async () => {
+      const products: ProductRow[] = [
+        {
+          id: "prod-zero",
+          naver_product_no: "712",
+          product_options: [
+            { id: "opt-zero-1", naver_option_id: "nz1", stock: 0 },
+            { id: "opt-zero-2", naver_option_id: "nz2", stock: 0 },
+          ],
+        },
+      ]
+      const { client, spies } = makeAdminClient({ products })
+      createAdminClient.mockReturnValue(client)
+
+      naverFetch.mockResolvedValue(
+        makeSearchResponse([{ originProductNo: 712, statusType: "OUTOFSTOCK", channelProductNo: 7121 }]),
+      )
+
+      await POST(makeReq("Bearer test-secret"))
+
+      expect(spies.productOptionsUpdateSpy).not.toHaveBeenCalled()
+      expect(revalidateTag).not.toHaveBeenCalled()
+    })
+
+    it("이미 HIDDEN 상품이 검색 미반환 → products.update 미호출", async () => {
+      const products: ProductRow[] = [
+        {
+          id: "prod-hid",
+          naver_product_no: "713",
+          status: "HIDDEN",
+          product_options: [],
+        },
+      ]
+      const { client, spies } = makeAdminClient({ products })
+      createAdminClient.mockReturnValue(client)
+
+      naverFetch.mockResolvedValue(defaultSearchResponse())
+
+      await POST(makeReq("Bearer test-secret"))
+
+      expect(spies.productsUpdateSpy).not.toHaveBeenCalled()
+      expect(revalidateTag).not.toHaveBeenCalled()
     })
   })
 
