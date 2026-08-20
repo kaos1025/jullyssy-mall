@@ -1,10 +1,14 @@
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { getHomeProducts, type HomeProductItem } from "@/lib/products"
 import ProductCard from "@/components/product/ProductCard"
 import HeroBanner from "@/components/home/HeroBanner"
 import { BUSINESS_INFO, BUSINESS_POSTAL_ADDRESS } from "@/constants/business"
 import type { Metadata } from "next"
+
+// ISR: 홈 렌더 트리에 cookies()/headers() 호출이 없어야 정적 유지된다(데이터는 전부
+// createAdminClient + unstable_cache 격리 fetcher). 상품/배너 mutation은 revalidateTag로 즉시 무효화.
+export const revalidate = 300
 
 export const metadata: Metadata = {
   title: "쥴리씨 | 트렌디한 여성의류 온라인 스토어",
@@ -24,35 +28,20 @@ const categories = [
 ]
 
 const HomePage = async () => {
-  const supabase = await createClient()
+  // 신상품(created_at desc)·인기상품(sell_count desc) 각 8개 — 카드 화이트리스트 + 캐시 격리 fetcher
+  const { newProducts, popularProducts } = await getHomeProducts()
 
-  // 신상품 (최신 8개)
-  const { data: newProducts } = await supabase
-    .from("products")
-    .select("*, product_images(url, is_thumbnail, sort_order), product_options(color)")
-    .eq("status", "ACTIVE")
-    .order("created_at", { ascending: false })
-    .limit(8)
-
-  // 인기상품 (판매량 기준 8개)
-  const { data: popularProducts } = await supabase
-    .from("products")
-    .select("*, product_images(url, is_thumbnail, sort_order), product_options(color)")
-    .eq("status", "ACTIVE")
-    .order("sell_count", { ascending: false })
-    .limit(8)
-
-  const getThumbnail = (product: { product_images?: { url: string; is_thumbnail: boolean }[] }) =>
+  const getThumbnail = (product: HomeProductItem) =>
     product.product_images?.find((img) => img.is_thumbnail)?.url
     || product.product_images?.[0]?.url
     || null
 
-  const getImages = (product: { product_images?: { url: string; is_thumbnail: boolean; sort_order?: number }[] }) =>
-    (product.product_images ?? [])
+  const getImages = (product: HomeProductItem) =>
+    [...(product.product_images ?? [])]
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((img) => img.url)
 
-  const getColors = (product: { product_options?: { color: string }[] }) =>
+  const getColors = (product: HomeProductItem) =>
     Array.from(new Set((product.product_options ?? []).map((o) => o.color)))
 
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
@@ -126,7 +115,7 @@ const HomePage = async () => {
       </section>
 
       {/* NEW ARRIVAL */}
-      {newProducts && newProducts.length > 0 && (
+      {newProducts.length > 0 && (
         <section className="py-16">
           <div className="container">
             <div className="flex items-end justify-between mb-8 md:mb-10">
@@ -168,7 +157,7 @@ const HomePage = async () => {
       )}
 
       {/* WEEKLY BEST */}
-      {popularProducts && popularProducts.length > 0 && (
+      {popularProducts.length > 0 && (
         <section className="py-16 bg-subtle">
           <div className="container">
             <div className="flex items-end justify-between mb-8 md:mb-10">
