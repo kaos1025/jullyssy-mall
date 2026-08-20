@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -147,6 +147,7 @@ const patchHandler = async (
     revalidatePath("/admin/event-categories/[id]", "page")
     revalidatePath("/events/[id]", "page")
     revalidatePath("/", "layout")
+    revalidateTag("event-categories") // 공개 fetcher 데이터 캐시(lib/events) 무효화
     return NextResponse.json(category)
   } catch (e) {
     const msg = e instanceof Error ? e.message : "이벤트 카테고리 수정 실패"
@@ -169,6 +170,7 @@ const deleteHandler = async (
     revalidatePath("/admin/event-categories/[id]", "page")
     revalidatePath("/events/[id]", "page")
     revalidatePath("/", "layout")
+    revalidateTag("event-categories") // 공개 fetcher 데이터 캐시(lib/events) 무효화
     return NextResponse.json({ ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "이벤트 카테고리 삭제 실패"
