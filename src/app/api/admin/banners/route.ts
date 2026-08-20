@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { verifyAdmin } from "@/lib/api-helpers/verifyAdmin"
 import { withRateLimit } from "@/lib/api-helpers/withRateLimit"
 import { adminLimiter } from "@/lib/rate-limit/limiters"
@@ -145,6 +145,7 @@ const postHandler = async (request: NextRequest) => {
     const banner = await createTopBannerAdmin(input)
     revalidatePath("/admin/banners")
     revalidatePath("/", "layout")
+    revalidateTag("top-banners") // 공개 fetcher 데이터 캐시(lib/banners) 무효화
     return NextResponse.json(banner, { status: 201 })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "배너 생성 실패"

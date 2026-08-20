@@ -1,4 +1,4 @@
-import { createClient as createServerClient } from "@/lib/supabase/server"
+import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Database } from "@/types/supabase"
 
@@ -11,13 +11,16 @@ export type TopBannerUpdate = Database["public"]["Tables"]["top_banners"]["Updat
 export type BannerVariant = "normal" | "urgent"
 
 // =============================================
-// 공개용 (anon / RSC)
+// 공개용 (RSC — 캐시 격리)
 // =============================================
-
-// 현재 노출 중인 활성 배너 목록.
-// RLS가 동일 조건을 강제하지만, 캐싱/RSC에서 명시적으로 필터링.
-export const getActiveTopBanners = async (): Promise<TopBanner[]> => {
-  const supabase = await createServerClient()
+// (shop)/layout.tsx가 매 렌더 호출. 종전 createServerClient(cookies)라 모든 shop 라우트를 dynamic으로
+// 끌고 가며 DB 직행 → lib/hero-banners.ts 패턴(createAdminClient + unstable_cache)으로 격리.
+// 무효화: 어드민 배너 mutation의 revalidateTag("top-banners") / 300s TTL.
+//
+// ⚠️ service_role은 RLS를 우회하므로 is_active + 노출기간 필터를 쿼리에서 직접 강제(민감 컬럼 없음).
+// 캐시 트레이드오프: 기간 필터의 now가 캐시 시점에 고정 → 예약 시작/종료 반영이 최대 TTL만큼 지연(무해).
+const fetchActiveTopBannersFromDb = async (): Promise<TopBanner[]> => {
+  const supabase = createAdminClient()
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
@@ -35,6 +38,16 @@ export const getActiveTopBanners = async (): Promise<TopBanner[]> => {
 
   return data ?? []
 }
+
+const fetchActiveTopBannersCached = unstable_cache(
+  fetchActiveTopBannersFromDb,
+  ["top-banners:active"],
+  { revalidate: 300, tags: ["top-banners"] },
+)
+
+// 현재 노출 중인 활성 배너 목록. 무효화: revalidateTag("top-banners") / 300s TTL.
+export const getActiveTopBanners = async (): Promise<TopBanner[]> =>
+  fetchActiveTopBannersCached()
 
 // =============================================
 // 어드민용 (service role, RLS 우회)

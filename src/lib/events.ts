@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type {
@@ -25,13 +26,13 @@ export type {
 } from "@/lib/events-utils"
 
 // =============================================
-// 공개용 (anon / RSC)
+// 공개용 (RSC — 캐시 격리)
 // =============================================
-
-// 현재 노출 중인 활성 이벤트 카테고리 목록.
-// RLS가 동일 조건을 강제하지만, 캐싱/RSC에서 명시적으로 필터링.
-export const getActiveEventCategories = async (): Promise<EventCategory[]> => {
-  const supabase = await createServerClient()
+// (shop)/layout.tsx(GNB 이벤트 탭)가 매 렌더 호출 — lib/banners.ts getActiveTopBanners와 동형
+// (createAdminClient + unstable_cache, service_role 보상 필터·TTL 트레이드오프 설명은 그쪽 참조).
+// 무효화: 어드민 이벤트 카테고리 mutation의 revalidateTag("event-categories") / 300s TTL.
+const fetchActiveEventCategoriesFromDb = async (): Promise<EventCategory[]> => {
+  const supabase = createAdminClient()
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
@@ -49,6 +50,16 @@ export const getActiveEventCategories = async (): Promise<EventCategory[]> => {
 
   return data ?? []
 }
+
+const fetchActiveEventCategoriesCached = unstable_cache(
+  fetchActiveEventCategoriesFromDb,
+  ["event-categories:active"],
+  { revalidate: 300, tags: ["event-categories"] },
+)
+
+// 현재 노출 중인 활성 이벤트 카테고리 목록. 무효화: revalidateTag("event-categories") / 300s TTL.
+export const getActiveEventCategories = async (): Promise<EventCategory[]> =>
+  fetchActiveEventCategoriesCached()
 
 // =============================================
 // 어드민용 (service role, RLS 우회)
