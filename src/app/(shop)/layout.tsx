@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache"
 import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
 import MobileNav from "@/components/layout/MobileNav"
@@ -12,6 +13,10 @@ const ShopLayout = async ({
 }: {
   children: React.ReactNode
 }) => {
+  // The API can be in maintenance during deployment. Fetch at request time;
+  // the explicit unstable_cache data helpers retain their existing lifetimes.
+  noStore()
+
   const [allCategories, banners, eventCategories] = await Promise.all([
     getCategoriesAll(),
     getActiveTopBanners(),

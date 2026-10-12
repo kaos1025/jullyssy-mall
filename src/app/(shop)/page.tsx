@@ -6,8 +6,8 @@ import HeroBanner from "@/components/home/HeroBanner"
 import { BUSINESS_INFO, BUSINESS_POSTAL_ADDRESS } from "@/constants/business"
 import type { Metadata } from "next"
 
-// ISR: 홈 렌더 트리에 cookies()/headers() 호출이 없어야 정적 유지된다(데이터는 전부
-// createAdminClient + unstable_cache 격리 fetcher). 상품/배너 mutation은 revalidateTag로 즉시 무효화.
+// ShopLayout renders on request so deployment does not need a live API.
+// Product fetchers retain their explicit data cache and mutation invalidation.
 export const revalidate = 300
 
 export const metadata: Metadata = {
