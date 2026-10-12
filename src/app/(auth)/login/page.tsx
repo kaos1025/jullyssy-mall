@@ -108,10 +108,14 @@ const LoginForm = () => {
           <Button
             variant="outline"
             className="w-full bg-[#FEE500] text-[#191919] hover:bg-[#FEE500]/90 border-[#FEE500]"
-            onClick={() => handleSocialLogin("kakao")}
+            disabled
+            aria-describedby="kakao-unavailable-note"
           >
-            카카오로 시작하기
+            카카오 로그인 이용 불가
           </Button>
+          <p id="kakao-unavailable-note" className="text-sm text-muted-foreground">
+            현재 카카오 로그인을 이용할 수 없습니다.
+          </p>
           <Button
             variant="outline"
             className="w-full bg-[#03C75A] text-white hover:bg-[#03C75A]/90 border-[#03C75A]"
