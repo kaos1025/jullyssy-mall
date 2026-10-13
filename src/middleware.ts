@@ -8,6 +8,14 @@ const authPaths = ["/login", "/signup"]
 const adminPaths = ["/admin"]
 
 export const middleware = async (request: NextRequest) => {
+  // Cutover gate must precede CSRF, session refresh and every route handler.
+  if (process.env.JULLYSSY_CUTOVER_MAINTENANCE === "1") {
+    return NextResponse.json(
+      { error: "서비스 점검 중입니다. 잠시 후 다시 시도해 주세요.", code: "CUTOVER_MAINTENANCE" },
+      { status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } }
+    )
+  }
+
   const { pathname } = request.nextUrl
 
   // CSRF 보호: /api/* state-changing 요청은 page 가드/updateSession 전에 차단
