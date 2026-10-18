@@ -1,0 +1,61 @@
+# ============================================================
+# main 푸시 → VPS 에서 이미지 빌드 + 재기동 (Vercel Git 연동 대체)
+#
+# GitHub repo Settings → Secrets and variables → Actions 에 등록:
+#   VPS_HOST      76.13.187.38
+#   VPS_USER      deploy
+#   VPS_SSH_KEY   배포 전용 ed25519 개인키 (VPS ~/.ssh/authorized_keys 에 공개키 등록)
+#   VPS_APP_DIR   /srv/jullyssy/app   (레포 클론 위치)
+#
+# 빌드는 VPS 에서 한다 — NEXT_PUBLIC_* 와 시크릿이 전부 VPS 의 deploy/.env.app 한 곳에만 있도록.
+# (GitHub 쪽엔 SSH 키 외에 아무 시크릿도 두지 않는다)
+# ============================================================
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 18m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_APP_DIR }}"
+
+            echo "== git sync =="
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
+            echo "HEAD: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+
+            echo "== build & restart =="
+            docker compose -f deploy/docker-compose.app.yml up -d --build --remove-orphans
+
+            echo "== health =="
+            for i in $(seq 1 20); do
+              if curl -fsS -o /dev/null http://127.0.0.1:3001/robots.txt; then
+                echo "app healthy after ${i}s"; break
+              fi
+              if [ "$i" -eq 20 ]; then
+                echo "app did not become healthy"; docker logs --tail 50 jullyssy-app; exit 1
+              fi
+              sleep 1
+            done
+
+            echo "== prune dangling images =="
+            docker image prune -f >/dev/null

@@ -48,3 +48,6 @@ e2e/.auth/
 
 # scratch
 tmp/
+
+# vps deploy
+deploy/.env.app

@@ -10,7 +10,7 @@
 - **백엔드/DB**: Supabase (Auth + PostgreSQL + Storage)
 - **비즈니스 로직**: Next.js API Routes (Route Handlers)
 - **결제**: 토스페이먼츠
-- **배포**: Vercel + Supabase Cloud
+- **배포**: VPS Docker (앱, `deploy/README.md`) + VPS self-hosted Supabase — 2026-10-18 Vercel 에서 이전. `main` push 시 GitHub Actions 가 VPS 에 배포
 - **폰트**: Pretendard (한국어 최적화)
 
 ## 코딩 컨벤션

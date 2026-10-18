@@ -1,6 +1,8 @@
 import { withSentryConfig } from "@sentry/nextjs";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // VPS Docker 배포용 (deploy/Dockerfile → node server.js). Vercel 빌드에는 영향 없음.
+  output: "standalone",
   images: {
     remotePatterns: [
       {
