@@ -76,23 +76,12 @@ cat ~/.ssh/jullyssy-deploy                   # → GitHub Secrets VPS_SSH_KEY
 ## Caddy 사이트 블록 (jullyssy-edge)
 
 `/etc/jullyssy-edge/Caddyfile` (`jullyssy-edge.service`, `bind 76.13.187.38`, `auto_https disable_redirects`, `strict_sni_host on`).
-기존 `api.jullyssy.shop` 과 같은 구조로 `jullyssy.shop` / `www` 블록을 추가한다. **`X-Robots-Tag noindex` 는 API 전용 — 쇼핑몰 블록에 넣지 말 것.**
+`api.jullyssy.shop` 과 같은 구조 — **DNS 전용(Cloudflare 프록시 안 씀) + Let's Encrypt HTTP-01**. **`X-Robots-Tag noindex` 는 API 전용 — 쇼핑몰 블록에 넣지 말 것.**
 
-### TLS — 권장: Cloudflare Origin Certificate (도메인을 Cloudflare 프록시로 둘 때)
+### 1단계 — 사전 테스트용 (`tls internal`)
 
-LE HTTP-01 은 DNS 가 VPS 를 가리킨 뒤에야 발급되므로 컷오버 순간 수십 초 TLS 공백이 생기고, 사전 테스트도 `beta.` 서브도메인으로는
-CSRF(`PRODUCTION_ORIGINS` = jullyssy.shop/www 만 허용) 때문에 로그인·장바구니가 막힌다. Origin Certificate 는 DNS 와 무관하게 즉시 유효해서 둘 다 해결된다.
-
-```bash
-# 1. Cloudflare 대시보드 → jullyssy.shop → SSL/TLS → Origin Server → Create Certificate
-#    Hostnames: jullyssy.shop, *.jullyssy.shop / RSA 2048 / 15년 → PEM 두 개 복사
-sudo mkdir -p /etc/jullyssy-edge/certs
-sudo nano /etc/jullyssy-edge/certs/jullyssy.shop.pem      # Origin Certificate
-sudo nano /etc/jullyssy-edge/certs/jullyssy.shop.key      # Private Key
-sudo chown -R jullyssy-edge:jullyssy-edge /etc/jullyssy-edge/certs   # 유저명은 ps aux | grep caddy 의 소유자로
-sudo chmod 600 /etc/jullyssy-edge/certs/*
-# 2. Cloudflare SSL/TLS → Overview → 암호화 모드 Full (strict)  ← Origin Cert 는 strict 통과
-```
+LE 는 DNS 가 VPS 를 가리켜야 발급되므로, 전환 전에는 자체서명으로 블록을 올려 hosts 파일 테스트를 한다.
+CSRF 가 `jullyssy.shop`/`www` origin 만 허용하므로 `beta.` 같은 다른 호스트명으로는 로그인·장바구니가 403 난다 — 반드시 실제 호스트명으로.
 
 ```caddyfile
 # ---- 쥴리씨 자사몰 (앱) ----
@@ -103,13 +92,13 @@ http://jullyssy.shop, http://www.jullyssy.shop {
 
 https://www.jullyssy.shop {
 	bind 76.13.187.38
-	tls /etc/jullyssy-edge/certs/jullyssy.shop.pem /etc/jullyssy-edge/certs/jullyssy.shop.key
+	tls internal
 	redir https://jullyssy.shop{uri} 307
 }
 
 https://jullyssy.shop {
 	bind 76.13.187.38
-	tls /etc/jullyssy-edge/certs/jullyssy.shop.pem /etc/jullyssy-edge/certs/jullyssy.shop.key
+	tls internal
 	encode gzip zstd
 	@health path /healthz
 	handle @health {
@@ -122,32 +111,34 @@ https://jullyssy.shop {
 }
 ```
 
-### TLS — 대안: Let's Encrypt (api 블록과 동일, DNS-only 로 둘 때)
+```bash
+sudo /opt/jullyssy-edge/caddy-2.11.7/caddy validate --config /etc/jullyssy-edge/Caddyfile --adapter caddyfile
+sudo systemctl reload jullyssy-edge
+curl -sk https://76.13.187.38/healthz -H 'Host: jullyssy.shop'     # "Jullyssy app edge"
+curl -skI https://76.13.187.38/ -H 'Host: jullyssy.shop'           # 200
+```
 
-`tls { ... }` 를 api 블록과 똑같이 두면 된다. 단 **블록 추가 → DNS 전환 → `systemctl reload jullyssy-edge`** 순서로, DNS 바꾼 직후 reload 해야 발급이
-바로 된다 (그 전 reload 는 실패하고 백오프 재시도에 걸린다). 전환 후 첫 reload 까지 수십 초 TLS 공백은 감수.
+로컬 PC `hosts` 에 `76.13.187.38 jullyssy.shop` 추가 → 브라우저에서 `https://jullyssy.shop` (자체서명 경고 1회 통과) →
+로그인 → 상품 → 장바구니 → 결제창 → 어드민. 끝나면 hosts 원복.
+
+### 2단계 — 컷오버 때 `tls internal` → LE 로 교체 (두 블록 모두)
 
 ```caddyfile
-https://jullyssy.shop {
-	bind 76.13.187.38
 	tls {
 		issuer acme {
 			dir https://acme-v02.api.letsencrypt.org/directory
 			disable_tlsalpn_challenge
 		}
 	}
-	# ... 나머지 동일
-}
 ```
 
-### 적용
+**순서가 중요하다**: Caddyfile 편집 → **DNS 전환** → `systemctl reload jullyssy-edge`. DNS 를 먼저 바꿔야 reload 직후 HTTP-01 이 바로 통과한다
+(DNS 전에 reload 하면 발급 실패 후 백오프 재시도에 걸려 수 분 공백). 전환 ~ reload 사이 수십 초는 자체서명 상태 — 트래픽 0 인 지금은 감수.
 
-```bash
-sudo /opt/jullyssy-edge/caddy-2.11.7/caddy validate --config /etc/jullyssy-edge/Caddyfile --adapter caddyfile
-sudo systemctl reload jullyssy-edge
-curl -sk https://76.13.187.38/healthz -H 'Host: jullyssy.shop'     # "Jullyssy app edge"
-curl -skI https://76.13.187.38/ -H 'Host: jullyssy.shop'           # 200 (앱이 떠 있을 때)
-```
+### (참고) 나중에 Cloudflare 프록시로 돌리게 되면
+
+SSL/TLS → Origin Server 에서 15년짜리 Origin Certificate 를 받아 `tls /path/cert.pem /path/key.pem` 으로 바꾸면 DNS 와 무관하게 즉시 유효하다.
+프록시를 켜면 DNS 반영이 즉시이고 정적 자산 엣지 캐시·DDoS 보호가 붙는다. api 는 Supabase Storage 업로드(100MB 한도)·WebSocket 때문에 DNS 전용 유지.
 
 ## 컷오버 순서
 
@@ -158,10 +149,11 @@ curl -skI https://76.13.187.38/ -H 'Host: jullyssy.shop'           # 200 (앱이
    curl -skI https://76.13.187.38/products -H 'Host: jullyssy.shop'    # 200
    curl -sk  https://76.13.187.38/api/cron/gsc-sync -X POST -H 'Host: jullyssy.shop' -H "Authorization: Bearer $CRON_SECRET"
    ```
-   로컬 PC `hosts` 에 `76.13.187.38 jullyssy.shop` 넣고 브라우저로 **실제 호스트명**으로 접속 (Origin Cert 는 브라우저가 신뢰하지 않으므로
-   경고 1회 통과). 로그인 → 상품 → 장바구니 → 결제창 → 어드민 까지. CSRF 가 jullyssy.shop origin 만 허용하므로 반드시 이 방법으로. 끝나면 hosts 원복.
-2. **DNS 전환** — Cloudflare DNS: `jullyssy.shop` A → `76.13.187.38` (Proxied), `www` CNAME → `jullyssy.shop` (Proxied).
-   Origin Cert 방식이면 Caddy 는 이미 준비돼 있어 DNS 만 바꾸면 끝 (반영 수 초). LE 방식이면 바꾼 직후 `systemctl reload jullyssy-edge`.
+   Caddy 1단계(`tls internal`) 상태에서 로컬 PC `hosts` 로 실제 호스트명 브라우저 테스트 (위 "Caddy 사이트 블록" 참고). 끝나면 hosts 원복.
+   **전환 하루 전** Cloudflare DNS 에서 `jullyssy.shop` / `www` 레코드 TTL 을 Auto(5분) → **1분**으로 내린다 (DNS 전용이라 TTL 이 실제 적용됨).
+2. **DNS 전환** — 먼저 Caddyfile 의 `tls internal` 두 곳을 LE 블록으로 바꿔두고(저장만, reload 아직), Cloudflare DNS:
+   `jullyssy.shop` A → `76.13.187.38` (DNS only), `www` CNAME → `jullyssy.shop` (DNS only). 바꾼 **직후** `sudo systemctl reload jullyssy-edge`.
+   `journalctl -u jullyssy-edge -f` 로 certificate obtained 확인. 기존 Vercel 레코드 값은 롤백용으로 적어둔다.
 3. **확인** — `https://jullyssy.shop` 홈/상품/로그인/마이페이지/어드민, `curl -I https://www.jullyssy.shop` → 307.
    Sentry 에 `environment: production` 으로 이벤트 들어오는지. GitHub Actions 에서 `workflow_dispatch` 로 배포 1회 돌려 파이프라인 확인.
 4. **하루 이틀 관찰** — `docker stats jullyssy-app` (메모리), `docker logs`, 주문·결제 1건 실거래 확인 (소액 상품 + 취소).
@@ -169,7 +161,8 @@ curl -skI https://76.13.187.38/ -H 'Host: jullyssy.shop'           # 200 (앱이
 
 ### 롤백
 
-DNS 를 Vercel 로 되돌린다 (A/CNAME 을 Vercel 값으로). Vercel 프로젝트는 5번 전까지 살아 있으므로 즉시 복구된다. 양쪽이 같은 Supabase 를 보므로 데이터 불일치는 없다.
+DNS 를 Vercel 로 되돌린다 (A/CNAME 을 적어둔 Vercel 값으로). TTL 1분이면 1~2분 안에 복구. Vercel 프로젝트는 5번 전까지 살아 있다.
+양쪽이 같은 Supabase 를 보므로 전환/롤백 중 일부 클라이언트가 Vercel, 일부가 VPS 를 봐도 데이터 불일치는 없다.
 
 ## 운영
 
