@@ -75,25 +75,78 @@ cat ~/.ssh/jullyssy-deploy                   # → GitHub Secrets VPS_SSH_KEY
 
 ## Caddy 사이트 블록 (jullyssy-edge)
 
-`/etc/jullyssy-edge/Caddyfile` 에 추가. TLS 방식은 기존 `api.jullyssy.shop` 블록과 **동일하게** 맞춘다.
+`/etc/jullyssy-edge/Caddyfile` (`jullyssy-edge.service`, `bind 76.13.187.38`, `auto_https disable_redirects`, `strict_sni_host on`).
+기존 `api.jullyssy.shop` 과 같은 구조로 `jullyssy.shop` / `www` 블록을 추가한다. **`X-Robots-Tag noindex` 는 API 전용 — 쇼핑몰 블록에 넣지 말 것.**
+
+### TLS — 권장: Cloudflare Origin Certificate (도메인을 Cloudflare 프록시로 둘 때)
+
+LE HTTP-01 은 DNS 가 VPS 를 가리킨 뒤에야 발급되므로 컷오버 순간 수십 초 TLS 공백이 생기고, 사전 테스트도 `beta.` 서브도메인으로는
+CSRF(`PRODUCTION_ORIGINS` = jullyssy.shop/www 만 허용) 때문에 로그인·장바구니가 막힌다. Origin Certificate 는 DNS 와 무관하게 즉시 유효해서 둘 다 해결된다.
+
+```bash
+# 1. Cloudflare 대시보드 → jullyssy.shop → SSL/TLS → Origin Server → Create Certificate
+#    Hostnames: jullyssy.shop, *.jullyssy.shop / RSA 2048 / 15년 → PEM 두 개 복사
+sudo mkdir -p /etc/jullyssy-edge/certs
+sudo nano /etc/jullyssy-edge/certs/jullyssy.shop.pem      # Origin Certificate
+sudo nano /etc/jullyssy-edge/certs/jullyssy.shop.key      # Private Key
+sudo chown -R jullyssy-edge:jullyssy-edge /etc/jullyssy-edge/certs   # 유저명은 ps aux | grep caddy 의 소유자로
+sudo chmod 600 /etc/jullyssy-edge/certs/*
+# 2. Cloudflare SSL/TLS → Overview → 암호화 모드 Full (strict)  ← Origin Cert 는 strict 통과
+```
 
 ```caddyfile
-# 앱 — www 는 apex 로 307 (Vercel 시절과 동일)
-www.jullyssy.shop {
+# ---- 쥴리씨 자사몰 (앱) ----
+http://jullyssy.shop, http://www.jullyssy.shop {
+	bind 76.13.187.38
+	redir https://jullyssy.shop{uri} 308
+}
+
+https://www.jullyssy.shop {
+	bind 76.13.187.38
+	tls /etc/jullyssy-edge/certs/jullyssy.shop.pem /etc/jullyssy-edge/certs/jullyssy.shop.key
 	redir https://jullyssy.shop{uri} 307
 }
 
-jullyssy.shop {
+https://jullyssy.shop {
+	bind 76.13.187.38
+	tls /etc/jullyssy-edge/certs/jullyssy.shop.pem /etc/jullyssy-edge/certs/jullyssy.shop.key
 	encode gzip zstd
-	reverse_proxy 127.0.0.1:3001 {
-		header_up X-Forwarded-Proto {scheme}
+	@health path /healthz
+	handle @health {
+		header Cache-Control "no-store"
+		respond "Jullyssy app edge" 200
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3001
 	}
 }
 ```
 
+### TLS — 대안: Let's Encrypt (api 블록과 동일, DNS-only 로 둘 때)
+
+`tls { ... }` 를 api 블록과 똑같이 두면 된다. 단 **블록 추가 → DNS 전환 → `systemctl reload jullyssy-edge`** 순서로, DNS 바꾼 직후 reload 해야 발급이
+바로 된다 (그 전 reload 는 실패하고 백오프 재시도에 걸린다). 전환 후 첫 reload 까지 수십 초 TLS 공백은 감수.
+
+```caddyfile
+https://jullyssy.shop {
+	bind 76.13.187.38
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			disable_tlsalpn_challenge
+		}
+	}
+	# ... 나머지 동일
+}
+```
+
+### 적용
+
 ```bash
 sudo /opt/jullyssy-edge/caddy-2.11.7/caddy validate --config /etc/jullyssy-edge/Caddyfile --adapter caddyfile
-sudo systemctl reload jullyssy-edge     # 유닛 이름은 systemctl list-units | grep jullyssy 로 확인
+sudo systemctl reload jullyssy-edge
+curl -sk https://76.13.187.38/healthz -H 'Host: jullyssy.shop'     # "Jullyssy app edge"
+curl -skI https://76.13.187.38/ -H 'Host: jullyssy.shop'           # 200 (앱이 떠 있을 때)
 ```
 
 ## 컷오버 순서
@@ -105,9 +158,10 @@ sudo systemctl reload jullyssy-edge     # 유닛 이름은 systemctl list-units 
    curl -skI https://76.13.187.38/products -H 'Host: jullyssy.shop'    # 200
    curl -sk  https://76.13.187.38/api/cron/gsc-sync -X POST -H 'Host: jullyssy.shop' -H "Authorization: Bearer $CRON_SECRET"
    ```
-   로컬 PC `hosts` 에 `76.13.187.38 jullyssy.shop` 넣고 브라우저로 로그인 → 상품 → 장바구니 → 결제창까지 확인. 끝나면 hosts 원복.
+   로컬 PC `hosts` 에 `76.13.187.38 jullyssy.shop` 넣고 브라우저로 **실제 호스트명**으로 접속 (Origin Cert 는 브라우저가 신뢰하지 않으므로
+   경고 1회 통과). 로그인 → 상품 → 장바구니 → 결제창 → 어드민 까지. CSRF 가 jullyssy.shop origin 만 허용하므로 반드시 이 방법으로. 끝나면 hosts 원복.
 2. **DNS 전환** — Cloudflare DNS: `jullyssy.shop` A → `76.13.187.38` (Proxied), `www` CNAME → `jullyssy.shop` (Proxied).
-   SSL/TLS 모드는 `api.jullyssy.shop` 과 같은 값 유지. 반영은 수 초.
+   Origin Cert 방식이면 Caddy 는 이미 준비돼 있어 DNS 만 바꾸면 끝 (반영 수 초). LE 방식이면 바꾼 직후 `systemctl reload jullyssy-edge`.
 3. **확인** — `https://jullyssy.shop` 홈/상품/로그인/마이페이지/어드민, `curl -I https://www.jullyssy.shop` → 307.
    Sentry 에 `environment: production` 으로 이벤트 들어오는지. GitHub Actions 에서 `workflow_dispatch` 로 배포 1회 돌려 파이프라인 확인.
 4. **하루 이틀 관찰** — `docker stats jullyssy-app` (메모리), `docker logs`, 주문·결제 1건 실거래 확인 (소액 상품 + 취소).
